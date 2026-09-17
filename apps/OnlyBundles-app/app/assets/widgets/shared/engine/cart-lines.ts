@@ -11,7 +11,7 @@
 const DEFAULT_CART_LINE_LABELS: any = {
   items: 'Items',
   retailPrice: 'Retail Price',
-  youSave: 'You Save',
+  youSave: 'Bundle Savings',
 };
 
 function formatCartLineItemTitle(product: any = {}) {
@@ -31,6 +31,7 @@ export function buildCartLineSourceProperties({
   box = '1',
   includeBox = true,
   labels = null,
+  tierProgress = null,
 }: any = {}) {
   const displayProperties: any = {
     items: selectedLines
@@ -50,6 +51,10 @@ export function buildCartLineSourceProperties({
       percentage,
       amountPercentage: `${discountAmount} (${percentage})`,
     };
+  }
+
+  if (tierProgress) {
+    displayProperties.tierProgress = tierProgress;
   }
 
   if (labels) {
@@ -80,4 +85,41 @@ export function buildCartLineDisplayProperties(displayProperties: any = {}, labe
   }
 
   return properties;
+}
+
+export function extractTierProgressForBundle(bundle: any = {}) {
+  if (!bundle?.pricing?.enabled) return null;
+  const rules = Array.isArray(bundle?.pricing?.rules) ? bundle.pricing.rules : [];
+  if (rules.length === 0) return null;
+
+  const progressBar = bundle?.pricing?.displayOptions?.progressBar
+    || bundle?.messaging?.displayOptions?.progressBar
+    || null;
+
+  if (progressBar?.enabled === false) {
+    return null;
+  }
+
+  const normalizedRules = rules.map((r: any) => {
+    const conditionType = r.conditionType || (r.minSubtotal !== undefined ? 'amount' : 'quantity');
+    const isAmount = conditionType === 'amount';
+    return {
+      conditionType,
+      minQuantity: isAmount ? undefined : Number(r.conditionValue ?? r.minQuantity ?? 0),
+      minSubtotal: isAmount ? Number(r.conditionValue ?? r.minSubtotal ?? 0) : undefined,
+      discountType: r.discountType || (bundle.pricing?.method === 'fixed_amount_off' ? 'fixed_amount' : 'percentage'),
+      discountValue: Number(r.discountValue ?? 0),
+      tierText: r.tierText || null,
+    };
+  });
+
+  return {
+    rules: normalizedRules,
+    progressBar: progressBar ? {
+      enabled: progressBar.enabled !== false,
+      type: progressBar.type || 'simple',
+      progressText: progressBar.progressText,
+      successText: progressBar.successText,
+    } : { enabled: true, type: 'simple' },
+  };
 }

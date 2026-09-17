@@ -180,9 +180,9 @@ pub struct CartLineDisplayProperties {
     pub bundle_name: Option<String>,
     #[serde(default, rename = "box")]
     pub box_label: Option<String>,
-    #[serde(default)]
+    #[serde(default, alias = "Items")]
     pub items: Option<String>,
-    #[serde(default)]
+    #[serde(default, alias = "Retail Price")]
     pub retail_price: Option<String>,
     #[serde(default)]
     pub you_save: CartLineDisplaySavings,
@@ -190,6 +190,8 @@ pub struct CartLineDisplayProperties {
     pub labels: CartLineDisplayLabels,
     #[serde(default)]
     pub offer_analytics: Option<CartLineOfferAnalytics>,
+    #[serde(default, alias = "tier_progress")]
+    pub tier_progress: Option<serde_json::Value>,
 }
 
 #[derive(serde::Deserialize, Debug, Clone, Default)]
@@ -245,7 +247,7 @@ fn default_retail_price_label() -> String {
     "Retail Price".to_string()
 }
 fn default_you_save_label() -> String {
-    "You Save".to_string()
+    "Bundle Savings".to_string()
 }
 
 #[derive(serde::Deserialize, Debug, Clone, Default)]

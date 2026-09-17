@@ -9,8 +9,8 @@ use crate::pricing::{
 use crate::runtime_token::{token_components_match, verify_bundle_token, verify_ppb_line_token};
 use crate::schema;
 use crate::types::{
-    CartBundleDetailsEntry, CartLineMessagingSettings, ComponentParent, PricingMethod,
-    RuntimeTokenPayload,
+    CartBundleDetailsEntry, CartLineMessagingSettings, ComponentParent, ConditionType,
+    PricingMethod, RuntimeTokenPayload,
 };
 
 fn non_empty(value: &Option<String>) -> Option<String> {
@@ -466,6 +466,52 @@ pub fn process_merge_operations(
                     key: "_wpb_offer_analytics".into(),
                     value,
                 });
+            }
+        }
+
+        if let Some(tier_progress) = &source_display_properties.tier_progress {
+            if let Ok(value) = serde_json::to_string(tier_progress) {
+                attributes.push(schema::AttributeOutput {
+                    key: "_bundle_tier_progress".into(),
+                    value,
+                });
+            }
+        } else if let Some(pa) = &parent.price_adjustment {
+            if let Some(rules) = &pa.rules {
+                if !rules.is_empty() {
+                    let normalized_rules: Vec<serde_json::Value> = rules
+                        .iter()
+                        .map(|r| {
+                            let (cond_type, min_qty, min_subtotal) = match &r.conditions {
+                                Some(c) if c.condition_type == ConditionType::Amount => {
+                                    ("amount", None, Some(c.value))
+                                }
+                                Some(c) => ("quantity", Some(c.value as i64), None),
+                                None => ("quantity", Some(0), None),
+                            };
+                            serde_json::json!({
+                                "conditionType": cond_type,
+                                "minQuantity": min_qty,
+                                "minSubtotal": min_subtotal,
+                                "discountType": if r.method == PricingMethod::FixedAmountOff { "fixed_amount" } else { "percentage" },
+                                "discountValue": r.value,
+                            })
+                        })
+                        .collect();
+                    let metadata = serde_json::json!({
+                        "rules": normalized_rules,
+                        "progressBar": {
+                            "enabled": true,
+                            "type": "simple"
+                        }
+                    });
+                    if let Ok(value) = serde_json::to_string(&metadata) {
+                        attributes.push(schema::AttributeOutput {
+                            key: "_bundle_tier_progress".into(),
+                            value,
+                        });
+                    }
+                }
             }
         }
 

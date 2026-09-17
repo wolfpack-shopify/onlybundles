@@ -1393,7 +1393,7 @@ mod tests {
             Some("₹50")
         );
         assert_eq!(
-            attributes.get("You Save").map(String::as_str),
+            attributes.get("Bundle Savings").map(String::as_str),
             Some("₹10 (20%)")
         );
     }
@@ -1520,7 +1520,7 @@ mod tests {
             Some("1 x First product, 1 x Second product")
         );
         assert!(!attributes.contains_key("Retail Price"));
-        assert!(!attributes.contains_key("You Save"));
+        assert!(!attributes.contains_key("Bundle Savings"));
     }
 
     #[test]
@@ -1547,7 +1547,7 @@ mod tests {
         assert!(!attributes.contains_key("_Items"));
         assert!(!attributes.contains_key("Items"));
         assert!(!attributes.contains_key("Retail Price"));
-        assert!(!attributes.contains_key("You Save"));
+        assert!(!attributes.contains_key("Bundle Savings"));
     }
 
     #[test]
@@ -1569,7 +1569,7 @@ mod tests {
         let output: schema::FunctionRunResult = run_cart_transform(&input);
         let attributes = merge_attributes(&output);
 
-        assert_eq!(attributes.get("You Save").map(String::as_str), Some("₹10"));
+        assert_eq!(attributes.get("Bundle Savings").map(String::as_str), Some("₹10"));
     }
 
     #[test]
@@ -1591,7 +1591,7 @@ mod tests {
         let output: schema::FunctionRunResult = run_cart_transform(&input);
         let attributes = merge_attributes(&output);
 
-        assert_eq!(attributes.get("You Save").map(String::as_str), Some("20%"));
+        assert_eq!(attributes.get("Bundle Savings").map(String::as_str), Some("20%"));
     }
 
     #[test]

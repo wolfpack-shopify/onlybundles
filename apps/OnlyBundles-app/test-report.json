@@ -1,21 +1,21 @@
 {
-  "timestamp": "2026-09-17T05:53:03.255Z",
+  "timestamp": "2026-09-17T13:57:08.568Z",
   "summary": {
     "totalSuites": 5,
-    "totalTests": 3834,
-    "totalPassed": 3834,
+    "totalTests": 3835,
+    "totalPassed": 3835,
     "totalFailed": 0,
     "totalSkipped": 0,
-    "totalDuration": 17708
+    "totalDuration": 14897
   },
-  "totalDuration": 17709,
+  "totalDuration": 14899,
   "suites": [
     {
       "suite": "Unit Tests - Lib",
-      "passed": 983,
+      "passed": 984,
       "failed": 0,
       "skipped": 0,
-      "duration": 3488,
+      "duration": 3684,
       "commandFailed": false
     },
     {
@@ -23,7 +23,7 @@
       "passed": 418,
       "failed": 0,
       "skipped": 0,
-      "duration": 2592,
+      "duration": 2302,
       "commandFailed": false
     },
     {
@@ -31,7 +31,7 @@
       "passed": 49,
       "failed": 0,
       "skipped": 0,
-      "duration": 2614,
+      "duration": 1731,
       "commandFailed": false
     },
     {
@@ -39,7 +39,7 @@
       "passed": 935,
       "failed": 0,
       "skipped": 0,
-      "duration": 4788,
+      "duration": 3888,
       "commandFailed": false
     },
     {
@@ -47,7 +47,7 @@
       "passed": 1449,
       "failed": 0,
       "skipped": 0,
-      "duration": 4226,
+      "duration": 3292,
       "commandFailed": false
     }
   ],

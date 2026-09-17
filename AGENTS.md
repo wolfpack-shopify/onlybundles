@@ -5,7 +5,7 @@ title: Repository Agent Instructions
 type: instructions
 status: authoritative
 summary: Engineering constraints, verification requirements, and authorized release workflows for Only Bundles.
-last_audited: 2026-09-16
+last_audited: 2026-09-17
 owners: [engineering]
 domains: [development, operations]
 systems: [only-bundles, shopify, canny]
@@ -217,6 +217,7 @@ Create `apps/OnlyBundles-app/test-spec/{module-name}.spec.md` alongside every Sh
 8. ❌ NEVER commit Chrome DevTools investigation screenshots
 9. ❌ NO competitor references in code (`eb`, `skai`, `skailama`, `easybundles`) — docs only
 10. ❌ NO unit tests that assert on CSS, class names, or element placement — see No UI Styling or Placement Unit Tests rule
+11. ❌ NEVER commit package-lock.json without verifying Node 22 Docker clean install — see Node 22 Lockfile & Docker Sync Rule
 
 ---
 
@@ -395,6 +396,41 @@ WPB_CART_TRANSFORM_REPAIR_APPLY=true
 ```
 
 Never set both flags. Dry-run scans installed shops without mutating Shopify. Apply mode runs `CartTransformService.completeSetup` through the app's offline Admin context for every installed shop.
+
+---
+
+## 📦 Node 22 Lockfile & Docker Sync Rule
+
+The production Docker container (`node:22-alpine` in `Dockerfile`) and Render deployment execute `npm ci --omit=dev`.
+
+Local macOS development environments frequently run newer Node and npm versions (e.g. Node 25 with npm 11). Running `npm install` on macOS with newer npm prunes cross-platform optional dependencies and WASM bindings — specifically `@emnapi/runtime@1.11.3` (required by `@img/sharp-wasm32` under `sharp`) and Linux musl/x64 optional packages — because darwin-arm64 does not activate them locally. This desynchronizes `package-lock.json` from declared `overrides`/`resolutions`, causing production Docker/Render builds to fail with:
+
+```
+npm error `npm ci` can only install packages when your package.json and package-lock.json or npm-shrinkwrap.json are in sync.
+npm error Missing: @emnapi/runtime@1.11.3 from lock file
+```
+
+### Mandatory Lockfile Protocol
+
+Whenever modifying dependencies, devDependencies, `overrides`, or `resolutions` in `package.json`, or whenever regenerating `package-lock.json`:
+
+1. **Regenerate the lockfile with Node 22 (npm 10)**:
+   ```bash
+   nvm exec 22 npm install --package-lock-only
+   ```
+2. **Verify dry-run clean install passes under Node 22**:
+   ```bash
+   nvm exec 22 npm ci --dry-run --ignore-scripts
+   nvm exec 22 npm ci --omit=dev --dry-run --ignore-scripts
+   ```
+   Both commands must exit with code `0`. Never commit `package-lock.json` if `npm ci` reports `EUSAGE` or missing packages.
+3. **Verify `@emnapi/runtime` is present in `package-lock.json`**:
+   ```bash
+   grep -q '"node_modules/@emnapi/runtime"' package-lock.json || echo "ERROR: @emnapi/runtime missing"
+   ```
+4. **Banned patterns**:
+   - Running `npm install` with Node > 22 and committing the pruned `package-lock.json` without verifying under Node 22.
+   - Removing `@emnapi/runtime` from `resolutions`, `overrides`, or `package-lock.json` merely because a local linter, pruning script, or dead-code candidate generator (such as Knip on macOS) flags it as unused.
 
 ---
 

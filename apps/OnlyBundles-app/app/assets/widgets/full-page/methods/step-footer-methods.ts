@@ -283,9 +283,6 @@ export const fullPageStepFooterMethods: Record<string, any> & ThisType<any> = {
           '_wolfpackProductBundle:prodQty': String(quantity),
           '_wolfpackProductBundle:OfferId': `${offerId}_${sessionKey}_${itemNumber}`,
         };
-        if (shouldIncludeBundleQuantityCartProperties(this)) {
-          properties.Box = String(itemNumber);
-        }
         const addonEval = this.getAddonTierEvaluation?.(step) || {};
         const addonDiscount = typeof this.getAddonLineDiscount === 'function'
           ? this.getAddonLineDiscount(step)
@@ -293,7 +290,6 @@ export const fullPageStepFooterMethods: Record<string, any> & ThisType<any> = {
         const isAddonCartLine = fullPageStepFooterMethods.isSelectedAddonCartLine.call(this, step);
         if (isAddonCartLine && addonEval?.tier) {
           hasSelectedAddonLine = true;
-          properties.Box = '1';
           properties._addon_product = 'true';
           properties._addon_offer_id = baseOfferId;
           properties._boxProduct = 'addonProduct';

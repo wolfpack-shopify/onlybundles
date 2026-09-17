@@ -73,7 +73,6 @@ describe('shared cart-line metadata helpers', () => {
     });
 
     expect(properties).toEqual({
-      Box: '1',
       'Bundle Includes': '2 x Product A',
       'Original Price': '$20.00',
       'Bundle Savings': '$5.00 (25%)',

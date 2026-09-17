@@ -475,7 +475,7 @@ updateModalDiscountMessaging(totalPrice: any, totalQuantity: any, discountInfo: 
   const nextRule = PricingCalculator.getNextDiscountRule(this.selectedBundle, totalQuantity, totalPrice);
   const ruleToUse = discountInfo.applicableRule || nextRule;
   const hasDiscountRules = !!ruleToUse;
-  const pbConfig = this.selectedBundle?.messaging?.displayOptions?.progressBar || {};
+  const pbConfig = this.selectedBundle?.pricing?.displayOptions?.progressBar || this.selectedBundle?.messaging?.displayOptions?.progressBar || {};
   const messageType = nextRule
     ? 'progress'
     : (discountInfo.qualifiesForDiscount ? 'success' : 'progress');

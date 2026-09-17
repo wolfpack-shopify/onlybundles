@@ -59,9 +59,63 @@ export class CheckoutIntegrationDiscountCodeService {
     }
   }
 
+  private static async findExistingDiscount(
+    admin: AdminApiContext,
+    code: string,
+  ): Promise<{ discountId: string; code: string; endsAt?: string | null } | null> {
+    const QUERY = `
+      query FindCheckoutIntegrationDiscountNode {
+        discountNodes(first: 50) {
+          nodes {
+            id
+            discount {
+              __typename
+              ... on DiscountCodeApp {
+                title
+                status
+                codes(first: 10) {
+                  nodes {
+                    code
+                  }
+                }
+                endsAt
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    try {
+      const response = await admin.graphql(QUERY);
+      const data = await response.json() as any;
+      const nodes = data.data?.discountNodes?.nodes ?? [];
+      const match = nodes.find((node: any) => {
+        const discount = node.discount;
+        if (discount?.__typename !== "DiscountCodeApp") return false;
+        if (discount.status !== "ACTIVE") return false;
+        const codeNodes = discount.codes?.nodes ?? [];
+        return codeNodes.some((c: any) => c.code === code);
+      });
+
+      if (!match) return null;
+
+      return {
+        discountId: match.id,
+        code,
+        endsAt: match.discount.endsAt,
+      };
+    } catch (error: any) {
+      AppLogger.warn("Failed to find existing checkout integration discount", {
+        component: "checkout-integration-discount-code",
+        operation: "find-existing",
+      }, error);
+      return null;
+    }
+  }
+
   private static buildCode(providerId: DiscountCodeCheckoutIntegrationProviderId): string {
-    const randomPart = crypto.randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase();
-    return `${CHECKOUT_INTEGRATION_DISCOUNT_PREFIX}${providerId.toUpperCase()}-${randomPart}`;
+    return `${CHECKOUT_INTEGRATION_DISCOUNT_PREFIX}${providerId.toUpperCase()}`;
   }
 
   static async createForProvider(
@@ -78,11 +132,22 @@ export class CheckoutIntegrationDiscountCodeService {
       };
     }
 
+    const code = this.buildCode(providerId);
+    const existing = await this.findExistingDiscount(admin, code);
+    if (existing) {
+      return {
+        success: true,
+        providerId,
+        functionId,
+        discountId: existing.discountId,
+        code: existing.code,
+        expiresAt: existing.endsAt ?? undefined,
+      };
+    }
+
+    const providerLabel = CHECKOUT_INTEGRATION_PROVIDER_LABELS[providerId];
     const now = Date.now();
     const startsAt = new Date(now - 60 * 1000).toISOString();
-    const expiresAt = new Date(now + CHECKOUT_INTEGRATION_DISCOUNT_CODE_TTL_MS).toISOString();
-    const code = this.buildCode(providerId);
-    const providerLabel = CHECKOUT_INTEGRATION_PROVIDER_LABELS[providerId];
 
     const MUTATION = `
       mutation CreateCheckoutIntegrationCode($codeAppDiscount: DiscountCodeAppInput!) {
@@ -113,8 +178,6 @@ export class CheckoutIntegrationDiscountCodeService {
             code,
             functionId,
             startsAt,
-            endsAt: expiresAt,
-            usageLimit: 1,
             appliesOncePerCustomer: false,
             discountClasses: ["PRODUCT"],
             combinesWith: {
@@ -130,7 +193,6 @@ export class CheckoutIntegrationDiscountCodeService {
                 mode: "checkout_integration",
                 providerId,
                 shopDomain,
-                ttlMs: CHECKOUT_INTEGRATION_DISCOUNT_CODE_TTL_MS,
               }),
             }],
           },
@@ -150,6 +212,26 @@ export class CheckoutIntegrationDiscountCodeService {
       const payload = data.data?.discountCodeAppCreate;
       const userErrors = payload?.userErrors ?? [];
       if (userErrors.length > 0) {
+        const isCodeTaken = userErrors.some((err: any) => {
+          const msg = err.message?.toLowerCase() ?? "";
+          return msg.includes("already exists")
+            || msg.includes("unique")
+            || msg.includes("taken");
+        });
+        if (isCodeTaken) {
+          const recovered = await this.findExistingDiscount(admin, code);
+          if (recovered) {
+            return {
+              success: true,
+              providerId,
+              functionId,
+              discountId: recovered.discountId,
+              code: recovered.code,
+              expiresAt: recovered.endsAt ?? undefined,
+            };
+          }
+        }
+
         return {
           success: false,
           providerId,
@@ -164,7 +246,7 @@ export class CheckoutIntegrationDiscountCodeService {
         functionId,
         discountId: payload?.codeAppDiscount?.discountId,
         code: payload?.codeAppDiscount?.codes?.nodes?.[0]?.code ?? code,
-        expiresAt: payload?.codeAppDiscount?.endsAt ?? expiresAt,
+        expiresAt: payload?.codeAppDiscount?.endsAt ?? undefined,
       };
     } catch (error: any) {
       return {

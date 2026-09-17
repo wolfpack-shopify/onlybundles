@@ -371,25 +371,27 @@ pub fn process_merge_operations(
 
         // -------------------------------------------------------------------------
         // Step 5: Build unique bundle title.
+        // If no custom bundle name is provided, leave title as None so Shopify
+        // natively uses the bundle parent product variant's title.
         // -------------------------------------------------------------------------
-        let base_name = non_empty(&source_display_properties.bundle_name)
-            .unwrap_or_else(|| "Bundle".to_string());
-
-        let count = if let Some((_, count)) = bundle_name_counts
-            .iter_mut()
-            .find(|(name, _)| name == &base_name)
-        {
-            *count += 1;
-            *count
-        } else {
-            bundle_name_counts.push((base_name.clone(), 1));
-            1
-        };
-        let bundle_name = if count > 1 {
-            format!("{} ({})", base_name, count)
-        } else {
-            base_name
-        };
+        let bundle_title = non_empty(&source_display_properties.bundle_name).map(|base_name| {
+            let count = if let Some((_, count)) = bundle_name_counts
+                .iter_mut()
+                .find(|(name, _)| name == &base_name)
+            {
+                *count += 1;
+                *count
+            } else {
+                bundle_name_counts.push((base_name.clone(), 1));
+                1
+            };
+            if count > 1 {
+                format!("{} ({})", base_name, count)
+            } else {
+                base_name
+            }
+        });
+        let bundle_name = bundle_title.clone().unwrap_or_else(|| "Bundle".to_string());
 
         // -------------------------------------------------------------------------
         // Step 6: Preserve the retail total used by checkout offer eligibility.
@@ -526,7 +528,7 @@ pub fn process_merge_operations(
         let merge_op = schema::LinesMergeOperation {
             cart_lines,
             parent_variant_id,
-            title: Some(bundle_name),
+            title: bundle_title,
             price,
             attributes: Some(attributes),
             image: None,

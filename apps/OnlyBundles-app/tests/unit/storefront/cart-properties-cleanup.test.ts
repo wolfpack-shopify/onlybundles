@@ -1,5 +1,10 @@
 import { JSDOM } from 'jsdom';
-import { cleanupInternalCartProperties } from '../../../app/storefront/cart-properties-cleanup';
+import {
+  cleanupInternalCartProperties,
+  scheduleCartPropertiesCleanup,
+  initCartPropertiesCleaner,
+  isCartContainerOrDescendant,
+} from '../../../app/storefront/cart-properties-cleanup';
 
 describe('cleanupInternalCartProperties', () => {
   let dom: JSDOM;
@@ -9,14 +14,20 @@ describe('cleanupInternalCartProperties', () => {
     dom = new JSDOM('<!DOCTYPE html><html><body></body></html>');
     document = dom.window.document;
     (global as any).document = document;
+    (global as any).window = dom.window;
     (global as any).NodeFilter = dom.window.NodeFilter;
     (global as any).Node = dom.window.Node;
+    (global as any).Element = dom.window.Element;
+    (global as any).MutationObserver = dom.window.MutationObserver;
   });
 
   afterEach(() => {
     delete (global as any).document;
+    delete (global as any).window;
     delete (global as any).NodeFilter;
     delete (global as any).Node;
+    delete (global as any).Element;
+    delete (global as any).MutationObserver;
   });
 
   it('removes raw text nodes and trailing <br> for leading underscore properties in legacy theme containers', () => {
@@ -84,5 +95,57 @@ describe('cleanupInternalCartProperties', () => {
 
     expect(document.body.textContent).toContain('Custom Engraving: John Doe');
     expect(document.body.textContent).toContain('Gift Note: Happy Birthday!');
+  });
+
+  describe('scoped container discovery and throttling', () => {
+    it('identifies cart container elements accurately', () => {
+      const form = document.createElement('form');
+      form.setAttribute('action', '/cart');
+      expect(isCartContainerOrDescendant(form)).toBe(true);
+
+      const drawer = document.createElement('div');
+      drawer.className = 'cart-drawer';
+      expect(isCartContainerOrDescendant(drawer)).toBe(true);
+
+      const divWithDrawer = document.createElement('div');
+      divWithDrawer.appendChild(drawer);
+      expect(isCartContainerOrDescendant(divWithDrawer)).toBe(true);
+
+      const carousel = document.createElement('div');
+      carousel.className = 'product-carousel';
+      expect(isCartContainerOrDescendant(carousel)).toBe(false);
+    });
+
+    it('coalesces multiple rapid schedule calls into one frame', () => {
+      const rafMock = jest.fn();
+      (global as any).window.requestAnimationFrame = rafMock;
+      (global as any).window.requestIdleCallback = undefined;
+
+      scheduleCartPropertiesCleanup();
+      scheduleCartPropertiesCleanup();
+      scheduleCartPropertiesCleanup();
+
+      expect(rafMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('attaches scoped observer to cart container when present', () => {
+      document.body.innerHTML = `
+        <div class="cart-drawer">
+          <div class="content">_bundle_name: Test</div>
+        </div>
+        <div class="other-section"></div>
+      `;
+
+      const observeMock = jest.fn();
+      (global as any).MutationObserver = jest.fn().mockImplementation(() => ({
+        observe: observeMock,
+        disconnect: jest.fn(),
+      }));
+
+      initCartPropertiesCleaner();
+
+      const cartContainer = document.querySelector('.cart-drawer');
+      expect(observeMock).toHaveBeenCalledWith(cartContainer, { childList: true, subtree: true });
+    });
   });
 });

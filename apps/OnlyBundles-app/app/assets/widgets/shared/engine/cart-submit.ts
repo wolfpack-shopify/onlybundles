@@ -99,9 +99,6 @@ export function buildProductPageCartFormData(cartItems: any[] = [], {
       if (key === '_bundle_display_properties' || key === '_wolfpack_bundle_runtime') return;
       formData.append(`items[${index}][properties][${key}]`, String(value));
     });
-    if (!sellingPlanId) {
-      formData.append(`items[${index}][properties][Box]`, String(itemNumber));
-    }
     formData.append(`items[${index}][properties][_bundleName]`, bundleName);
     formData.append(`items[${index}][properties][_wolfpackProductBundle:OfferId]`, `${offerId}_${sessionKey}_${itemNumber}`);
     formData.append(`items[${index}][properties][_wolfpackProductBundle:prodQty]`, String(item.quantity));

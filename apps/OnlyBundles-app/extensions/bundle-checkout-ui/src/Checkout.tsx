@@ -12,6 +12,8 @@ type CheckoutMoney = {
 
 type CheckoutDiscountAllocation = {
   discountedAmount?: CheckoutMoney;
+  code?: string;
+  title?: string;
 };
 
 type CheckoutLine = {
@@ -49,12 +51,27 @@ export function calculateCheckoutTotalSavings({
   lines?: CheckoutLine[];
   discountAllocations?: CheckoutDiscountAllocation[];
 } = {}) {
-  const checkoutNativeSavings = sumDiscountAllocations(discountAllocations);
-  const lineNativeSavings = lines.reduce(
-    (sum, line) => sum + sumDiscountAllocations(line.discountAllocations),
-    0,
+  const lineAllocations = lines.flatMap((line) => line.discountAllocations ?? []);
+  const lineNativeSavings = sumDiscountAllocations(lineAllocations);
+
+  const lineDiscountKeys = new Set(
+    lineAllocations
+      .map((a) => a.code ?? a.title)
+      .filter((k): k is string => Boolean(k)),
   );
-  return Math.max(checkoutNativeSavings, lineNativeSavings);
+
+  const uniqueCheckoutAllocations = discountAllocations.filter((a) => {
+    const key = a.code ?? a.title;
+    return !key || !lineDiscountKeys.has(key);
+  });
+
+  const checkoutNativeSavings = sumDiscountAllocations(uniqueCheckoutAllocations);
+
+  if (lineNativeSavings > 0 && checkoutNativeSavings === lineNativeSavings && lineDiscountKeys.size === 0) {
+    return lineNativeSavings;
+  }
+
+  return lineNativeSavings + checkoutNativeSavings;
 }
 
 export function formatCheckoutMoney(amount: number, currencyCode = 'USD') {

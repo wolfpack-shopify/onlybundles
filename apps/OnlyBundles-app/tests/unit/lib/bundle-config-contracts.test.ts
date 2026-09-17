@@ -341,7 +341,6 @@ describe("formatStepCategoryForRuntime", () => {
         title: "Rings",
         imageUrl: "https://cdn.example/ring-card.jpg",
         description: "Detailed ring description",
-        descriptionHtml: "<p>Detailed ring description</p>",
         price: "10.00",
         weight: 2,
         weightUnit: "KILOGRAMS",

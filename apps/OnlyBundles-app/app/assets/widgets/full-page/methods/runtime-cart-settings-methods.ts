@@ -306,31 +306,35 @@ async syncBundleDetailsCartMetafield(bundleDetailsKey: any, sourceProperties: an
     }
 },
 
-buildBundleDetailsDisplayProperties(sourceProperties: any) {
-  const displayProperties: any = {};
-  const raw = sourceProperties?._bundle_display_properties;
-  const cartLineLabels = this.getCartLineLabels();
+  buildBundleDetailsDisplayProperties(sourceProperties: any) {
+    const displayProperties: any = {};
+    const raw = sourceProperties?._bundle_display_properties;
+    const cartLineLabels = this.getCartLineLabels();
 
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw);
-      if (parsed?.box) displayProperties.Box = String(parsed.box);
-      if (parsed?.items) displayProperties[cartLineLabels.items] = String(parsed.items);
-      if (parsed?.retailPrice) displayProperties[cartLineLabels.retailPrice] = String(parsed.retailPrice);
-      if (parsed?.youSave?.amountPercentage) displayProperties[cartLineLabels.youSave] = String(parsed.youSave.amountPercentage);
-    } catch {
-      // Ignore malformed display metadata; cart add must remain non-blocking.
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed?.bundleName) displayProperties.bundleName = String(parsed.bundleName);
+        if (parsed?.items) displayProperties[cartLineLabels.items] = String(parsed.items);
+        if (parsed?.retailPrice) displayProperties[cartLineLabels.retailPrice] = String(parsed.retailPrice);
+        if (parsed?.youSave?.amountPercentage) displayProperties[cartLineLabels.youSave] = String(parsed.youSave.amountPercentage);
+      } catch {
+        // Ignore malformed display metadata; cart add must remain non-blocking.
+      }
     }
-  }
 
-  ['Box', cartLineLabels.items, cartLineLabels.retailPrice, cartLineLabels.youSave, 'Items', 'Retail Price', 'You Save'].forEach((key) => {
-    if (sourceProperties?.[key] && !displayProperties[key]) {
-      displayProperties[key] = String(sourceProperties[key]);
+    if (sourceProperties?._bundleName && !displayProperties.bundleName) {
+      displayProperties.bundleName = String(sourceProperties._bundleName);
     }
-  });
 
-  return displayProperties;
-},
+    [cartLineLabels.items, cartLineLabels.retailPrice, cartLineLabels.youSave, 'Items', 'Retail Price', 'You Save'].forEach((key) => {
+      if (sourceProperties?.[key] && !displayProperties[key]) {
+        displayProperties[key] = String(sourceProperties[key]);
+      }
+    });
+
+    return displayProperties;
+  },
 
 getCartLineLabels() {
   const labels = this.config?.sharedCartLabels || {};

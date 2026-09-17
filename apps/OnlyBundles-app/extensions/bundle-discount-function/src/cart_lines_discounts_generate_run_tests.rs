@@ -914,3 +914,30 @@ fn caps_total_authorized_discount_lines_before_verification() {
     assert!(run_automatic_addon_lines(vec![line.clone(); 11], &secret, vec![]).operations.is_empty());
     assert!(!run_automatic_addon_lines(vec![line; 10], &secret, vec![]).operations.is_empty());
 }
+
+#[test]
+fn accepts_scheduled_pricing_mode_in_bundle_policy() {
+    let secret = test_runtime_secret();
+    let token = sign_runtime_token_for_test(&addon_runtime_payload(), &secret);
+    let line = addon_line(
+        "gid://shopify/CartLine/addon",
+        "gid://shopify/ProductVariant/201",
+        1,
+        10.0,
+        &token,
+    );
+    let input = serde_json::json!({
+        "cart": { "lines": [line] },
+        "discount": {
+            "discountClasses": ["PRODUCT"],
+            "runtimeTokenSecret": { "value": secret },
+            "checkoutIntegrationConfig": null
+        },
+        "enteredDiscountCodes": [],
+        "triggeringDiscountCode": null,
+        "shop": { "ppbPolicyRevisions": { "value": { "bundle-1": { "revision": "rev-1", "pricingMode": "scheduled" } } } },
+        "presentmentCurrencyRate": "1.0"
+    });
+    let output = run_discount(&input.to_string());
+    assert_eq!(output.operations.len(), 1);
+}

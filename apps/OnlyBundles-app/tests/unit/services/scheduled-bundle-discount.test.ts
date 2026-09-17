@@ -7,7 +7,7 @@ function fixture(existing: any[] = []) {
   const admin = { graphql: jest.fn(async (query: string, options: any): Promise<{ json: () => Promise<any> }> => {
     const v = options?.variables;
     let data: any;
-    if (query.includes('ScheduledDiscountOwners')) data = { shop: { ianaTimezone: 'America/Toronto' }, shopifyFunctions: { nodes: [{ id: 'function-1', handle: 'scheduled-bundle-discount' }], pageInfo: { hasNextPage: false } }, discountNodes: { nodes: [...stored.values()], pageInfo: { hasNextPage: false, endCursor: null } } };
+    if (query.includes('ScheduledDiscountOwners')) data = { shop: { ianaTimezone: 'America/Toronto' }, shopifyFunctions: { nodes: [{ id: 'function-1', handle: 'bundle-discount-function' }], pageInfo: { hasNextPage: false } }, discountNodes: { nodes: [...stored.values()], pageInfo: { hasNextPage: false, endCursor: null } } };
     else if (query.includes('CreateScheduledDiscount')) {
       const id = `gid://shopify/DiscountAutomaticNode/${stored.size + 1}`;
       stored.set(id, node(id, v.discount)); data = { discountAutomaticAppCreate: { automaticAppDiscount: { discountId: id }, userErrors: [] } };

@@ -24,7 +24,6 @@ import { buildCheckoutOfferRuntime } from "../../../checkout-bundle-offers.serve
 import { buildPublicBundleSubscriptionConfig } from "../../../../lib/bundle-subscriptions";
 import { buildPpbStaticAuthorization } from "../../../ppb-static-authorization.server";
 import { generateCartTransformRuntimeTokenSecret } from "../../../cart-transform-runtime-token.server";
-import { assertPpbStorefrontSnapshotSize } from "../../../ppb-storefront-runtime.server";
 import { parsePricingRule } from "../../../../lib/pricing-rule-parser";
 import { buildOfferCountryTargetingRule, encodeOfferCountryTargetingRule } from "../../../../lib/offer-country-eligibility";
 
@@ -515,6 +514,10 @@ export async function updateBundleProductMetafields(
     throw new Error("bundle_ui_config requires a canonical id");
   }
 
+  const isUpsellActive = bundleConfiguration.bundleUpsellConfig?.upsellConfiguration?.isEnabled === true
+    || bundleConfiguration.bundleUpsellConfig?.widgetConfiguration?.isEnabled === true;
+  const compactBundleUpsellConfig = isUpsellActive ? bundleConfiguration.bundleUpsellConfig : null;
+
   // Build bundle_ui_config for widget
   const bundleUiConfig: BundleUiConfig = {
     id: canonicalBundleId,
@@ -528,7 +531,7 @@ export async function updateBundleProductMetafields(
     bundleDesignPresetId: bundleConfiguration.bundleDesignPresetId ?? null,
     defaultProductsData: bundleConfiguration.defaultProductsData ?? {},
     boxSelection: bundleConfiguration.boxSelection ?? null,
-    bundleUpsellConfig: bundleConfiguration.bundleUpsellConfig ?? null,
+    bundleUpsellConfig: compactBundleUpsellConfig,
     bundleTextConfig: bundleConfiguration.bundleTextConfig ?? null,
     bundleLevelCss: typeof bundleConfiguration.bundleLevelCss === 'string' && bundleConfiguration.bundleLevelCss.trim()
       ? bundleConfiguration.bundleLevelCss
@@ -544,9 +547,9 @@ export async function updateBundleProductMetafields(
       allowedQuantity: 0,
     },
     productSlotsEnabled: bundleConfiguration.bundleType === "full_page" ? bundleConfiguration.productSlotsEnabled ?? false : false,
-  productSlotIconUrl: bundleConfiguration.bundleType === "full_page" ? bundleConfiguration.productSlotIconUrl ?? null : null,
-  useSingleStepCategoriesAsBundleSteps: bundleConfiguration.useSingleStepCategoriesAsBundleSteps ?? false,
-  showProductComparedAtPrice: resolveShowProductComparedAtPrice(),
+    productSlotIconUrl: bundleConfiguration.bundleType === "full_page" ? bundleConfiguration.productSlotIconUrl ?? null : null,
+    useSingleStepCategoriesAsBundleSteps: bundleConfiguration.useSingleStepCategoriesAsBundleSteps ?? false,
+    showProductComparedAtPrice: resolveShowProductComparedAtPrice(),
     lowStockAlert: {
       enabled: bundleConfiguration.lowStockAlertEnabled ?? false,
       threshold: bundleConfiguration.lowStockAlertThreshold ?? 5,
@@ -634,7 +637,6 @@ export async function updateBundleProductMetafields(
       showDiscountMessaging: bundleConfiguration.pricing?.messages?.showDiscountMessaging || false,
       showFooter: bundleConfiguration.pricing?.display?.showFooter !== false && bundleConfiguration.messaging?.showFooter !== false,
       showDiscountProgressBar: bundleConfiguration.pricing?.display?.showDiscountProgressBar === true || bundleConfiguration.pricing?.showProgressBar === true,
-      displayOptions: bundleConfiguration.pricing?.displayOptions ?? null
     },
     promoBannerBgImage: bundleConfiguration.promoBannerBgImage ?? null,
     bundleBannerDesktopUrl: bundleConfiguration.bundleBannerDesktopUrl ?? null,
@@ -669,7 +671,6 @@ export async function updateBundleProductMetafields(
     });
     bundleUiConfig.schemaVersion = 3;
     bundleUiConfig.runtimeAuthorization = staticAuthorization.authorization;
-    assertPpbStorefrontSnapshotSize("bundle_ui_config", bundleUiConfig);
   }
 
   // Check metafield sizes and log warnings
@@ -678,7 +679,7 @@ export async function updateBundleProductMetafields(
   const componentPricingSizeCheck = checkMetafieldSize(componentPricing, 'component_pricing', 'updateBundleProductMetafields');
 
   // Abort if any metafield exceeds size limit
-  if (bundleUiConfig.bundleType !== BundleType.PRODUCT_PAGE && !uiConfigSizeCheck.withinLimit) {
+  if (!uiConfigSizeCheck.withinLimit) {
     throw new Error(`bundle_ui_config metafield exceeds Shopify's 64KB limit (size: ${uiConfigSizeCheck.size} bytes). Bundle has too many products or complex configuration.`);
   }
 

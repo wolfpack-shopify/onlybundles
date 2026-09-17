@@ -6,6 +6,24 @@
 
 const INTERNAL_PROPERTY_REGEX = /^\s*_(?:is_bundle_parent|bundle_name|bundle_total_retail_cents|wolfpackProductBundle|wolfpack_bundle_runtime|addon_offer_id|wpb_offer_analytics|[a-zA-Z0-9_:-]+)\s*:/;
 
+export const CART_CONTAINER_SELECTORS = [
+  'form[action*="/cart"]',
+  'cart-drawer',
+  '.cart-drawer',
+  '#cart-drawer',
+  '.cart__items',
+  '#CartContainer',
+  '[data-cart-view]',
+  '.cart-items',
+  '.ajax-cart',
+  '.mini-cart',
+].join(', ');
+
+export function isCartContainerOrDescendant(node: Node): boolean {
+  if (typeof Element === 'undefined' || !(node instanceof Element)) return false;
+  return Boolean(node.matches(CART_CONTAINER_SELECTORS) || node.querySelector(CART_CONTAINER_SELECTORS));
+}
+
 function findPropertyWrapper(element: Element | null): Element | null {
   let current = element;
   let candidate: Element | null = null;
@@ -106,7 +124,14 @@ let cleanupScheduled = false;
 export function scheduleCartPropertiesCleanup(root?: ParentNode): void {
   if (cleanupScheduled || typeof window === 'undefined') return;
   cleanupScheduled = true;
-  requestAnimationFrame(() => {
+
+  const scheduleFn = typeof window.requestIdleCallback === 'function'
+    ? window.requestIdleCallback
+    : typeof window.requestAnimationFrame === 'function'
+      ? window.requestAnimationFrame
+      : (cb: () => void) => setTimeout(cb, 16);
+
+  scheduleFn(() => {
     cleanupScheduled = false;
     cleanupInternalCartProperties(root);
   });
@@ -126,14 +151,32 @@ export function initCartPropertiesCleaner(): void {
   document.addEventListener('cart:refresh', () => scheduleCartPropertiesCleanup());
 
   if (typeof MutationObserver !== 'undefined' && document.body) {
-    const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        if (mutation.addedNodes.length > 0) {
-          scheduleCartPropertiesCleanup();
-          break;
+    const cartContainers = document.querySelectorAll(CART_CONTAINER_SELECTORS);
+    if (cartContainers.length > 0) {
+      const cartObserver = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          if (mutation.addedNodes.length > 0) {
+            scheduleCartPropertiesCleanup(mutation.target as ParentNode);
+            break;
+          }
         }
-      }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
+      });
+      cartContainers.forEach((container) => {
+        cartObserver.observe(container, { childList: true, subtree: true });
+      });
+    } else {
+      const bodyObserver = new MutationObserver((mutations) => {
+        for (const mutation of mutations) {
+          for (let i = 0; i < mutation.addedNodes.length; i++) {
+            const addedNode = mutation.addedNodes[i];
+            if (isCartContainerOrDescendant(addedNode)) {
+              scheduleCartPropertiesCleanup(addedNode as ParentNode);
+              return;
+            }
+          }
+        }
+      });
+      bodyObserver.observe(document.body, { childList: true, subtree: false });
+    }
   }
 }

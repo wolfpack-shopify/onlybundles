@@ -70,7 +70,6 @@ export function buildCartLineDisplayProperties(displayProperties: any = {}, labe
     ...labels,
   };
   const properties: any = {
-    Box: displayProperties.box || '1',
     [cartLineLabels.items]: displayProperties.items,
     [cartLineLabels.retailPrice]: displayProperties.retailPrice,
     _bundle_display_properties: JSON.stringify(displayProperties),

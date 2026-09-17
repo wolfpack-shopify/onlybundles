@@ -4,10 +4,10 @@ id: checkout-ui-total-savings
 title: Checkout UI Total Savings Test Spec
 type: test-spec
 status: active
-summary: Defines checkout total-savings behavior for native discounts and transformed bundle lines.
-last_audited: 2026-07-30
+summary: Defines checkout total-savings behavior for native discounts, order-level allocations, and transformed bundle lines.
+last_audited: 2026-09-16
 owners:
-  - Wolfpack Product Bundles
+  - engineering
 domains:
   - checkout
 systems:
@@ -15,34 +15,39 @@ systems:
 source_paths:
   - extensions/bundle-checkout-ui/src/Checkout.tsx
 related_docs:
-  - docs/competitor-analysis/checkout-page-parity-matrix.md
+  - internal docs/Architecture/Shopify Native Audit.md
 tags:
   - checkout
-  - parity
+  - discounts
+  - savings
 keywords:
   - total savings
   - checkout extension
+  - discount allocations
 ---
 
 # Test Spec: Checkout UI Total Savings
-**Spec ID:** checkout-ui-total-savings  **Created:** 2026-06-30
+**Spec ID:** checkout-ui-total-savings  **Created:** 2026-06-30  **Updated:** 2026-09-16
 
 ## Purpose
-Match EB checkout order-summary savings behavior for bundle carts without reintroducing the removed cart-line savings panel.
+Accurately calculate and format total savings in the Checkout UI extension. Seamlessly combine line-level bundle discounts and checkout/order-level discounts (e.g. promo codes, automatic order discounts) without under-reporting savings via lossy `Math.max`, while deduplicating mirrored allocations when Shopify mirrors line discounts at the cart root.
 
 ## Test Cases
 ### TotalSavingsExtension
 | # | Scenario | Input | Expected Output | Notes |
 |---|---|---|---|---|
-| 1 | No savings | Empty discounts and no bundle savings attributes | Component returns `null` | Avoids noise on undiscounted carts |
-| 2 | Native add-on discount | Line discount allocation for selected add-on | `TOTAL SAVINGS` row with formatted amount | Matches EB native checkout proof |
-| 3 | Cart Transform savings | Bundle parent `_bundle_total_savings_cents` with no native allocation | Same savings amount is included | Covers merged parent bundle savings |
-| 4 | Filtered private attributes | Public `Retail Price` plus native line cost | Difference is included once | Covers checkout runtimes that omit private line attributes |
-| 5 | Native and derived savings overlap | Native allocation and retail-price difference represent the same discount | Larger value is used once | Prevents double counting |
-| 6 | Zero-decimal currency | JPY savings | Currency-native formatting without decimal places | Avoids hard-coded USD precision |
-| 7 | Discounted add-on plus parent price delta | Native add-on allocation and parent bundle savings metadata | Only the native checkout discount is shown | Matches direct EB rich-cart evidence |
+| 1 | No savings | Empty line and checkout discounts | Returns `0` (renders `null`) | Avoids noise on undiscounted carts |
+| 2 | Native line discount only | Line allocation $82.90, checkout allocation $82.90 | $82.90 | Clean single discount |
+| 3 | Disallowed attributes | `_bundle_total_savings_cents` without native allocation | Returns `0` | Ignores private Cart Transform attributes |
+| 4 | Parent retail price | `Retail Price: $2,606.00` | Returns `0` | Disregards parent placeholder differences |
+| 5 | Public price fallback + discount | Retail price + native line allocation $10 | Returns $10 | Native discount is authoritative |
+| 6 | Transformed bundle + add-on | Line discount $30 + bundle savings attribute | Returns $30 | Uses native discount only |
+| 7 | Mirrored identical allocation | Line allocation $30 and checkout allocation $30 | Returns $30 | Deduplicates mirrored allocations |
+| 8 | Combined line + order code | Line discount $20 (`"Bundle 20%"`) + order code $10 (`"SAVE10"`) | Returns $30 | Correctly sums combined discounts |
+| 9 | Combined line + order automatic | Line discount $25 (`"Tier Discount"`) + order auto $15 (`"Summer Sale"`) | Returns $40 | Both discounts counted |
+| 10 | Currency formatting | 82.9 INR / 1000 JPY | `₹82.90` / `¥1,000` | Currency-native formatting |
 
 ## Acceptance Criteria
-- [x] Focused checkout UI unit test passes.
-- [x] Shopify checkout UI component validation passes for `purchase.checkout.reductions.render-after`.
-- [x] Checkout UI TypeScript check passes.
+- [ ] All listed test cases pass
+- [ ] 0 ESLint errors
+- [ ] Verified in Chrome QA on dev tunnel

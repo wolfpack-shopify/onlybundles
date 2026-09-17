@@ -11,7 +11,7 @@ type Owner = {
   role?: { id?: string; value: string } | null;
   secret?: { id?: string; value: string } | null;
 };
-const HANDLE = 'scheduled-bundle-discount';
+const HANDLE = 'bundle-discount-function';
 const OWNER_FIELDS = `
   id
   config: metafield(namespace: "$app", key: "scheduled_offer") { id value }

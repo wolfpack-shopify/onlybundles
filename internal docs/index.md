@@ -57,6 +57,7 @@ Full evidence record: `docs/competitor-analysis/16-eb-full-data-flow-investigati
 - [[Architecture/Only Bundles Brand and Compatibility Boundary]] — visible brand identity, preserved runtime identifiers, legacy URL boundary, and parent-tag transition
 - [[Architecture/Database Schema]] — Authoritative Prisma schema summary
 - [[Architecture/Cart Transform Function]] — Rust Cart Transform and Discount Function runtime, build, and checkout pricing contracts
+- [[Architecture/Shopify Native Audit]] — Review of discount functions, cart transform, SDK, and storefront architecture for over-engineering and Shopify canonical patterns
 - [[Architecture/Widget Architecture]] — FPB + PPB widgets, limited-release hydrated SDK, app-embed-owned product-page upsells, load strategy, versioning
 - [[Architecture/Product Card Layout Contract]] — Hard rule for row-level card size behavior across all templates and interaction states
 - [[Architecture/Admin Configure Page]] — shared FPB/PPB Admin configure-page adapter boundary, section rhythm, route-owned save semantics

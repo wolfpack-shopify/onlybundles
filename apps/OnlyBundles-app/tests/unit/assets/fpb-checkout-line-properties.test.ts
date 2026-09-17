@@ -566,7 +566,7 @@ describe("FPB checkout cart-line properties", () => {
         item.properties._bundle_step_type === "addon:PERCENTAGE:10",
     );
 
-    expect(addonLine.properties.Box).toBe("1");
+    expect(addonLine.properties).not.toHaveProperty("Box");
     expect(addonLine.properties).not.toHaveProperty("_bundle_display_properties");
     expect(addonLine.properties).toHaveProperty("_wolfpack_bundle_runtime", "runtime-token");
     expect(addonLine.properties).not.toHaveProperty("Items");

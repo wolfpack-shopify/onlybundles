@@ -207,7 +207,7 @@ export const cascadeTemplateMethods: Record<string, any> & ThisType<any> = {
   },
 
   _getCascadeFooterMessage() {
-    const displayOptions = this.selectedBundle?.messaging?.displayOptions;
+    const displayOptions = this.selectedBundle?.pricing?.displayOptions ?? this.selectedBundle?.messaging?.displayOptions;
     const pbConfig = displayOptions?.progressBar;
     const rules = this.selectedBundle?.pricing?.rules || [];
 

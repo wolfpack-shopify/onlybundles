@@ -12,7 +12,10 @@ impl DiscountScope for StandardScope {
         revision: &str,
     ) -> bool {
         use crate::published_policy::{pricing_mode, PricingMode};
-        pricing_mode(policies, bundle_id, revision) == Some(PricingMode::Standard)
+        match pricing_mode(policies, bundle_id, revision) {
+            Some(PricingMode::Standard) | Some(PricingMode::Scheduled) => true,
+            _ => false,
+        }
     }
 }
 

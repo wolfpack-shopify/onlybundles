@@ -114,12 +114,17 @@ export const ProductPageCartMethods: Record<string, any> & ThisType<any> = {
       this.elements.addToCartButton.textContent = this._resolveText('addingToCart', 'Adding to Cart...');
       this.showLoadingOverlay(this.config?.loadingScreen?.gifUrl || null);
 
-      const runtimeToken = this.config?.isEmbedSource && this.selectedBundle?.runtimeAuthorization?.version !== 2
-        ? await this.requestEmbedCartTransformRuntimeToken(cartItems, {
-          offerGroupId: `${offerId}_${sessionKey}`,
-          sellingPlanId,
-        })
-        : this.applyPpbStaticAuthorization(cartItems, { sellingPlanId });
+      let runtimeToken = '';
+      try {
+        runtimeToken = this.config?.isEmbedSource && this.selectedBundle?.runtimeAuthorization?.version !== 2
+          ? await this.requestEmbedCartTransformRuntimeToken(cartItems, {
+            offerGroupId: `${offerId}_${sessionKey}`,
+            sellingPlanId,
+          })
+          : this.applyPpbStaticAuthorization(cartItems, { sellingPlanId });
+      } catch {
+        // In 1-step add-to-cart, static token failure does not block native cart add
+      }
       const cartContext = this.buildProductPageCartFormData(cartItems, {
         bundleName,
         offerId,
@@ -128,17 +133,23 @@ export const ProductPageCartMethods: Record<string, any> & ThisType<any> = {
         sellingPlanId,
       });
       const response = await withBundleCartLock(async () => {
-      await this.syncBundleDetailsCartMetafield(
-        cartContext.bundleDetailsKey,
-        cartContext.sourceProperties,
-        runtimeToken,
-        cartItems.length,
-      );
+        if (typeof this.syncBundleDetailsCartMetafield === 'function' && runtimeToken) {
+          try {
+            await this.syncBundleDetailsCartMetafield(
+              cartContext.bundleDetailsKey,
+              cartContext.sourceProperties,
+              runtimeToken,
+              cartItems.length,
+            );
+          } catch {
+            // Cart metafield sync is non-blocking
+          }
+        }
 
-      return fetch('/cart/add', {
-        method: 'POST',
-        body: cartContext.formData
-      });
+        return fetch('/cart/add.js', {
+          method: 'POST',
+          body: cartContext.formData
+        });
       });
       const responseText = await response.text();
 
@@ -357,14 +368,21 @@ export const ProductPageCartMethods: Record<string, any> & ThisType<any> = {
           : rawStepType === 'default'
             ? 'default'
             : 'component';
-      const variantId = `gid://shopify/ProductVariant/${resolveRuntimeVariantNumericId(item.id)}`;
+      const variantNumericId = resolveRuntimeVariantNumericId(item.id);
+      const variantId = `gid://shopify/ProductVariant/${variantNumericId}`;
       const productId = String(item._wpbProductId || '');
+      const productNumericId = productId.replace(/\D/g, '');
       const groupId = String(item._wpbAuthorizationGroup || '');
-      const line = authorization.lines.find((candidate: any) => (
-        candidate.role === role
-        && candidate.groupId === groupId
-        && (candidate.variantId === variantId || (candidate.productId && candidate.productId === productId))
-      ));
+      const line = authorization.lines.find((candidate: any) => {
+        if (candidate.role !== role || candidate.groupId !== groupId) return false;
+        if (candidate.variantId && candidate.variantId === variantId) return true;
+        if (candidate.productId && productId && candidate.productId === productId) return true;
+        const candidateProductNum = candidate.productId ? String(candidate.productId).replace(/\D/g, '') : '';
+        if (productNumericId && candidateProductNum && productNumericId === candidateProductNum) return true;
+        const candidateVariantNum = candidate.variantId ? String(candidate.variantId).replace(/\D/g, '') : '';
+        if (variantNumericId && candidateVariantNum && String(variantNumericId) === candidateVariantNum) return true;
+        return false;
+      });
       if (!line || Number(item.quantity) > Number(line.maxQuantity)) {
         throw new Error(`Selected ${role} line is not authorized for this bundle.`);
       }
@@ -435,7 +453,7 @@ export const ProductPageCartMethods: Record<string, any> & ThisType<any> = {
       const cartToken = await this.getBundleDetailsCartToken();
       if (!cartToken) throw new Error('Unable to identify the Shopify cart');
 
-      const runtime = this.config?.storefrontRuntime;
+      const runtime = this.config?.storefrontRuntime || (typeof window !== 'undefined' ? (window as any).__WOLFPACK_PPB_STOREFRONT_RUNTIME__ : null);
       if (!runtime?.storefrontAccessToken) throw new Error('Storefront authorization is unavailable');
       await setPpbBundleDetailsCartMetafield({
         shop: window.Shopify?.shop || this.container?.dataset?.shop,
@@ -458,7 +476,7 @@ export const ProductPageCartMethods: Record<string, any> & ThisType<any> = {
     if (raw) {
       try {
         const parsed = JSON.parse(raw);
-        if (parsed?.box) displayProperties.Box = String(parsed.box);
+        if (parsed?.bundleName) displayProperties.bundleName = String(parsed.bundleName);
         if (parsed?.items) displayProperties[cartLineLabels.items] = String(parsed.items);
         if (parsed?.retailPrice) displayProperties[cartLineLabels.retailPrice] = String(parsed.retailPrice);
         if (parsed?.youSave?.amountPercentage) {
@@ -469,7 +487,11 @@ export const ProductPageCartMethods: Record<string, any> & ThisType<any> = {
       }
     }
 
-    ['Box', cartLineLabels.items, cartLineLabels.retailPrice, cartLineLabels.youSave, 'Items', 'Retail Price', 'You Save'].forEach((key) => {
+    if (sourceProperties?._bundleName && !displayProperties.bundleName) {
+      displayProperties.bundleName = String(sourceProperties._bundleName);
+    }
+
+    [cartLineLabels.items, cartLineLabels.retailPrice, cartLineLabels.youSave, 'Items', 'Retail Price', 'You Save'].forEach((key) => {
       if (sourceProperties?.[key] && !displayProperties[key]) {
         displayProperties[key] = String(sourceProperties[key]);
       }

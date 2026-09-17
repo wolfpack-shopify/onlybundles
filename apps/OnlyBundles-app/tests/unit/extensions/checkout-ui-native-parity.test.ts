@@ -184,6 +184,58 @@ describe("TotalSavingsExtension native checkout parity", () => {
     ).toBe(30);
   });
 
+  it("sums combined line-level bundle discounts and checkout-level promo code discounts", () => {
+    expect(
+      calculateCheckoutTotalSavings({
+        lines: [
+          {
+            discountAllocations: [
+              { title: "Bundle 20% Off", discountedAmount: { amount: 20, currencyCode: "USD" } },
+            ],
+          },
+        ],
+        discountAllocations: [
+          { code: "SAVE10", discountedAmount: { amount: 10, currencyCode: "USD" } },
+        ],
+      }),
+    ).toBe(30);
+  });
+
+  it("sums combined line-level discounts and automatic order discounts", () => {
+    expect(
+      calculateCheckoutTotalSavings({
+        lines: [
+          {
+            discountAllocations: [
+              { title: "Tier Discount", discountedAmount: { amount: 25, currencyCode: "USD" } },
+            ],
+          },
+        ],
+        discountAllocations: [
+          { title: "Summer Sale", discountedAmount: { amount: 15, currencyCode: "USD" } },
+        ],
+      }),
+    ).toBe(40);
+  });
+
+  it("deduplicates mirrored title allocations while keeping unique order discounts", () => {
+    expect(
+      calculateCheckoutTotalSavings({
+        lines: [
+          {
+            discountAllocations: [
+              { title: "Bundle Discount", discountedAmount: { amount: 20, currencyCode: "USD" } },
+            ],
+          },
+        ],
+        discountAllocations: [
+          { title: "Bundle Discount", discountedAmount: { amount: 20, currencyCode: "USD" } },
+          { code: "EXTRA5", discountedAmount: { amount: 5, currencyCode: "USD" } },
+        ],
+      }),
+    ).toBe(25);
+  });
+
   it("formats savings with the active checkout currency", () => {
     expect(formatCheckoutMoney(82.9, "INR")).toBe("₹82.90");
   });

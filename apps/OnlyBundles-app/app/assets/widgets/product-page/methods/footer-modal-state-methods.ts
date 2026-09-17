@@ -149,7 +149,7 @@ renderFooter() {
     return;
   }
 
-  const displayOptions = this.selectedBundle?.messaging?.displayOptions;
+  const displayOptions = this.selectedBundle?.pricing?.displayOptions ?? this.selectedBundle?.messaging?.displayOptions;
   const pbConfig = displayOptions?.progressBar;
   const isDiscountMessagingEnabled = this.config?.showDiscountMessaging !== false;
   if (!isDiscountMessagingEnabled) {
@@ -256,7 +256,7 @@ renderQuantityOptionPills() {
   if (!el) return;
   el.replaceChildren();
 
-  const displayOptions = this.selectedBundle?.messaging?.displayOptions;
+  const displayOptions = this.selectedBundle?.pricing?.displayOptions ?? this.selectedBundle?.messaging?.displayOptions;
   const qtyOpts = displayOptions?.bundleQuantityOptions;
   const rules = this.selectedBundle?.pricing?.rules || [];
 
@@ -333,7 +333,7 @@ renderQuantityOptionPills() {
 
 getProductPageTierPillContent(rule: any, index: number, qtyOpts: any) {
   const pricing = this.selectedBundle?.pricing || {};
-  const bundleQuantityOptions = this.selectedBundle?.messaging?.displayOptions?.bundleQuantityOptions || qtyOpts || {};
+  const bundleQuantityOptions = this.selectedBundle?.pricing?.displayOptions?.bundleQuantityOptions || this.selectedBundle?.messaging?.displayOptions?.bundleQuantityOptions || qtyOpts || {};
   const optionsByRuleId = bundleQuantityOptions.optionsByRuleId || {};
   const tierTextByRuleId = pricing.messages?.tierTextByRuleId || {};
   const ruleId = String(rule?.id || '');

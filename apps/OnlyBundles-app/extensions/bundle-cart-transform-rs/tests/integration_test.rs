@@ -873,6 +873,25 @@ mod tests {
     }
 
     #[test]
+    fn test_merge_omits_title_when_bundle_name_is_absent() {
+        let input = messaging_merge_input("").replace(
+            "\"wolfpackProductBundleName\": { \"value\": \"Test Bundle\" },",
+            "\"wolfpackProductBundleName\": null,",
+        );
+        let output: schema::FunctionRunResult = run_cart_transform(&input);
+        assert_eq!(output.operations.len(), 1);
+
+        let op = &output.operations[0];
+        let merge = match op {
+            schema::CartOperation::LinesMerge(ref m) => m,
+            _ => panic!("expected Merge operation"),
+        };
+        assert_eq!(merge.parent_variant_id, "gid://shopify/ProductVariant/999");
+        // Must be None so Shopify native checkout uses the parent variant's title from Shopify
+        assert_eq!(merge.title, None);
+    }
+
+    #[test]
     fn test_merge_fixed_amount_off() {
         let cp = serde_json::json!([{
             "id": "gid://shopify/ProductVariant/999",

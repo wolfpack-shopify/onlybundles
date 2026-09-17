@@ -34,7 +34,7 @@ export async function action({ request }: ActionFunctionArgs) {
       providerId,
     );
 
-    if (!result.success || !result.code || !result.expiresAt) {
+    if (!result.success || !result.code) {
       return json({
         ok: false,
         error: result.error ?? "Checkout integration discount code could not be created",
@@ -45,7 +45,7 @@ export async function action({ request }: ActionFunctionArgs) {
       ok: true,
       providerId,
       code: result.code,
-      expiresAt: result.expiresAt,
+      expiresAt: result.expiresAt ?? null,
     }, {
       headers: {
         ...CORS_HEADERS,

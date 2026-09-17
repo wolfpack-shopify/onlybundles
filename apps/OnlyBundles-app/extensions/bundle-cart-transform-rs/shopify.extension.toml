@@ -18,3 +18,4 @@ description = "Transform cart lines to display bundles as single items with disc
   command = "node ../../scripts/build-cart-transform-function.mjs"
   path = "target/wasm32-unknown-unknown/release/bundle_cart_transform_rs.wasm"
   watch = ["src/**/*.rs"]
+  wasm_opt = true

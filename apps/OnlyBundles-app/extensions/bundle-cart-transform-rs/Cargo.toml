@@ -10,14 +10,14 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 shopify_function = "=2.2.0"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = { version = "1.0", features = ["raw_value"] }
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
+serde_json = { version = "1.0", default-features = false, features = ["alloc", "raw_value"] }
 hmac = { version = "0.12.1", default-features = false }
 sha2 = { version = "0.10.9", default-features = false, features = ["force-soft-compact"] }
 
 [profile.release]
 lto = true        # link-time optimization — smaller binary
 opt-level = 'z'   # optimize for size over speed
-strip = true      # strip debug symbols from final .wasm
+strip = false     # preserve symbols for wasm-snip; wasm-opt strips them in next stage
 panic = "abort"   # omit unwinding machinery; Shopify Functions fail closed
 codegen-units = 1 # maximize cross-module size optimization

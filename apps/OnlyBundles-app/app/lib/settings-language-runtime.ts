@@ -74,7 +74,7 @@ export const SETTINGS_LANGUAGE_LOCALES = [
 const DEFAULT_SHARED_CART_LABELS: SharedCartLabels = {
   bundleContainsLabel: "Items",
   bundleOriginalPriceLabel: "Retail Price",
-  bundleDiscountDisplayLabel: "You Save",
+  bundleDiscountDisplayLabel: "Bundle Savings",
 };
 
 const FPB_DEFAULTS = {

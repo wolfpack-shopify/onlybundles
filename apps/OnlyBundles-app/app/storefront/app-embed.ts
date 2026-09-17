@@ -21,6 +21,10 @@ import { loadAndApplyGlobalSettingsControls } from './settings-controls.js';
 import { FPB_PROXY_PATH_PATTERN, setStorefrontProxyRoot } from '../config/storefront-proxy-routes.js';
 import { resolveAppEmbedOwnership } from './app-embed-marker.js';
 import { initCartPropertiesCleaner } from './cart-properties-cleanup.js';
+import {
+  initCartTierProgressBar,
+  syncCartTierProgressBar,
+} from './cart-tier-progress-bar.js';
 
 const ownership = resolveAppEmbedOwnership();
 const embed = ownership.status === 'owned' ? ownership.marker : null;
@@ -137,6 +141,7 @@ function hydrateGlobalSettingsControls(): void {
 if (embed) {
   (window as Window & { __WOLFPACK_BUNDLE_EMBED_ACTIVE__?: boolean }).__WOLFPACK_BUNDLE_EMBED_ACTIVE__ = true;
   initCartPropertiesCleaner();
+  initCartTierProgressBar();
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
       hydrateMarker();
@@ -156,4 +161,5 @@ if (embed) {
   document.addEventListener('shopify:section:load', hydratePageBuilderEmbed);
   document.addEventListener('shopify:section:load', hydrateProductPageUpsells);
   document.addEventListener('shopify:section:load', hydratePpbBundleEmbed);
+  document.addEventListener('shopify:section:load', () => void syncCartTierProgressBar());
 }

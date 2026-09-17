@@ -1,5 +1,6 @@
 import { withBundleCartLock } from "../../../../lib/bundle-cart-lock.js";
 import { buildCartLineSourceProperties } from '../../shared/engine/cart-lines.js';
+import { extractTierProgressForBundle } from '../../shared/engine/cart-lines.js';
 import {
   buildOfferAnalyticsCartProperties,
   buildProductPageCartFormData,
@@ -231,6 +232,7 @@ export const ProductPageCartMethods: Record<string, any> & ThisType<any> = {
         : '',
       discountPercentage,
       labels: this.getCartLineLabels?.(),
+      tierProgress: extractTierProgressForBundle(this.selectedBundle),
     });
   },
 
@@ -482,6 +484,9 @@ export const ProductPageCartMethods: Record<string, any> & ThisType<any> = {
         if (parsed?.youSave?.amountPercentage) {
           displayProperties[cartLineLabels.youSave] = String(parsed.youSave.amountPercentage);
         }
+        if (parsed?.tierProgress) {
+          displayProperties.tierProgress = parsed.tierProgress;
+        }
       } catch {
         // Cart add must remain non-blocking if display metadata is malformed.
       }
@@ -505,7 +510,7 @@ export const ProductPageCartMethods: Record<string, any> & ThisType<any> = {
     return {
       items: labels.bundleContainsLabel || 'Items',
       retailPrice: labels.bundleOriginalPriceLabel || 'Retail Price',
-      youSave: labels.bundleDiscountDisplayLabel || 'You Save',
+      youSave: labels.bundleDiscountDisplayLabel || 'Bundle Savings',
     };
   },
 

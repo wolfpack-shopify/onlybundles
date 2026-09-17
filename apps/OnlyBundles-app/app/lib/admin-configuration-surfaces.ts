@@ -313,7 +313,7 @@ export const LANGUAGE_CONFIGURATION: LanguageConfiguration = {
   sharedCartFields: [
     { key: "shared.cartCheckout.bundleContainsLabel", label: "Bundle Contains Label", value: "Items", kind: "text" },
     { key: "shared.cartCheckout.bundleOriginalPriceLabel", label: "Bundle Original Price Label", value: "Retail Price", kind: "text" },
-    { key: "shared.cartCheckout.bundleDiscountDisplayLabel", label: "Bundle Cart Discount Display Label", value: "You Save", kind: "text" },
+    { key: "shared.cartCheckout.bundleDiscountDisplayLabel", label: "Bundle Cart Discount Display Label", value: "Bundle Savings", kind: "text" },
   ],
   templateSections: ["Product Card", "Bundle Cart", "Bundle", "Popups", "Toasts", "Addons"],
   productPageTemplateSections: ["Product Card", "Bundle Cart", "Bundle", "Toasts"],

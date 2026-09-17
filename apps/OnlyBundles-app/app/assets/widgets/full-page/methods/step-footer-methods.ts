@@ -7,6 +7,7 @@ import { ToastManager } from '../../shared/toast-manager.js';
 import {
   buildCartLineDisplayProperties as buildSharedCartLineDisplayProperties,
   buildCartLineSourceProperties as buildSharedCartLineSourceProperties,
+  extractTierProgressForBundle,
 } from '../../shared/engine/cart-lines.js';
 import { shouldDisplayClassicFixedBundleRawTotal } from '../shared/summary-pricing-display.js';
 import { preflightVariantOnStorefront } from '../../shared/variant-preflight.js';
@@ -166,6 +167,7 @@ export const fullPageStepFooterMethods: Record<string, any> & ThisType<any> = {
       discountPercentage,
       includeBox: shouldIncludeBundleQuantityCartProperties(this),
       labels: this.getCartLineLabels?.(),
+      tierProgress: extractTierProgressForBundle(this.selectedBundle),
     });
 
     return sourceProperties;

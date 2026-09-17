@@ -130,7 +130,7 @@ describe('PPB Product List cart display metadata', () => {
       labels: {
         items: 'Items',
         retailPrice: 'Retail Price',
-        youSave: 'You Save',
+        youSave: 'Bundle Savings',
       },
     });
 

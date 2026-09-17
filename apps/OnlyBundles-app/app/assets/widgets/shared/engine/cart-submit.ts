@@ -102,6 +102,17 @@ export function buildProductPageCartFormData(cartItems: any[] = [], {
     formData.append(`items[${index}][properties][_bundleName]`, bundleName);
     formData.append(`items[${index}][properties][_wolfpackProductBundle:OfferId]`, `${offerId}_${sessionKey}_${itemNumber}`);
     formData.append(`items[${index}][properties][_wolfpackProductBundle:prodQty]`, String(item.quantity));
+    const rawDisplayProps = item?.properties?._bundle_display_properties;
+    if (rawDisplayProps) {
+      try {
+        const parsed = typeof rawDisplayProps === 'string' ? JSON.parse(rawDisplayProps) : rawDisplayProps;
+        if (parsed?.tierProgress) {
+          formData.append(`items[${index}][properties][_bundle_tier_progress]`, JSON.stringify(parsed.tierProgress));
+        }
+      } catch {
+        // Safe bypass
+      }
+    }
     const requiresLineRuntimeAuthorization = Boolean(
       sellingPlanId
       || item?.properties?._wolfpack_line_auth

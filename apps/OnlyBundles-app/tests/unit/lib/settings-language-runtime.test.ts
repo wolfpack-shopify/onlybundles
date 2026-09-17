@@ -261,4 +261,10 @@ describe("settings language runtime", () => {
     expect(buildSettingsLanguageResponse(saved, "product_page", "en").textOverrides)
       .toMatchObject({ productCardOutOfStockButton: expected });
   });
+
+  it("defaults bundleDiscountDisplayLabel to Bundle Savings when unconfigured", () => {
+    const runtime = buildSettingsLanguageRuntime({});
+    const response = buildSettingsLanguageResponse(runtime.settingsLanguage, "full_page");
+    expect(response.sharedCartLabels.bundleDiscountDisplayLabel).toBe("Bundle Savings");
+  });
 });

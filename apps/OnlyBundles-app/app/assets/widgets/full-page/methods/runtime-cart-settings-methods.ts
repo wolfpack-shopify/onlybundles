@@ -318,6 +318,9 @@ async syncBundleDetailsCartMetafield(bundleDetailsKey: any, sourceProperties: an
         if (parsed?.items) displayProperties[cartLineLabels.items] = String(parsed.items);
         if (parsed?.retailPrice) displayProperties[cartLineLabels.retailPrice] = String(parsed.retailPrice);
         if (parsed?.youSave?.amountPercentage) displayProperties[cartLineLabels.youSave] = String(parsed.youSave.amountPercentage);
+        if (parsed?.tierProgress) {
+          displayProperties.tierProgress = parsed.tierProgress;
+        }
       } catch {
         // Ignore malformed display metadata; cart add must remain non-blocking.
       }
@@ -341,7 +344,7 @@ getCartLineLabels() {
   return {
     items: labels.bundleContainsLabel || 'Items',
     retailPrice: labels.bundleOriginalPriceLabel || 'Retail Price',
-    youSave: labels.bundleDiscountDisplayLabel || 'You Save',
+    youSave: labels.bundleDiscountDisplayLabel || 'Bundle Savings',
   };
 },
 

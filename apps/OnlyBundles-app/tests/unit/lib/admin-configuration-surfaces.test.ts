@@ -47,7 +47,7 @@ describe("recovered admin surfaces contract", () => {
     expect(LANGUAGE_CONFIGURATION.sharedCartFields.map((field) => field.value)).toEqual([
       "Items",
       "Retail Price",
-      "You Save",
+      "Bundle Savings",
     ]);
     expect(LANGUAGE_CONFIGURATION.templateSections).toEqual([
       "Product Card",

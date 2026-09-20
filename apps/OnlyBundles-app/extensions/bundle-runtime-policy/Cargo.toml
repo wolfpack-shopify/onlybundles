@@ -1,0 +1,10 @@
+[package]
+name = "bundle-runtime-policy"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+shopify_function = "=2.2.0"
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
+# Share Shopify SDK's Ryū formatter; see Operations/Build Process for size evidence.
+serde_json = { version = "=1.0.146", default-features = false, features = ["alloc"] }

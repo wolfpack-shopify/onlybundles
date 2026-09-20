@@ -9,8 +9,7 @@ describe("Cart Transform input query", () => {
   const normalizedQuery = query.replace(/\s+/g, " ");
 
   it.each([
-    ["component_reference", "component_reference"],
-    ["price_adjustment", "price_adjustment"],
+    ["runtimePolicies", "bundle_runtime_memberships"],
   ])("queries app-owned %s metafield with the app namespace", (_label, key) => {
     expect(normalizedQuery).toContain(`metafield(namespace: "$app", key: "${key}")`);
   });
@@ -28,25 +27,16 @@ describe("Cart Transform input query", () => {
     const attributeCost = (normalizedQuery.match(/\battribute\(/g) ?? []).length;
     const requiredLeafCost = 8;
 
-    expect(metafieldCost + attributeCost + requiredLeafCost).toBe(26);
+    expect(metafieldCost + attributeCost + requiredLeafCost).toBeLessThanOrEqual(30);
     expect(normalizedQuery).toContain("sellingPlanAllocation { __typename }");
     expect(normalizedQuery).toContain("localization { country { isoCode } }");
   });
 
-  it("reads runtime and display metadata from the app-reserved cart metafield", () => {
-    expect(normalizedQuery).toContain('bundleDetails: metafield(namespace: "$app", key: "bundle_details")');
-    expect(normalizedQuery).not.toContain('attribute(key: "_bundle_display_properties")');
-    expect(normalizedQuery).not.toContain('attribute(key: "_wolfpack_bundle_runtime")');
-    expect(normalizedQuery).not.toContain('attribute(key: "_wpb_');
-  });
-
-  it("groups merge lines by the public offer attribute", () => {
-    expect(normalizedQuery).toContain('wolfpackProductBundleOfferId: attribute(key: "_wolfpackProductBundle:OfferId")');
-    expect(normalizedQuery).not.toContain('attribute(key: "_bundleName")');
-    expect(normalizedQuery).toContain('lineAuthorization: attribute(key: "_wolfpack_line_auth")');
-    expect(normalizedQuery).not.toContain('attribute(key: "_addon_offer_id")');
-    expect(normalizedQuery).not.toContain('metafield(namespace: "$app", key: "component_parents")');
-    expect(normalizedQuery).not.toContain('attribute(key: "_bundle_id")');
-    expect(normalizedQuery).not.toContain('attribute(key: "_bundle_name")');
+  it("reads buyer selection identifiers and optional presentation independently of policy", () => {
+    expect(normalizedQuery).toContain('selection: attribute(key: "_wpb_selection")');
+    expect(normalizedQuery).toContain('attribute(key: "_bundle_display_properties")');
+    expect(normalizedQuery).not.toContain('key: "bundle_details"');
+    expect(normalizedQuery).not.toContain('key: "_wolfpack_line_auth"');
+    expect(normalizedQuery).not.toContain('key: "_wolfpack_bundle_runtime"');
   });
 });

@@ -1,6 +1,6 @@
 import { BUNDLE_WIDGET } from '../../shared/constants.js';
 import { PricingCalculator } from '../../shared/pricing-calculator.js';
-import { calculateBundleTotalForPurchaseOption } from '../../shared/subscription-storefront-methods.js';
+import { calculatePaidBundleTotalForPurchaseOption } from '../../shared/subscription-storefront-methods.js';
 
 export const ProductPageSelectionDataMethods: Record<string, any> & ThisType<any> = {
 isInventoryTrackingOnAddToCartEnabled() {
@@ -122,11 +122,7 @@ getAddonTiers(step: any) {
 },
 
 getAddonTierEvaluation(step: any) {
-  const { totalPrice, totalQuantity } = calculateBundleTotalForPurchaseOption(this,
-    this.selectedProducts,
-    this.stepProductData,
-    this.selectedBundle?.steps
-  );
+  const { totalPrice, totalQuantity } = calculatePaidBundleTotalForPurchaseOption(this);
   const directTier = step?.addonEligibilityCondition || step?.addonDiscount
     ? [{
         eligibilityCondition: step?.addonEligibilityCondition || {},

@@ -239,6 +239,19 @@ function makeContext(preset: string, progressType: 'simple' | 'step_based'): any
 }
 
 describe('FPB summary sidebar discount progress', () => {
+  it('counts selected units rather than distinct products in the summary', () => {
+    const panel = document.createElement('aside') as unknown as FakeElement;
+    const context = makeContext('STANDARD', 'simple');
+    context.getAllSelectedProductsData = () => [
+      { product: { id: 'roasted', title: 'Roasted' }, quantity: 1 },
+      { product: { id: 'peri', title: 'Peri' }, quantity: 2 },
+    ];
+    fullPageSidePanelMethods.renderSidePanel.call(context, panel);
+    const text = (element: FakeElement): string => [element.textContent, ...element.children.map(text)].join('\n');
+    expect(text(panel)).toContain('3 item(s)');
+    expect(text(panel)).not.toContain('2 item(s)');
+  });
+
   it.each(['STANDARD', 'CLASSIC', 'COMPACT', 'HORIZONTAL'])(
     'requests step-based progress rendering in the %s summary sidebar',
     (preset) => {

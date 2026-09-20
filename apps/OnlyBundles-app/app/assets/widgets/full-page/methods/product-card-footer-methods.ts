@@ -97,13 +97,20 @@ createProductCard(product: any, stepIndex: string|number, options: any = {}) {
   const selectableVariantCount = Array.isArray(product?.variants)
     ? product.variants.filter((variant: any)  => variant?.available !== false).length
     : 0;
+  const displayProduct = this.buildPaidAddonProductDisplayData(product, step);
+  const outOfStock = typeof this.isVariantOutOfStock === 'function'
+    ? this.isVariantOutOfStock(displayProduct)
+    : displayProduct?.available === false;
+  const outOfStockLabel = resolveText('outOfStockText', 'Out of stock');
   const openVariantModalOnAdd =
     this.selectedBundle?.variantSelectorEnabled === false
     && displayVariantsAsIndividualProducts === false
     && selectableVariantCount > 1;
-  const addButtonText = openVariantModalOnAdd
-    ? resolveText('chooseOptionsButton', 'Choose Options')
-    : this.getProductCardAddButtonText(step);
+  const addButtonText = outOfStock
+    ? outOfStockLabel
+    : openVariantModalOnAdd
+      ? resolveText('chooseOptionsButton', 'Choose Options')
+      : this.getProductCardAddButtonText(step);
   const variantSelectorElement = shouldRenderVariantSelector
     ? usesConfiguredVariantSelector
       ? VariantSelectorComponent.createConfiguredElement(
@@ -126,10 +133,6 @@ createProductCard(product: any, stepIndex: string|number, options: any = {}) {
       : VariantSelectorComponent.createElement(product, primaryOptionName)
     : null;
 
-  const displayProduct = this.buildPaidAddonProductDisplayData(product, step);
-  const outOfStock = typeof this.isVariantOutOfStock === 'function'
-    ? this.isVariantOutOfStock(displayProduct)
-    : displayProduct?.available === false;
   const lowStockAlert = this.selectedBundle?.lowStockAlert
     ? resolveLowStockAlert(this.selectedBundle.lowStockAlert, [{
       quantityAvailable: typeof displayProduct.quantityAvailable === 'number'
@@ -144,7 +147,7 @@ createProductCard(product: any, stepIndex: string|number, options: any = {}) {
   if (lowStockAlert) {
     stockBadgeElement = document.createElement('div');
     stockBadgeElement.className = 'product-stock-badge product-stock-badge--low';
-    stockBadgeElement.textContent = lowStockAlert.message;
+    stockBadgeElement.textContent = lowStockAlert?.message ?? '';
   }
   const increaseDisabled = ConditionValidator.isProductQuantityIncreaseDisabled(
     this.selectedBundle?.validateQuantityPerProduct,
@@ -195,8 +198,9 @@ createProductCard(product: any, stepIndex: string|number, options: any = {}) {
         variantAriaLabel: resolveText('variantLabel', 'Variant'),
         removeAriaLabel: removeActionLabel,
         soldOutAriaLabel: resolveText('noProductsAvailableText', 'No Products Available'),
-        addButtonAriaLabel: resolveText('addButtonText', 'Add'),
+        addButtonAriaLabel: outOfStock ? outOfStockLabel : resolveText('addButtonText', 'Add'),
         addButtonText,
+        addDisabled: outOfStock,
         increaseDisabled,
         cardBadgeElement,
         stockBadgeElement,
@@ -489,6 +493,7 @@ attachProductCardListeners(cardElement: any, product: any, stepIndex: any, optio
   cardElement.addEventListener('click', (e: any) => {
     const addBtn = e.target.closest('.product-add-btn');
     if (!addBtn) return;
+    if (addBtn.disabled || addBtn.getAttribute?.('aria-disabled') === 'true') return;
     e.stopPropagation();
     if (options.openVariantModalOnAdd === true) {
       if (!this.productModal) {

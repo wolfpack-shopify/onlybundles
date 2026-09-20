@@ -13,6 +13,9 @@ export interface TierRule {
   minSubtotal?: number;
   discountType?: 'percentage' | 'fixed_amount' | string;
   discountValue?: number;
+  customerBuys?: number;
+  customerGets?: number;
+  bxyDiscountType?: string;
   tierText?: string | null;
 }
 
@@ -39,6 +42,11 @@ export interface CartTierProgressState {
 
 function formatDiscountBadge(rule: TierRule, currencySymbol = '$'): string {
   const val = Number(rule.discountValue || 0);
+  if (rule.discountType === 'fixed_bundle_price') return `Bundle price: ${formatMoneyCents(val, currencySymbol)}`;
+  if (rule.discountType === 'buy_x_get_y') {
+    const saving = rule.bxyDiscountType === 'fixed_amount' ? formatMoneyCents(val, currencySymbol) : `${val}%`;
+    return `Buy ${rule.customerBuys}, get ${rule.customerGets} at ${saving} off`;
+  }
   if (rule.discountType === 'fixed_amount') {
     return `${currencySymbol}${(val / 100).toFixed(2)}`;
   }
@@ -83,45 +91,17 @@ export function calculateCartTierProgress(
       } catch {
         // Safe bypass
       }
-    } else if (item?.properties?._wolfpack_bundle_runtime) {
-      try {
-        const token = String(item.properties._wolfpack_bundle_runtime);
-        for (const part of token.split('.')) {
-          try {
-            const rawPayload = typeof atob === 'function'
-              ? atob(part.replace(/-/g, '+').replace(/_/g, '/'))
-              : Buffer.from(part, 'base64').toString('utf-8');
-            const payload = JSON.parse(rawPayload);
-            const rules = payload?.priceAdjustment?.rules;
-            if (Array.isArray(rules) && rules.length > 0) {
-              itemTierProgress = {
-                rules: rules.map((r: any) => ({
-                  conditionType: r.conditions?.type || 'quantity',
-                  minQuantity: r.conditions?.type === 'amount' ? undefined : Number(r.conditions?.value || 0),
-                  minSubtotal: r.conditions?.type === 'amount' ? Number(r.conditions?.value || 0) : undefined,
-                  discountType: r.method === 'fixed_amount_off' ? 'fixed_amount' : 'percentage',
-                  discountValue: Number(r.value || 0),
-                })),
-                progressBar: { enabled: true, type: 'simple' },
-              };
-              break;
-            }
-          } catch {
-            // Safe bypass: try next token part
-          }
-        }
-      } catch {
-        // Safe bypass
-      }
     }
 
     if (itemTierProgress?.rules && Array.isArray(itemTierProgress.rules)) {
       if (!metadata) {
         metadata = itemTierProgress;
       }
-      const qty = Number(item.quantity || 1);
+      const componentQuantity = Number(item.properties?._bundle_total_quantity);
+      const qty = Number.isSafeInteger(componentQuantity) && componentQuantity > 0 ? componentQuantity : Number(item.quantity || 1);
       totalBundleQuantity += qty;
-      const linePrice = Number(item.line_price || item.final_line_price || (item.price * qty) || 0);
+      const retailCents = Number(item.properties?._bundle_total_retail_cents);
+      const linePrice = Number.isFinite(retailCents) && retailCents >= 0 ? retailCents : Number(item.line_price || item.final_line_price || (item.price * qty) || 0);
       totalBundlePriceCents += linePrice;
     }
   }
@@ -149,7 +129,8 @@ export function calculateCartTierProgress(
   if (currentValue >= maxThreshold) {
     const maxDiscount = formatDiscountBadge(maxRule, currencySymbol);
     const successTemplate = metadata.progressBar?.successText || "You've unlocked {{discountText}} off!";
-    const message = successTemplate.replace('{{discountText}}', maxDiscount);
+    const message = !metadata.progressBar?.successText && ['fixed_bundle_price', 'buy_x_get_y'].includes(maxRule.discountType || '')
+      ? maxDiscount : successTemplate.replace('{{discountText}}', maxDiscount);
     return {
       progressPercent: 100,
       message,
@@ -190,11 +171,12 @@ export function calculateCartTierProgress(
   const nextDiscount = formatDiscountBadge(nextRule, currencySymbol);
   const activeDiscount = activeRule ? formatDiscountBadge(activeRule, currencySymbol) : null;
 
+  const suffix = ['fixed_bundle_price', 'buy_x_get_y'].includes(nextRule.discountType || '') ? '' : ' off';
   let message: string;
   if (activeDiscount) {
-    message = `${activeDiscount} unlocked! Add ${conditionText} to unlock ${nextDiscount} off!`;
+    message = `${activeDiscount} unlocked! Add ${conditionText} to unlock ${nextDiscount}${suffix}!`;
   } else {
-    message = `Add ${conditionText} to unlock ${nextDiscount} off!`;
+    message = `Add ${conditionText} to unlock ${nextDiscount}${suffix}!`;
   }
 
   const badgeText = activeDiscount ? `${activeDiscount} Unlocked` : 'Next Milestone';
@@ -350,29 +332,24 @@ function ensureProgressStyles(doc: Document): void {
 }
 
 const CART_CONTAINER_SELECTORS = [
-  'cart-drawer-component .cart-drawer__header',
-  'cart-drawer .drawer__header',
-  '.cart-drawer__header',
   '#cart-drawer-header',
+  'cart-drawer-component .cart-drawer__header',
+  '.cart-drawer__header',
+  'cart-drawer .drawer__header',
   '.drawer__header',
   'cart-drawer-component .cart-drawer__content',
   'cart-drawer .cart-drawer-items',
   'cart-drawer .drawer__inner',
-  'cart-drawer',
-  'cart-drawer-component',
-  '.cart-drawer',
-  '#cart-drawer',
-  '#CartDrawer',
-  '[data-cart-drawer]',
-  '[data-side-cart]',
+  '.cart-drawer__inner',
+  '.cart-drawer__dialog',
   '#sidebar-cart',
   '#rebuy-cart',
   'upcart-cart',
+  '#main-cart-items',
   '.cart-items__wrapper',
   '.cart-page__items',
   '[data-cart-items-wrapper]',
-  'form[action*="/cart"]',
-  '#main-cart-items',
+  'form[action="/cart"]',
   '.cart-items',
   '.cart__items',
 ];
@@ -380,16 +357,11 @@ const CART_CONTAINER_SELECTORS = [
 function findCartMountTarget(doc: Document): HTMLElement | null {
   for (const selector of CART_CONTAINER_SELECTORS) {
     const target = doc.querySelector<HTMLElement>(selector);
-    if (target && target.offsetParent !== null) {
+    if (target) {
       return target;
     }
   }
-  return doc.querySelector<HTMLElement>(CART_CONTAINER_SELECTORS[0])
-    || doc.querySelector<HTMLElement>('cart-drawer-component')
-    || doc.querySelector<HTMLElement>('cart-drawer')
-    || doc.querySelector<HTMLElement>('.cart-items__wrapper')
-    || doc.querySelector<HTMLElement>('form[action*="/cart"]')
-    || null;
+  return null;
 }
 
 function formatStyledMessage(rawMessage: string, isMaxTier: boolean): string {
@@ -413,6 +385,12 @@ export function renderCartTierProgressBar(
   const existing = doc.querySelector<HTMLElement>(`.${BAR_CLASS}`);
 
   if (!state) {
+    existing?.remove();
+    return;
+  }
+
+  const mountTarget = findCartMountTarget(doc);
+  if (!mountTarget) {
     existing?.remove();
     return;
   }
@@ -468,19 +446,18 @@ export function renderCartTierProgressBar(
 
     barElement.appendChild(headerEl);
     barElement.appendChild(trackWrapper);
+  }
 
-    const mountTarget = findCartMountTarget(doc);
-    if (mountTarget) {
-      if (
-        mountTarget.classList.contains('drawer__header')
-        || mountTarget.classList.contains('cart-drawer__header')
-        || mountTarget.id === 'cart-drawer-header'
-      ) {
-        mountTarget.after(barElement);
-      } else {
-        mountTarget.prepend(barElement);
-      }
+  if (
+    mountTarget.classList.contains('drawer__header')
+    || mountTarget.classList.contains('cart-drawer__header')
+    || mountTarget.id === 'cart-drawer-header'
+  ) {
+    if (mountTarget.nextElementSibling !== barElement) {
+      mountTarget.after(barElement);
     }
+  } else if (barElement.parentElement !== mountTarget) {
+    mountTarget.prepend(barElement);
   }
 
   // Update dynamic state
@@ -628,7 +605,9 @@ export function extractTierProgressForBundle(bundle: any): BundleTierProgressMet
       conditionType,
       minQuantity: isAmount ? undefined : Number(r.conditionValue ?? r.minQuantity ?? 0),
       minSubtotal: isAmount ? Number(r.conditionValue ?? r.minSubtotal ?? 0) : undefined,
-      discountType: r.discountType || (bundle.pricing?.method === 'fixed_amount_off' ? 'fixed_amount' : 'percentage'),
+      discountType: ['fixed_bundle_price', 'buy_x_get_y'].includes(bundle.pricing.method) ? bundle.pricing.method
+        : r.discountType || (bundle.pricing.method === 'fixed_amount_off' ? 'fixed_amount' : 'percentage'),
+      customerBuys: r.customerBuys, customerGets: r.customerGets, bxyDiscountType: r.bxyDiscountType,
       discountValue: Number(r.discountValue ?? 0),
       tierText: r.tierText || null,
     };

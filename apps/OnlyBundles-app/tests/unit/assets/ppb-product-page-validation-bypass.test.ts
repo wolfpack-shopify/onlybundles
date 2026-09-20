@@ -153,15 +153,12 @@ describe('PPB validation control disables cart gating when disabled', () => {
         getDiscountInfoWithSelectedAddonDiscount(value: Record<string, unknown>) {
           return value;
         },
-        applyPpbStaticAuthorization: jest.fn().mockReturnValue('runtime-token'),
         buildProductPageCartFormData() {
           return {
             formData: new FormData(),
-            bundleDetailsKey: 'MIX-1_K1K',
             sourceProperties: {},
           };
         },
-        syncBundleDetailsCartMetafield: jest.fn(),
         resolveProductPageOfferId: () => 'MIX-1',
         generateBundleSessionKey: () => 'K1K',
         elements: {
@@ -176,8 +173,6 @@ describe('PPB validation control disables cart gating when disabled', () => {
         method: 'GET',
         headers: { 'Accept': 'application/json' },
       }));
-      expect(context.syncBundleDetailsCartMetafield).toHaveBeenCalled();
-      expect(context.applyPpbStaticAuthorization).toHaveBeenCalled();
       expect(toastSpy).not.toHaveBeenCalledWith('Please complete all bundle steps before adding to cart.');
     } finally {
       toastSpy.mockRestore();
@@ -262,15 +257,12 @@ describe('PPB validation control disables cart gating when disabled', () => {
         getDiscountInfoWithSelectedAddonDiscount(value: Record<string, unknown>) {
           return value;
         },
-        applyPpbStaticAuthorization: jest.fn().mockReturnValue('runtime-token'),
         buildProductPageCartFormData() {
           return {
             formData: new FormData(),
-            bundleDetailsKey: 'MIX-1_K1K',
             sourceProperties: {},
           };
         },
-        syncBundleDetailsCartMetafield: jest.fn(),
         resolveProductPageOfferId: () => 'MIX-1',
         generateBundleSessionKey: () => 'K1K',
         hideLoadingOverlay: jest.fn(),

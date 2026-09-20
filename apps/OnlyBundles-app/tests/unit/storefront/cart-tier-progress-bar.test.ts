@@ -131,27 +131,18 @@ describe('Cart Tier Progress Bar', () => {
       expect(result?.message).toBe('Add $15.00 to unlock 10% off!');
     });
 
-    it('extracts tier progress from _wolfpack_bundle_runtime when present on cart parent item', () => {
-      const payload = {
-        version: 2,
-        bundleId: 'bundle-test',
-        priceAdjustment: {
-          method: 'percentage_off',
-          value: 10,
-          rules: [
-            { method: 'percentage_off', value: 10, conditions: { type: 'quantity', operator: 'gte', value: 2 } },
-            { method: 'percentage_off', value: 15, conditions: { type: 'quantity', operator: 'gte', value: 3 } },
-          ],
-        },
-      };
-      const token = `${Buffer.from(JSON.stringify(payload)).toString('base64')}.mock_sig`;
+    it('extracts published tier presentation metadata from a transformed parent', () => {
+      const metadata = { rules: [
+        { conditionType: 'quantity', minQuantity: 2, discountType: 'percentage', discountValue: 10 },
+        { conditionType: 'quantity', minQuantity: 3, discountType: 'percentage', discountValue: 15 },
+      ], progressBar: { enabled: true, type: 'simple' } };
       const cartItems = [
         {
           id: 12345,
           quantity: 1,
           price: 2000,
           properties: {
-            _wolfpack_bundle_runtime: token,
+            _bundle_tier_progress: JSON.stringify(metadata),
           },
         },
       ];
@@ -215,5 +206,111 @@ describe('Cart Tier Progress Bar', () => {
       renderCartTierProgressBar(document, null);
       expect(document.querySelector('.wpb-cart-tier-progress-bar')).toBeNull();
     });
+
+    it('mounts inside Horizon theme dialog after #cart-drawer-header instead of outer cart-drawer-component', () => {
+      const horizonDom = new JSDOM(`
+        <!DOCTYPE html>
+        <html>
+          <body>
+            <cart-drawer-component class="cart-drawer">
+              <button class="header-actions__action">Cart (1)</button>
+              <dialog class="cart-drawer__dialog">
+                <div class="cart-drawer__inner">
+                  <cart-items-component class="cart-items-component">
+                    <div id="cart-drawer-header" class="cart-drawer__header">
+                      <h2>Cart</h2>
+                    </div>
+                    <div class="cart-drawer__content"></div>
+                  </cart-items-component>
+                </div>
+              </dialog>
+            </cart-drawer-component>
+          </body>
+        </html>
+      `);
+      const horizonDoc = horizonDom.window.document;
+      const state: CartTierProgressState = {
+        progressPercent: 50,
+        message: 'Add 1 more to unlock 10% off!',
+        isMaxTier: false,
+      };
+
+      renderCartTierProgressBar(horizonDoc, state);
+
+      const bar = horizonDoc.querySelector('.wpb-cart-tier-progress-bar');
+      expect(bar).not.toBeNull();
+      // Must be inside the dialog after cart-drawer-header
+      expect(bar?.parentElement?.tagName).toBe('CART-ITEMS-COMPONENT');
+      expect(horizonDoc.getElementById('cart-drawer-header')?.nextElementSibling).toBe(bar);
+      // Must NOT be a direct child of cart-drawer-component
+      expect(horizonDoc.querySelector('cart-drawer-component > .wpb-cart-tier-progress-bar')).toBeNull();
+    });
+
+    it('does not mount on product pages when only a product purchase form is present', () => {
+      const pdpDom = new JSDOM(`
+        <!DOCTYPE html>
+        <html>
+          <body>
+            <div class="product-info">
+              <form action="/cart/add" method="post">
+                <button type="submit">Add to cart</button>
+              </form>
+            </div>
+          </body>
+        </html>
+      `);
+      const pdpDoc = pdpDom.window.document;
+      const state: CartTierProgressState = {
+        progressPercent: 50,
+        message: 'Add 1 more to unlock 10% off!',
+        isMaxTier: false,
+      };
+
+      renderCartTierProgressBar(pdpDoc, state);
+
+      expect(pdpDoc.querySelector('.wpb-cart-tier-progress-bar')).toBeNull();
+    });
+
+    it('mounts into /cart page container (#main-cart-items)', () => {
+      const cartPageDom = new JSDOM(`
+        <!DOCTYPE html>
+        <html>
+          <body>
+            <div id="main-cart-items">
+              <div class="cart-item"></div>
+            </div>
+          </body>
+        </html>
+      `);
+      const cartDoc = cartPageDom.window.document;
+      const state: CartTierProgressState = {
+        progressPercent: 50,
+        message: 'Add 1 more to unlock 10% off!',
+        isMaxTier: false,
+      };
+
+      renderCartTierProgressBar(cartDoc, state);
+
+      const bar = cartDoc.querySelector('#main-cart-items > .wpb-cart-tier-progress-bar');
+      expect(bar).not.toBeNull();
+    });
+  });
+});
+
+test('uses the transformed component count for bundle tier progress', () => {
+  const result = calculateCartTierProgress([{quantity: 1, price: 4000, line_price: 4000, properties: {
+    _bundle_total_quantity: '3', _bundle_total_retail_cents: '6000',
+    _bundle_tier_progress: JSON.stringify({rules:[{conditionType:'quantity',minQuantity:3,discountType:'percentage',discountValue:100}],progressBar:{enabled:true}})
+  }}]);
+  expect(result?.isMaxTier).toBe(true);
+});
+
+describe('Cart pricing method messages', () => {
+  test.each([
+    [{discountType:'fixed_bundle_price',discountValue:3500},'Bundle price: $35.00'],
+    [{discountType:'buy_x_get_y',discountValue:100,customerBuys:2,customerGets:1,bxyDiscountType:'percentage'},'Buy 2, get 1 at 100% off'],
+  ])('describes the actual offer instead of treating every value as a percentage', (rule,message) => {
+    const result=calculateCartTierProgress([{quantity:3,price:2000,properties:{_bundle_tier_progress:JSON.stringify({rules:[{...rule,minQuantity:3}]})}}]);
+    expect(result?.message).toBe(message);
   });
 });

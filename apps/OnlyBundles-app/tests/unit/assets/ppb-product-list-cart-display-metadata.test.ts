@@ -61,6 +61,7 @@ function makeProductPageContext() {
     ],
     selectedBundle: {
       id: 'bundle-1',
+      runtimePolicyRevision: 'published-revision',
       name: 'PPB Product List Fixture',
       steps: [{ id: 'productsData1' }],
       pricing: { enabled: false },
@@ -99,7 +100,7 @@ function makeProductPageContext() {
 }
 
 describe('PPB Product List cart display metadata', () => {
-  it('builds EB-compatible display metadata for Product List cart lines', () => {
+  it('builds presentation metadata and stable identifiers for Product List cart lines', () => {
     const context = makeProductPageContext();
 
     const items = ProductPageCartMethods.buildCartItems.call(context, 'MIX-894502', 'K1K');
@@ -127,26 +128,14 @@ describe('PPB Product List cart display metadata', () => {
         offerRuleVersion: 4,
         offerEligibilitySource: 'always',
       },
-      labels: {
-        items: 'Items',
-        retailPrice: 'Retail Price',
-        youSave: 'Bundle Savings',
-      },
-    });
-
-    expect(ProductPageCartMethods.buildBundleDetailsDisplayProperties.call(context, items[0].properties)).toEqual({
-      bundleName: 'PPB Product List Fixture',
-      Items: '2 x 14k Dangling Obsidian Earrings, 1 x 14k Dangling Pendant Earrings, 1 x 18k Pedal Ring - 8 (8)',
-      'Retail Price': '$2,676.00',
     });
 
     const cartContext = ProductPageCartMethods.buildProductPageCartFormData.call(context, items, {
       bundleName: 'PPB Product List Fixture',
       offerId: 'MIX-894502',
       sessionKey: 'K1K',
-      runtimeToken: 'runtime-token',
     });
-    expect(cartContext.bundleDetailsKey).toBe('MIX-894502_K1K');
+    expect(cartContext).not.toHaveProperty('bundleDetailsKey');
     expect((Array.from(cartContext.formData.entries()) as Array<[string, unknown]>).filter(([key]: any) => key.endsWith('[_wolfpackProductBundle:OfferId]'))).toEqual([
       ['items[0][properties][_wolfpackProductBundle:OfferId]', 'MIX-894502_K1K_1'],
       ['items[1][properties][_wolfpackProductBundle:OfferId]', 'MIX-894502_K1K_2'],

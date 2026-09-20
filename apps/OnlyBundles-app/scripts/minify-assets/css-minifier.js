@@ -11,6 +11,11 @@ export function minifyCSS(css) {
   css = css.replace(/\s*,\s*/g, ',');
   css = css.replace(/\s*;\s*/g, ';');
   css = css.replace(/;}/g, '}');
+  css = css.replace(/\s*>\s*/g, '>');
+  css = css.replace(/\s*\)\s*\{/g, '){');
+  css = css.replace(/\s*!\s*important/g, '!important');
+  css = css.replace(/\(\s+/g, '(');
+  css = css.replace(/\s+\)/g, ')');
   css = css.replace(/#([0-9a-fA-F])\1([0-9a-fA-F])\2([0-9a-fA-F])\3\b/g, '#$1$2$3');
   css = css.replace(
     /(^|[\s:,(])0(?:px|rem|em|%)(?=\b|[;},)\s])/g,

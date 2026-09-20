@@ -765,3 +765,12 @@ describe('isStepConditionSatisfied — category mode', () => {
     })).toBe(true);
   });
 });
+
+test('a configured free gift without an eligibility tier remains optional', () => {
+  expect(ConditionValidator.isAddonStepSatisfied({tier:null},{gift:{quantity:1,amount:2000}})).toBe(true);
+});
+
+test('normalizes persisted add-on condition values before producing limit messages', () => {
+  expect(ConditionValidator.canUpdateQuantity({}, {gift:1}, 'gift', 2, null,
+    [{type:'quantity',condition:'lessThanOrEqualTo',value:'1'}])).toMatchObject({allowed:false,conditionValue:1});
+});

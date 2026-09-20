@@ -658,7 +658,7 @@ async _reconcileDirectDefaultProductsFromStorefront(stepIndex: number) {
     return;
   }
 
-  const productIds = Array.from(new Set(this.directDefaultProducts
+  const productIds = Array.from(new Set<string>(this.directDefaultProducts
     .map((product: any)  => extractFullPageId(product?.id))
     .filter(Boolean)
     .map((productId: any)  => `gid://shopify/Product/${productId}`)));
@@ -704,7 +704,7 @@ async _reconcileDirectDefaultProductsFromStorefront(stepIndex: number) {
     });
 
     if (typeof this.rememberRuntimeProductInventory === 'function') {
-      this.rememberRuntimeProductInventory(data.products);
+      this.rememberRuntimeProductInventory(products);
     }
   } catch (error: any) {
   }
@@ -897,7 +897,7 @@ processProductsForStep(products: any, step: any) {
 
       const processedOptions = deriveProductOptionNames(product);
 
-    return product.variants
+      return product.variants
         .filter((variant: any)  => this.isVariantSelectableForInventory(variant))
         .map((variant: any)  => {
           const variantId = variantLookupKey(variant);
@@ -947,19 +947,21 @@ processProductsForStep(products: any, step: any) {
         })
         .filter(Boolean);
     } else {
-      // Grouped cards require at least one sellable variant. This also removes
-      // tracked zero-stock products when the global inventory control is active.
       const defaultVariant = this.getFirstAvailableVariant(product);
-      if (Array.isArray(product?.variants) && product.variants.length > 0 && !defaultVariant) {
+      const trackInventoryOnAddToCart = typeof this.isInventoryTrackingOnAddToCartEnabled === 'function'
+        ? this.isInventoryTrackingOnAddToCartEnabled()
+        : fullPageProductProcessingMethods.isInventoryTrackingOnAddToCartEnabled.call(this);
+      if (trackInventoryOnAddToCart && Array.isArray(product?.variants) && product.variants.length > 0 && !defaultVariant) {
         return [];
       }
-      const defaultRuntimeInventory = defaultVariant
+      const activeVariant = defaultVariant || (Array.isArray(product?.variants) && product.variants.length > 0 ? product.variants[0] : null);
+      const defaultRuntimeInventory = activeVariant
         && typeof this.getRuntimeVariantInventory === 'function'
-        ? this.getRuntimeVariantInventory(defaultVariant)
+        ? this.getRuntimeVariantInventory(activeVariant)
         : null;
       const defaultVariantSource = defaultRuntimeInventory
-        ? { ...defaultVariant, ...defaultRuntimeInventory }
-        : defaultVariant;
+        ? { ...activeVariant, ...defaultRuntimeInventory }
+        : activeVariant;
 
       // Storefront API: prioritize variant image, fallback to product featured image.
       // product.imageUrl — set by API path; product.featuredImage/images — metafield cache format.
@@ -1105,7 +1107,7 @@ async enrichMissingProductDescriptions(products: any[]) {
   const missingProductIds = Array.from(new Set(products
     .filter(product => !normalizeProductDescriptionHtml(product))
     .map(productGraphqlId)
-    .filter(Boolean)));
+    .filter((id): id is string => typeof id === 'string' && id.length > 0)));
 
   if (missingProductIds.length === 0) return products;
 

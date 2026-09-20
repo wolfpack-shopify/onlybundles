@@ -21,6 +21,12 @@ const {
 } = require('../../../app/assets/widgets/full-page/methods/product-processing-methods.js');
 
 describe('Full Page widget category hydration behavior', () => {
+  it('hydrates configured Shopify product IDs without requiring images or selection state', () => {
+    expect(fullPageSearchCategoryMethods.collectStepProductIds({
+      products: [{ id: 'gid://shopify/Product/123', selectionId: 'buyer-choice' }],
+      categories: [{ products: [{ id: 'gid://shopify/Product/123' }, { id: 'gid://shopify/Product/456' }] }],
+    })).toEqual(['gid://shopify/Product/123', 'gid://shopify/Product/456']);
+  });
   const getStepCategoryTabEntries = fullPageSearchCategoryMethods.getStepCategoryTabEntries;
   const shouldDisplayVariantsAsIndividualForProductGrid =
     fullPageSearchCategoryMethods.shouldDisplayVariantsAsIndividualForProductGrid;

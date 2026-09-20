@@ -712,6 +712,8 @@
   display: -webkit-box;
   min-height: 2.3625rem;
   max-height: 2.3625rem;
+  text-align: left;
+  text-align: start;
   overflow: hidden;
   -webkit-line-clamp: 2;
   line-clamp: 2;

@@ -154,3 +154,24 @@ describe("shared storefront selling-plan presentation", () => {
     });
   });
 });
+
+describe('Paid-component pricing with optional add-ons', () => {
+  test.each([
+    ['fixed_bundle_price',3500,2500],
+    ['percentage_off',20,1200],
+    ['fixed_amount_off',1000,1000],
+    ['buy_x_get_y',100,2000],
+  ])('%s applies only to paid components', (method,value,expectedDiscount) => {
+    const controller={selectedProducts:[{paid:3},{addon:1}],stepProductData:[[{selectionId:'paid',price:2000}],[{selectionId:'addon',price:2000}]],
+      selectedBundle:{steps:[{id:'paid'},{id:'addon',isFreeGift:true,addonDisplayFree:false}],pricing:{enabled:true,method,rules:[{
+        conditionType:'quantity',conditionValue:3,conditionOperator:'gte',discountValue:value,customerBuys:2,customerGets:1,bxyDiscountType:'percentage',bxyApplyMode:'lowest_priced',
+      }]}}};
+    const discount=calculateBundleDiscountForPurchaseOption(controller,8000,4,[2000,2000,2000,2000]);
+    expect(discount.discountAmount).toBe(expectedDiscount);
+  });
+  test('an add-on cannot qualify a paid-component quantity threshold', () => {
+    const controller={selectedProducts:[{paid:2},{addon:1}],stepProductData:[[{selectionId:'paid',price:2000}],[{selectionId:'addon',price:2000}]],
+      selectedBundle:{steps:[{id:'paid'},{id:'addon',isFreeGift:true}],pricing:{enabled:true,method:'percentage_off',rules:[{conditionType:'quantity',conditionValue:3,discountValue:20}]}}};
+    expect(calculateBundleDiscountForPurchaseOption(controller,6000,3,[2000,2000,2000]).discountAmount).toBe(0);
+  });
+});

@@ -34,6 +34,14 @@ export function calculateBundleDiscountForPurchaseOption(
   unitPrices: any[] = [],
 ) {
   const bundle = controller?.selectedBundle;
+  // Optional add-ons have their own tier discount. Base bundle pricing and its
+  // qualification thresholds use only paid components, including defaults.
+  if (bundle?.steps?.some((step: any) => step?.isFreeGift)) {
+    const paid = calculatePaidBundleTotalForPurchaseOption(controller);
+    totalPrice = paid.totalPrice;
+    totalQuantity = paid.totalQuantity;
+    unitPrices = paid.unitPrices;
+  }
   const subscription = bundle?.subscription;
   if (subscription?.enabled && !shouldApplyStorefrontBundleDiscount(
     subscription,
@@ -84,4 +92,12 @@ export function calculateBundleTotalForPurchaseOption(
     totalPrice: adjusted.totalPrice,
     unitPrices: adjusted.unitPrices,
   };
+}
+
+/** Paid components, including defaults, qualify base pricing and add-on tiers. */
+export function calculatePaidBundleTotalForPurchaseOption(controller: any) {
+  const steps = controller.selectedBundle.steps;
+  const paidSelections = controller.selectedProducts.map((selections: any, index: number) =>
+    steps[index]?.isFreeGift ? {} : selections);
+  return calculateBundleTotalForPurchaseOption(controller, paidSelections, controller.stepProductData, steps);
 }

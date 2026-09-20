@@ -1,4 +1,3 @@
-import { syncCartBundleDetails } from "../../../lib/cart-bundle-details.js";
 const PRODUCT_BATCH_SIZE = 50;
 
 export function resolvePpbStorefrontEndpoint(shop: string, apiVersion: string) {
@@ -211,25 +210,4 @@ export async function fetchPpbStorefrontProducts({
     }
   }
   return products;
-}
-
-export async function setPpbBundleDetailsCartMetafield({
-  shop,
-  apiVersion,
-  accessToken,
-  cartToken,
-  bundleDetailsKey,
-  displayProperties,
-  runtimeToken,
-  pendingLineCount,
-  fetchImpl = fetch,
-}: any) {
-  const endpoint = resolvePpbStorefrontEndpoint(shop, apiVersion);
-  const token = String(cartToken || '').trim();
-  if (!token) return false;
-  const cartId = token.startsWith('gid://shopify/Cart/') ? token : `gid://shopify/Cart/${token}`;
-  if (!runtimeToken) throw new Error('Missing bundle cart authorization');
-  await syncCartBundleDetails((query, variables) => requestStorefront({ endpoint, accessToken, query, variables, fetchImpl }),
-    cartId, { key: bundleDetailsKey, displayProperties, runtimeToken }, pendingLineCount);
-  return true;
 }

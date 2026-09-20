@@ -74,6 +74,7 @@ const getDb = () => require("../../../app/db.server").default;
 describe("storefront sync direct flow", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    process.env.SHOPIFY_APP_URL = "https://app.example.test";
     jest.spyOn(Date, "now").mockReturnValue(1720440000000);
     getDb().bundle.update.mockImplementation(async ({ data }: any) => ({
       id: "bundle-1",
@@ -119,6 +120,7 @@ describe("storefront sync direct flow", () => {
     expect(getDb().bundle.update).not.toHaveBeenCalled();
     expect(ensureBundleParentProduct).toHaveBeenCalledWith(expect.objectContaining({
       shopDomain: "test.myshopify.com",
+      appUrl: "https://app.example.test",
       bundle: expect.objectContaining({ id: "bundle-1", publicNumber: 1 }),
     }));
     expect(result).toMatchObject({

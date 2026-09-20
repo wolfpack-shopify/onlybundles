@@ -77,6 +77,7 @@ describe("repository layout", () => {
       .map(([name, command]) => [name, String(command)]);
 
     expect(shopifyScripts.map(([name]) => name)).toEqual([
+      "build:cart-transform",
       "dev",
       "dev:sit",
       "config:link",
@@ -88,7 +89,8 @@ describe("repository layout", () => {
       "env",
       "shopify",
     ]);
-    for (const [, command] of shopifyScripts) {
+    for (const [name, command] of shopifyScripts) {
+      if (name === "build:cart-transform") { expect(command).toBe("shopify app function build --path extensions/bundle-cart-transform-rs"); continue; }
       expect(command).toMatch(/(?:^|&& )SHOPIFY_FLAG_PATH=\. shopify(?: |$)/);
     }
   });

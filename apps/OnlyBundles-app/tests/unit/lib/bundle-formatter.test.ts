@@ -718,3 +718,8 @@ describe("formatBundleForWidget", () => {
     });
   });
 });
+
+test('exposes only the last successfully published runtime revision to widgets', () => {
+  expect(formatBundleForWidget(makeBundle({ runtimePolicyRevision: 'published-revision' }))).toMatchObject({ runtimePolicyRevision: 'published-revision' });
+  expect(formatBundleForWidget(makeBundle())).toMatchObject({ runtimePolicyRevision: null });
+});

@@ -13,11 +13,7 @@
 import db from "../../db.server";
 import { matchLineItemGroupsToBundles } from "../../lib/analytics/bundle-matcher.server";
 import { AppLogger } from "../../lib/logger";
-import { collectBundleLineRevenue } from "../../lib/analytics/bundle-line-revenue";
-import {
-  generateCartTransformRuntimeTokenSecret,
-  verifyRuntimeCartToken,
-} from "../cart-transform-runtime-token.server";
+import { bundleLineAttributionId, collectBundleLineRevenue } from "../../lib/analytics/bundle-line-revenue";
 
 interface BackfillResult {
   created: number;
@@ -98,53 +94,15 @@ function toRevenueCents(amount?: string | null): number {
   return Math.round(parseFloat(amount) * 100);
 }
 
-function verifiedRuntimeBundleIds(node: OrderNode, shopId: string): string[] {
-  let secret: string;
-  try {
-    secret = generateCartTransformRuntimeTokenSecret(shopId);
-  } catch {
-    return [];
-  }
-
-  const bundleIds = new Set<string>();
-  for (const lineItem of node.lineItems?.nodes ?? []) {
-    const runtimeToken = lineItem.customAttributes?.find(
-      (attribute) => attribute.key === "_wolfpack_bundle_runtime",
-    )?.value;
-    if (!runtimeToken) continue;
-    const payload = verifyRuntimeCartToken(runtimeToken, secret);
-    if (payload?.shop === shopId && payload.bundleId) {
-      bundleIds.add(payload.bundleId);
-    }
-  }
-  return [...bundleIds];
+function attributedBundleIds(node: OrderNode): string[] {
+  return [...new Set((node.lineItems?.nodes ?? []).flatMap(line => {
+    const id = bundleLineAttributionId(line);
+    return id ? [id] : [];
+  }))];
 }
 
-function bundleRevenueById(
-  node: OrderNode,
-  shopId: string,
-  bundleIds: string[],
-): Record<string, number> {
-  let secret: string;
-  try {
-    secret = generateCartTransformRuntimeTokenSecret(shopId);
-  } catch {
-    return Object.fromEntries(bundleIds.map((bundleId) => [bundleId, 0]));
-  }
-
-  const lines = (node.lineItems?.nodes ?? []).map((lineItem) => {
-    const runtimeToken = lineItem.customAttributes?.find(
-      (attribute) => attribute.key === "_wolfpack_bundle_runtime",
-    )?.value;
-    const payload = runtimeToken
-      ? verifyRuntimeCartToken(runtimeToken, secret)
-      : null;
-    return {
-      ...lineItem,
-      bundleId: payload?.shop === shopId ? payload.bundleId : null,
-    };
-  });
-  return collectBundleLineRevenue(lines, bundleIds);
+function bundleRevenueById(node: OrderNode, bundleIds: string[]): Record<string, number> {
+  return collectBundleLineRevenue(node.lineItems?.nodes ?? [], bundleIds);
 }
 
 export async function backfillOrderAttribution(
@@ -188,7 +146,7 @@ export async function backfillOrderAttribution(
     );
 
     const explicitBundleIdsByOrder = nodes.map((node) => (
-      verifiedRuntimeBundleIds(node, shopId)
+      attributedBundleIds(node)
     ));
     const fallbackNodeIndexes = nodes.flatMap((node, index) => {
       const existingRows = existingRowsForOrder(node.id);
@@ -247,7 +205,7 @@ export async function backfillOrderAttribution(
       const revenue = toRevenueCents(node.currentTotalPriceSet?.shopMoney?.amount);
       const currency = node.currentTotalPriceSet?.shopMoney?.currencyCode ?? "USD";
       const orderNumber = extractOrderNumber(node.id);
-      const revenueByBundleId = bundleRevenueById(node, shopId, bundleIds);
+      const revenueByBundleId = bundleRevenueById(node, bundleIds);
       const baseRow = {
         shopId,
         orderId: node.id,

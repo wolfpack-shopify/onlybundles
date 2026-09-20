@@ -436,7 +436,7 @@ export async function runDeploymentGeneralSync(
   for (const shopDomain of shopDomains) {
     try {
       const admin = await deps.getAdmin(shopDomain);
-      await deps.ensureMetafieldDefinitions(admin);
+      if (await deps.ensureMetafieldDefinitions(admin) === false) throw new Error("Bundle metafield definition provisioning failed");
       await deps.syncPpbRuntime(admin, shopDomain);
       adminByShop.set(shopDomain, admin);
       summary.metafieldDefinitionShopsSynced += 1;

@@ -262,9 +262,9 @@ export class AddOnDiscountFunctionService {
             : {}),
           metafields: [{
             namespace: "$app",
-            key: "discount_role",
-            type: "single_line_text_field",
-            value: role.key,
+            key: "discount_configuration",
+            type: "json",
+            value: JSON.stringify({ version: 1, role: role.key, windowStart: '00:00:00', windowEnd: '23:59:59' }),
           }],
         },
       },
@@ -332,6 +332,18 @@ export class AddOnDiscountFunctionService {
     return this.completeRoleSetup(admin, shopDomain, SUBSCRIPTION_RECURRING_ROLE);
   }
 
+  private static async syncConfiguration(admin: AdminApiContext, ownerId: string, role: DiscountFunctionRole) {
+    const value = JSON.stringify({ version: 1, role: role.key, windowStart: '00:00:00', windowEnd: '23:59:59' });
+    const response = await admin.graphql(`mutation SyncBundleDiscountConfiguration($metafields: [MetafieldsSetInput!]!) {
+      metafieldsSet(metafields: $metafields) { metafields { key value } userErrors { message } }
+    }`, { variables: { metafields: [{ ownerId, namespace: '$app', key: 'discount_configuration', type: 'json', value }] } });
+    const payload = await response.json() as any;
+    const result = payload.data?.metafieldsSet;
+    if (payload.errors?.length || !result || result.userErrors?.length
+      || !result.metafields?.some((field: any) => field.key === 'discount_configuration'
+        && JSON.stringify(JSON.parse(field.value)) === value)) throw new Error('Bundle discount configuration was not confirmed by Shopify');
+  }
+
   private static async completeRoleSetup(
     admin: AdminApiContext,
     shopDomain: string,
@@ -362,6 +374,7 @@ export class AddOnDiscountFunctionService {
         (discount) => discount.status === "ACTIVE",
       );
       if (activeDiscount) {
+        await this.syncConfiguration(admin, activeDiscount.id, role);
         return {
           success: true,
           functionId: shopifyFunction.id,
@@ -379,6 +392,8 @@ export class AddOnDiscountFunctionService {
             shopifyFunction,
           )
         : await this.createAutomaticDiscount(admin, shopifyFunction, role);
+
+      if (result.success && inactiveDiscount && result.discountId) await this.syncConfiguration(admin, result.discountId, role);
 
       if (!result.success) {
         AppLogger.warn("Add-on automatic discount setup failed", {

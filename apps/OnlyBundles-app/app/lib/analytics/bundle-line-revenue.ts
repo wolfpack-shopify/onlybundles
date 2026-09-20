@@ -40,7 +40,7 @@ function jsonRecord(value: unknown): Record<string, unknown> {
   }
 }
 
-function taggedBundleId(line: BundleRevenueLine): string | null {
+export function bundleLineAttributionId(line: BundleRevenueLine): string | null {
   if (typeof line.bundleId === "string" && line.bundleId.trim()) {
     return line.bundleId.trim();
   }
@@ -49,6 +49,10 @@ function taggedBundleId(line: BundleRevenueLine): string | null {
     ...propertyMap(line.customAttributes),
     ...propertyMap(line.properties),
   };
+  // Analytics attribution only: these identifiers never authorize pricing.
+  const selectionId = jsonRecord(properties._wpb_selection).bundleId;
+  const identity = properties._wpb_bundle_id ?? selectionId;
+  if (typeof identity === 'string' && identity.trim()) return identity.trim();
   const direct = jsonRecord(properties._wpb_offer_analytics);
   const display = jsonRecord(properties._bundle_display_properties);
   const analytics = Object.keys(direct).length > 0
@@ -77,7 +81,7 @@ export function collectBundleLineRevenue(
   const totals = Object.fromEntries(matchedBundleIds.map((id) => [id, 0]));
 
   const addLine = (line: BundleRevenueLine) => {
-    const bundleId = taggedBundleId(line);
+    const bundleId = bundleLineAttributionId(line);
     const cents = moneyCents(line);
     if (!bundleId || !allowed.has(bundleId) || cents === null) return false;
     totals[bundleId] += cents;

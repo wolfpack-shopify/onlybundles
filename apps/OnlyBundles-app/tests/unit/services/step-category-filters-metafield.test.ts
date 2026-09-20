@@ -1,5 +1,7 @@
 import { updateBundleProductMetafields } from "../../../app/services/bundles/metafield-sync/operations/bundle-product.server";
 import { BundleType } from "../../../app/constants/bundle";
+jest.mock('../../../app/services/bundle-runtime-policy-publisher.server', () => ({publishBundleRuntimePolicy: jest.fn().mockResolvedValue({ok: true})}));
+jest.mock('../../../app/db.server', () => ({__esModule: true, default: {bundle: {update: jest.fn().mockResolvedValue({})}}}));
 
 jest.mock("../../../app/services/scheduled-bundle-discount.server", () => ({ syncScheduledBundleDiscounts: jest.fn().mockResolvedValue({}) }));
 /**

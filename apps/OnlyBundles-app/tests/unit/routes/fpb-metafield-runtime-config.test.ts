@@ -1,6 +1,27 @@
 import { buildFullPageBundleMetafieldConfig } from "../../../app/routes/app/app.bundles.full-page-bundle.configure.$bundleId/handlers/shared.server";
+import { compileBundleRuntimePolicy } from "../../../app/services/bundle-runtime-policy.server";
 
 describe("FPB runtime metafield config", () => {
+  it("publishes required default products through the FPB sync configuration", () => {
+    const config = buildFullPageBundleMetafieldConfig({
+      id: "bundle-defaults", name: "Bundle", status: "active", bundleType: "full_page",
+      steps: [{id: "step", StepProduct: [{productId: "gid://shopify/Product/1", variants: []}]}],
+      defaultProductsData: {isDefaultProductsEnabled: true, products: [{
+        productId: "2", graphqlId: "gid://shopify/Product/2", requiredQuantity: 2,
+        variants: [{variantGraphqlId: "gid://shopify/ProductVariant/22"}],
+      }]},
+    });
+    const compiled = compileBundleRuntimePolicy({bundle: config, parentVariantId: "gid://shopify/ProductVariant/999"});
+    expect(compiled.ok).toBe(true);
+    if (!compiled.ok) throw new Error(compiled.error);
+    expect(compiled.productPolicies.map(p => p.productId)).toContain("gid://shopify/Product/2");
+    for (const projection of compiled.productPolicies) {
+      expect(projection.metafield.policies[0].groups).toContainEqual(expect.objectContaining({
+        id: "default-products", role: "default", minQuantity: 2, maxQuantity: 2,
+        requiredProducts: [{productId: "gid://shopify/Product/2", quantity: 2}],
+      }));
+    }
+  });
   const product = {
     productId: "gid://shopify/Product/123",
     title: "Runtime Product",
@@ -83,7 +104,8 @@ describe("FPB runtime metafield config", () => {
       pricing: null,
     } as any) as any;
 
-    expect(config.steps[0].products).toEqual([]);
+    expect(config.steps[0].StepProduct).toEqual([product]);
+    expect(config.steps[0].StepCategory[0].products).toEqual([{id: "gid://shopify/Product/123"}]);
     expect(config.steps[0].categories[0].products[0]).toMatchObject({
       selectionId: "gid://shopify/Product/123",
       price: 1999,
@@ -137,4 +159,10 @@ describe("FPB runtime metafield config", () => {
     expect(config.pricing.rules[0]).not.toHaveProperty("fixedBundlePrice");
     expect(config).not.toHaveProperty("fullPageLayout");
   });
+});
+
+
+test('passes the saved per-product ceiling to the runtime policy compiler', () => {
+  const config = buildFullPageBundleMetafieldConfig({id:'bundle',bundleType:'full_page',validateQuantityPerProduct:{isEnabled:true,allowedQuantity:2}});
+  expect(config.validateQuantityPerProduct).toEqual({isEnabled:true,allowedQuantity:2});
 });

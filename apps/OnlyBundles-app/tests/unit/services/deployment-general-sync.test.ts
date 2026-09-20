@@ -314,6 +314,14 @@ describe("deployment general sync", () => {
     expect(deps.syncBundle).not.toHaveBeenCalled();
   });
 
+  it("does not publish policies when metafield access provisioning returns false", async () => {
+    const deps = makeDeps();
+    deps.ensureMetafieldDefinitions.mockResolvedValueOnce(false);
+    const result = await runDeploymentGeneralSync(parseDeploymentGeneralSyncEnv({WPB_DEPLOYMENT_GENERAL_SYNC: "true"}), deps);
+    expect(result.failedShops).toBe(1);
+    expect(deps.syncBundle).not.toHaveBeenCalledWith(expect.objectContaining({shopDomain: "alpha.myshopify.com"}));
+  });
+
   it("records shop setup failures and skips that shop's bundles", async () => {
     const deps = makeDeps();
     deps.ensureMetafieldDefinitions.mockRejectedValueOnce(

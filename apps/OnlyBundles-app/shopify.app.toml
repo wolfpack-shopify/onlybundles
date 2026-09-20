@@ -107,3 +107,9 @@ type = "json"
 name = "Bundle Details"
 description = "Copied bundle display metadata from cart metafields for order attribution"
 capabilities.cart_to_order_copyable = true
+
+[product.metafields.app.bundle_runtime_memberships]
+name = "Bundle runtime memberships"
+description = "App-owned membership references validated against active shared bundle rules"
+type = "json"
+access.admin = "merchant_read"

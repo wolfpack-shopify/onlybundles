@@ -1,5 +1,8 @@
 import { BundleType } from "../../../app/constants/bundle";
 import { updateBundleProductMetafields } from "../../../app/services/bundles/metafield-sync/operations/bundle-product.server";
+jest.mock('../../../app/services/addon-discount-function-service.server', () => ({AddOnDiscountFunctionService:{completeSetup:jest.fn().mockResolvedValue({success:true})}}));
+jest.mock('../../../app/services/bundle-runtime-policy-publisher.server', () => ({publishBundleRuntimePolicy: jest.fn().mockResolvedValue({ok: true})}));
+jest.mock('../../../app/db.server', () => ({__esModule: true, default: {bundle: {update: jest.fn().mockResolvedValue({})}}}));
 
 jest.mock("../../../app/services/scheduled-bundle-discount.server", () => ({ syncScheduledBundleDiscounts: jest.fn().mockResolvedValue({}) }));
 
@@ -47,17 +50,18 @@ describe("checkout offer bundle_ui_config sync", () => {
       id: "bundle-1", shopId: "test.myshopify.com",
       name: "Bundle",
       description: "",
-      status: "ACTIVE",
+      status: "active",
       bundleType: BundleType.FULL_PAGE,
       shopifyProductId: "gid://shopify/Product/999",
-      steps: [],
-      personalizationData: {
+      steps: [{id:"paid",StepProduct:[{productId:"gid://shopify/Product/100"}]}],
+      personalizationData: { isPersonalizationEnabled: true,
         addonProducts: {
           isEnabled: true,
           tiers: [{
             tierId: "tier-1",
             maxQuantity: 2,
             selectedAddonProducts: [{
+              productId: "gid://shopify/Product/200",
               title: "Extra",
               variants: [{ variantGraphqlId: "gid://shopify/ProductVariant/201" }],
             }],

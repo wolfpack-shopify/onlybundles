@@ -15,6 +15,7 @@ export type CheckoutOfferVariant = {
 export type CheckoutOffer = {
   key: string;
   groupKey: string;
+  runtimeGroupId: string;
   tierId: string;
   kind: "addon" | "gift";
   title: string;
@@ -108,6 +109,7 @@ function fpbOffers(bundle: any): CheckoutOffer[] {
     return [{
       key: `fpb:${tierId}`,
       groupKey: "fpb:addons",
+      runtimeGroupId: "personalization-addons",
       tierId,
       kind: discount?.value === 100 ? "gift" as const : "addon" as const,
       title: String(tier?.title ?? addonProducts.title ?? ""),
@@ -134,6 +136,7 @@ function ppbOffers(bundle: any): CheckoutOffer[] {
       return {
         key: `ppb:${step.id}:${tierId}`,
         groupKey: `ppb:${step.id}`,
+        runtimeGroupId: String(step.id),
         tierId,
         kind: discount?.value === 100 ? "gift" as const : "addon" as const,
         title: String(tier?.title ?? step?.addonTitle ?? step?.freeGiftName ?? step?.name ?? ""),

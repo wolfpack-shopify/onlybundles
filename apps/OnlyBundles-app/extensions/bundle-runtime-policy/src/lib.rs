@@ -108,6 +108,7 @@ pub struct ValidatedPolicyGroup {
     pub discount_applies: bool,
     pub has_addons: bool,
     pub line_discounts: Vec<f64>,
+    pub line_roles: Vec<String>,
 }
 
 #[derive(serde::Deserialize)]
@@ -292,6 +293,10 @@ pub fn validate_policy_group(
     Some(ValidatedPolicyGroup {
         has_addons: policy.groups.iter().any(|group| group.role == "addon" || group.role == "free_gift"),
         line_discounts,
+        line_roles: line_groups.iter().map(|group_id| {
+            policy.groups.iter().find(|group| &group.id == group_id)
+                .map(|group| group.role.clone()).unwrap_or_default()
+        }).collect(),
         is_subscription: first.has_selling_plan,
         recurring: policy.subscription.as_ref().is_some_and(|subscription| subscription.recurring),
         discount_applies,
@@ -315,6 +320,125 @@ pub struct PolicyLine<'a> {
     pub selection: Option<&'a str>,
     pub claimed_role: Option<&'a str>,
     pub policy: Option<&'a Value>,
+}
+
+pub struct TransformedPolicyLine<'a> {
+    pub product_id: &'a str,
+    pub variant_id: &'a str,
+    pub quantity: i64,
+    pub unit_amount_shop_cents: Option<f64>,
+    pub unit_weight_grams: Option<f64>,
+    pub selection: Option<&'a str>,
+    pub policy: Option<&'a Value>,
+    pub parent_policy: Option<&'a Value>,
+}
+
+#[derive(shopify_function::Deserialize)]
+struct ParentPolicyCollection {
+    policies: Vec<ParentPolicyEvidence>,
+}
+
+#[derive(shopify_function::Deserialize)]
+#[shopify_function(rename_all = "camelCase")]
+struct ParentPolicyEvidence {
+    schema_version: i64,
+    bundle_id: String,
+    revision: String,
+}
+
+fn parent_safe_pricing(pricing: &PriceAdjustmentConfig) -> bool {
+    pricing.method != pricing::PricingMethod::BuyXGetY
+        && !pricing.conditions.as_ref().is_some_and(|condition| condition.condition_type == pricing::ConditionType::Quantity)
+        && pricing.rules.as_ref().is_none_or(|rules| !rules.is_empty() && rules.iter().all(parent_safe_pricing))
+}
+
+/// Validates a Cart Transform parent plus separate add-on/gift lines. The
+/// app-owned parent metafield proves the line is the dedicated parent; Shopify's
+/// `requiresComponents` protection prevents that variant from being added
+/// directly without a successful transform.
+pub fn validate_transformed_policy_group(
+    lines: &[TransformedPolicyLine],
+    revisions: Option<&Value>,
+    country: &str,
+) -> Option<ValidatedPolicyGroup> {
+    let parent_positions = lines.iter().enumerate().filter(|(_, line)| line.parent_policy.is_some()).collect::<Vec<_>>();
+    let [(parent_position, parent)] = parent_positions.as_slice() else { return None; };
+    let parent_selection = selection(&PolicyLine {
+        product_id: parent.product_id, variant_id: parent.variant_id, quantity: parent.quantity,
+        unit_amount_shop_cents: parent.unit_amount_shop_cents, unit_weight_grams: parent.unit_weight_grams,
+        has_selling_plan: false, selling_plan_id: None, selection: parent.selection,
+        claimed_role: None, policy: parent.policy,
+    })?;
+    let mode = published_policy::pricing_mode(revisions, &parent_selection.bundle_id, &parent_selection.revision)?;
+    let published = revisions?.get_obj_prop(&parent_selection.bundle_id).get_obj_prop("policy");
+    let policy: Policy = shopify_function::wasm_api::Deserialize::deserialize(&published).ok()?;
+    if policy.schema_version != 2 || policy.bundle_id != parent_selection.bundle_id
+        || policy.revision != parent_selection.revision || policy.parent_variant_id != parent.variant_id
+        || !country_is_eligible(&policy.country_rule, country) || !parent_safe_pricing(&policy.pricing)
+    { return None; }
+    let evidence: ParentPolicyCollection = shopify_function::wasm_api::Deserialize::deserialize(parent.parent_policy?).ok()?;
+    let matching = evidence.policies.iter().filter(|entry| entry.schema_version == 1
+        && entry.bundle_id == policy.bundle_id && entry.revision == policy.revision).count();
+    if matching != 1 || parent.quantity <= 0 { return None; }
+
+    let paid_total = parent.unit_amount_shop_cents? * parent.quantity as f64 / 100.0;
+    if !paid_total.is_finite() || paid_total < 0.0 { return None; }
+    let base_percentage = calculation::calculate_discount_percentage(
+        &policy.pricing, paid_total, paid_total, parent.quantity, parent.quantity, 1.0,
+    );
+    let mut line_discounts = vec![0.0; lines.len()];
+    let mut line_roles = vec![String::new(); lines.len()];
+    line_discounts[*parent_position] = base_percentage;
+    line_roles[*parent_position] = "parent".into();
+
+    for (index, line) in lines.iter().enumerate() {
+        if index == *parent_position { continue; }
+        let selected = selection(&PolicyLine {
+            product_id: line.product_id, variant_id: line.variant_id, quantity: line.quantity,
+            unit_amount_shop_cents: line.unit_amount_shop_cents, unit_weight_grams: line.unit_weight_grams,
+            has_selling_plan: false, selling_plan_id: None, selection: line.selection,
+            claimed_role: None, policy: line.policy,
+        })?;
+        if selected.bundle_id != policy.bundle_id || selected.revision != policy.revision
+            || selected.instance_id != parent_selection.instance_id || line.quantity <= 0 { return None; }
+        let group = policy.groups.iter().find(|group| group.id == selected.group_id
+            && matches!(group.role.as_str(), "addon" | "free_gift"))?;
+        let references: Vec<String> = shopify_function::wasm_api::Deserialize::deserialize(line.policy?).ok()?;
+        let mut sets = references.iter().filter_map(|reference| policy.membership_sets.get(reference));
+        let memberships = sets.next()?;
+        if sets.next().is_some() { return None; }
+        let mut matches = memberships.iter().filter(|membership| membership.group_id == group.id
+            && variant_matches(&membership.variant_selection, line.variant_id));
+        let membership = matches.next()?;
+        if matches.next().is_some() || line.quantity > membership.max_quantity || line.quantity > group.max_quantity { return None; }
+        let amount = line.unit_amount_shop_cents.map(|value| value * line.quantity as f64);
+        let weight = line.unit_weight_grams.map(|value| value * line.quantity as f64);
+        let percentage = if group.role == "free_gift" && group.tiers.is_empty() { 100.0 } else {
+            let tier = group.tiers.iter().enumerate().filter(|(_, tier)| {
+                tier.condition.metric == "amount"
+                    && conditions_match(std::slice::from_ref(&tier.condition), parent.quantity, Some(paid_total * 100.0), None)
+            }).max_by(|(left_index, left), (right_index, right)| {
+                left.condition.value.total_cmp(&right.condition.value).then(left_index.cmp(right_index))
+            })?.1;
+            if !membership.tiers.iter().any(|entry| entry.id == tier.id && variant_matches(&entry.variant_selection, line.variant_id))
+                || line.quantity > tier.max_quantity
+                || !conditions_match(&tier.conditions, line.quantity, amount, weight)
+            { return None; }
+            tier.percentage
+        };
+        if !percentage.is_finite() || !(0.0..=100.0).contains(&percentage) { return None; }
+        line_discounts[index] = percentage;
+        line_roles[index] = group.role.clone();
+    }
+
+    Some(ValidatedPolicyGroup {
+        bundle_id: policy.bundle_id, bundle_name: policy.bundle_name,
+        parent_variant_id: policy.parent_variant_id, price_adjustment: Some(policy.pricing),
+        is_scheduled: mode == published_policy::PricingMode::Scheduled,
+        is_subscription: false, recurring: false, discount_applies: true,
+        has_addons: policy.groups.iter().any(|group| matches!(group.role.as_str(), "addon" | "free_gift")),
+        line_discounts, line_roles,
+    })
 }
 
 fn add_metric(total: Option<f64>, unit: Option<f64>, quantity: i64) -> Option<f64> {

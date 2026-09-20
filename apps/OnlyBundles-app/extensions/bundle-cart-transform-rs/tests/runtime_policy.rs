@@ -136,10 +136,47 @@ fn variant_selection_modes_fail_closed_when_incomplete_or_unknown() {
 }
 
 #[test]
-fn scheduled_policies_keep_components_for_native_scheduled_discounts() {
+fn scheduled_policies_merge_the_base_without_applying_an_always_on_price_adjustment() {
     let mut input = fixture();
     input["shop"]["ppbPolicyRevisions"]["value"]["bundle"]["pricingMode"] = json!("scheduled");
-    assert!(run(input).operations.is_empty());
+    let output = run(input);
+    assert_eq!(output.operations.len(), 1);
+    let schema::CartOperation::LinesMerge(merge) = &output.operations[0] else {
+        panic!("expected merge")
+    };
+    assert!(merge.price.is_none());
+    assert_eq!(merge.cart_lines.len(), 2);
+    let attributes = merge.attributes.as_ref().unwrap();
+    assert!(!attributes.iter().any(|attribute| matches!(attribute.key.as_str(), "Bundle Price" | "Bundle Savings")));
+}
+
+#[test]
+fn add_on_lines_stay_separate_while_base_components_merge() {
+    let mut input = fixture();
+    input["shop"]["ppbPolicyRevisions"]["value"]["bundle"]["pricingMode"] = json!("scheduled");
+    for line in input["cart"]["lines"].as_array_mut().unwrap() {
+        let policy = &mut line["merchandise"]["product"]["runtimePolicies"]["value"]["policies"][0];
+        policy["groups"] = json!([
+            {"id":"group","role":"component","minQuantity":2,"maxQuantity":2},
+            {"id":"addon","role":"addon","minQuantity":0,"maxQuantity":1,
+             "tiers":[{"id":"addon-tier","condition":{"type":"amount","operator":"gte","value":4000},"percentage":25,"maxQuantity":1}]}
+        ]);
+    }
+    let addon = &mut input["cart"]["lines"][1];
+    addon["quantity"] = json!(1);
+    addon["selection"]["value"] = json!(json!({"bundleId":"bundle","instanceId":"instance","groupId":"addon","revision":"revision"}).to_string());
+    addon["stepType"] = json!({"value":"addon"});
+    addon["merchandise"]["product"]["runtimePolicies"]["value"]["policies"][0]["memberships"] = json!([{
+        "groupId":"addon","tiers":[{"id":"addon-tier","variantSelection":{"mode":"all_product_variants"}}],
+        "variantSelection":{"mode":"all_product_variants"},"maxQuantity":1
+    }]);
+    let output = run(input);
+    assert_eq!(output.operations.len(), 1);
+    let schema::CartOperation::LinesMerge(merge) = &output.operations[0] else {
+        panic!("expected merge")
+    };
+    assert_eq!(merge.cart_lines.len(), 1);
+    assert_eq!(merge.cart_lines[0].cart_line_id, "line-1");
 }
 
 #[test]

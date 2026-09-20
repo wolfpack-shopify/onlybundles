@@ -14,6 +14,8 @@ systems:
   - only-bundles
 source_paths:
   - apps/OnlyBundles-app/app/lib/scheduled-bundle-compatibility.ts
+  - apps/OnlyBundles-app/extensions/bundle-cart-transform-rs/src/merge.rs
+  - apps/OnlyBundles-app/extensions/bundle-discount-function/src/candidates.rs
 related_docs:
   - internal docs/Architecture/Cart Transform Function.md
 tags:
@@ -43,6 +45,10 @@ Prevent merchants from scheduling bundle discounts that Shopify cannot calculate
 | 6 | Variant-triggered gift | Gift eligibility depends on selected base variants | Scheduling unavailable | The gift line cannot prove the hidden trigger variant. |
 | 7 | Per-component allocation | A rule selects or allocates savings to individual components | Scheduling unavailable | Individual target lines no longer exist downstream. |
 | 8 | Crafted scheduled save | An incompatible bundle submits a non-always schedule | Save validation returns an Offer scheduling issue | Server validation owns the final guard. |
+| 9 | Compatible scheduled base | Amount-based scheduled bundle | Base components merge without a Cart Transform price adjustment | Shopify's native discount window gates the saving. |
+| 10 | Scheduled add-on | Compatible amount-based add-on tier | Base components merge; add-on remains separate and receives its own eligible discount | The parent and add-on use authoritative app-owned policies. |
+| 11 | Ordinary add-on | Non-scheduled bundle with an add-on | Components remain separate for direct downstream validation | Existing add-on eligibility remains authoritative. |
+| 12 | Inactive schedule | Native scheduled discount is inactive | Parent remains purchasable at regular price without a fabricated Function warning | Shopify validation messages are blocking errors. |
 
 ## Acceptance Criteria
 
@@ -52,3 +58,7 @@ Prevent merchants from scheduling bundle discounts that Shopify cannot calculate
 - [ ] Merchants can still select Always active to remove an existing incompatible schedule.
 - [ ] Server-side validation rejects a crafted incompatible scheduled save.
 - [ ] Compatible amount-based configurations can still be scheduled.
+- [ ] Compatible scheduled base components merge into the dedicated parent.
+- [ ] Add-on and gift lines remain separate from the parent merge.
+- [ ] Scheduled pricing is applied only by the native scheduled Discount Function.
+- [ ] Ordinary bundles with add-ons continue to retain component lines.

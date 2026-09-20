@@ -17,6 +17,7 @@ query Input($windowStart: TimeWithoutTimezone!, $windowEnd: TimeWithoutTimezone!
           id
           weight
           weightUnit
+          parentPolicy: metafield(namespace: "$app", key: "bundle_parent_policy") { value: jsonValue }
           product {
             id
             runtimePolicies: metafield(namespace: "$app", key: "bundle_runtime_memberships") { value: jsonValue }

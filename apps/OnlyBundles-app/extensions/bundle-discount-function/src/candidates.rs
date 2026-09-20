@@ -1,5 +1,5 @@
 use crate::schema;
-use bundle_runtime_policy::{selection_group, validate_policy_group, PolicyLine};
+use bundle_runtime_policy::{selection_group, validate_policy_group, validate_transformed_policy_group, PolicyLine, TransformedPolicyLine};
 use shopify_function::{scalars::Decimal, wasm_api::Value};
 
 type Input = schema::cart_lines_discounts_generate_run::Input;
@@ -36,7 +36,29 @@ pub(crate) fn build_candidates(input: &Input) -> Vec<schema::ProductDiscountCand
             })
         }).collect::<Option<Vec<_>>>();
         let Some(facts) = facts else { continue; };
-        let Some(validated) = validate_policy_group(&facts,input.shop().ppb_policy_revisions().map(|field|field.value()),input.localization().country().iso_code().as_str()) else { continue; };
+        let transformed = indices.iter().map(|&index| {
+            let line = &lines[index];
+            let schema::cart_lines_discounts_generate_run::input::cart::lines::Merchandise::ProductVariant(variant) = line.merchandise() else { return None; };
+            Some(TransformedPolicyLine {
+                product_id:variant.product().id(),variant_id:variant.id(),quantity:i64::from(*line.quantity()),
+                unit_amount_shop_cents:Some(line.cost().amount_per_quantity().amount().as_f64()*100.0/rate),
+                unit_weight_grams:variant.weight().map(|weight| weight * match variant.weight_unit() {
+                    schema::WeightUnit::Grams=>1.0,schema::WeightUnit::Kilograms=>1000.0,
+                    schema::WeightUnit::Ounces=>28.349523125,schema::WeightUnit::Pounds=>453.59237,_=>f64::NAN }),
+                selection:line.selection().and_then(|attribute|attribute.value()).map(String::as_str),
+                policy:variant.product().runtime_policies().map(|field|field.value()),
+                parent_policy:variant.parent_policy().map(|field|field.value()),
+            })
+        }).collect::<Option<Vec<_>>>();
+        let Some(transformed) = transformed else { continue; };
+        let revisions=input.shop().ppb_policy_revisions().map(|field|field.value());
+        let country=input.localization().country().iso_code().as_str();
+        let validated = if transformed.iter().any(|line| line.parent_policy.is_some()) {
+            validate_transformed_policy_group(&transformed,revisions,country)
+        } else {
+            validate_policy_group(&facts,revisions,country)
+        };
+        let Some(validated) = validated else { continue; };
         let allowed = match role.as_str() {
             "addons" => !validated.is_scheduled && !validated.is_subscription && validated.has_addons,
             "subscription_initial" => !validated.is_scheduled && validated.is_subscription && !validated.recurring,
@@ -53,7 +75,9 @@ pub(crate) fn build_candidates(input: &Input) -> Vec<schema::ProductDiscountCand
         if !allowed { continue; }
         let mut cumulative_saving_cents: f64 = 0.0;
         let mut allocated_saving_cents: f64 = 0.0;
-        for (&index,percentage) in indices.iter().zip(validated.line_discounts) {
+        for ((&index,percentage),line_role) in indices.iter().zip(validated.line_discounts).zip(validated.line_roles) {
+            if role == "addons" && !matches!(line_role.as_str(), "addon" | "free_gift") { continue; }
+            if role == "checkout_integration" && line_role == "parent" { continue; }
             if percentage <= 0.0 { continue; }
             let line = &lines[index];
             // Round the instance's cumulative saving, then allocate the remainder

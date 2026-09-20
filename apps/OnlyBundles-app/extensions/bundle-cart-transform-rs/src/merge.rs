@@ -30,16 +30,22 @@ pub fn process_merge_operations(
         if merge_line_indices.iter().any(|&index| lines[index].selling_plan_allocation().is_some()) { continue; }
         let Some(validated) = validate_policy_group(lines, merge_line_indices, revisions,
             input.localization().country().iso_code().as_str(), presentment_currency_rate) else { continue; };
-        if validated.is_scheduled || validated.has_addons { continue; }
+        if validated.has_addons && !validated.is_scheduled { continue; }
+        let base_positions: Vec<usize> = validated.line_roles.iter().enumerate()
+            .filter_map(|(position, role)| matches!(role.as_str(), "component" | "default").then_some(position))
+            .collect();
+        if base_positions.is_empty() { continue; }
+        let base_line_indices: Vec<usize> = base_positions.iter().map(|&position| merge_line_indices[position]).collect();
         let parent = ComponentParent { id: validated.parent_variant_id.clone(),
-            price_adjustment: if validated.discount_applies { validated.price_adjustment.clone() } else { None } };
+            price_adjustment: if !validated.is_scheduled && validated.discount_applies { validated.price_adjustment.clone() } else { None } };
         let offer_group_id = instance_id;
         let source_display_properties: CartLineDisplayProperties = parse_json_or_default(
-            lines[merge_line_indices[0]].bundle_display_properties().and_then(|attribute| attribute.value()).map(String::as_str));
+            lines[base_line_indices[0]].bundle_display_properties().and_then(|attribute| attribute.value()).map(String::as_str));
         let parent_variant_id = parent.id.clone();
         let mut original_total = 0.0;
         let mut total_discount_amount = 0.0;
-        for (position, &index) in merge_line_indices.iter().enumerate() {
+        for &position in &base_positions {
+            let index = merge_line_indices[position];
             let line = &lines[index];
             let total = decimal_to_f64(line.cost().amount_per_quantity().amount()) * f64::from(*line.quantity());
             original_total += total;
@@ -47,7 +53,7 @@ pub fn process_merge_operations(
         }
         let discount_percentage = rounded_percentage(total_discount_amount, original_total);
         let bundle_total = (original_total * (1.0 - discount_percentage / 100.0) * 100.0).round() / 100.0;
-        let currency = lines[merge_line_indices[0]].cost().amount_per_quantity().currency_code();
+        let currency = lines[base_line_indices[0]].cost().amount_per_quantity().currency_code();
 
         // -------------------------------------------------------------------------
         // Step 5: Build unique bundle title.
@@ -81,7 +87,7 @@ pub fn process_merge_operations(
         // -------------------------------------------------------------------------
         // Step 7: Build MERGE operation using schema-generated types.
         // -------------------------------------------------------------------------
-        let cart_lines: Vec<schema::CartLineInput> = merge_line_indices
+        let cart_lines: Vec<schema::CartLineInput> = base_line_indices
             .iter()
             .map(|&idx| {
                 let line = &lines[idx];
@@ -111,8 +117,11 @@ pub fn process_merge_operations(
             },
         ];
         attributes.push(schema::AttributeOutput { key: "_bundle_total_quantity".into(),
-            value: merge_line_indices.iter().map(|&index| i64::from(*lines[index].quantity())).sum::<i64>().to_string() });
+            value: base_line_indices.iter().map(|&index| i64::from(*lines[index].quantity())).sum::<i64>().to_string() });
         attributes.push(schema::AttributeOutput { key: "_wpb_bundle_id".into(), value: validated.bundle_id.clone() });
+        if let Some(selection) = lines[base_line_indices[0]].selection().and_then(|attribute| attribute.value()) {
+            attributes.push(schema::AttributeOutput { key: "_wpb_selection".into(), value: selection.clone() });
+        }
         if let Some(offer_analytics) = &source_display_properties.offer_analytics {
             if let Ok(value) = serde_json::to_string(offer_analytics) {
                 attributes.push(schema::AttributeOutput {
@@ -209,7 +218,7 @@ pub fn process_merge_operations(
             }
         }
 
-        if cart_line_messaging.is_enabled {
+        if cart_line_messaging.is_enabled && !validated.is_scheduled {
             if cart_line_messaging.show_original_price {
                 attributes.push(schema::AttributeOutput { key: "Retail Price".into(), value: format_money(original_total, currency.as_str()) });
             }
@@ -221,7 +230,7 @@ pub fn process_merge_operations(
                     value: format!("{} ({:.2}%)", format_money(original_total - bundle_total, currency.as_str()), discount_percentage) });
             }
         }
-        let price = Some(schema::PriceAdjustment {
+        let price = (!validated.is_scheduled).then(|| schema::PriceAdjustment {
             percentage_decrease: Some(schema::PriceAdjustmentValue { value: Decimal::from(discount_percentage) }),
         });
 
@@ -236,7 +245,7 @@ pub fn process_merge_operations(
 
         operations.push(schema::CartOperation::LinesMerge(merge_op));
 
-        for &idx in merge_line_indices {
+        for &idx in &base_line_indices {
             processed_lines[idx] = true;
         }
     }

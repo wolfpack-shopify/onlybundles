@@ -21,6 +21,115 @@ fn run(mut input: Value) -> schema::CartLinesDiscountsGenerateRunResult {
     run_function_with_input(cart_lines_discounts_generate_run,&input.to_string()).unwrap()
 }
 fn has_discount(input: Value) -> bool { !run(input).operations.is_empty() }
+
+fn merged_fixture(role: &str, scheduled: bool) -> Value {
+    let mut input = fixture(role, scheduled);
+    input["cart"]["lines"][0]["merchandise"]["product"]["runtimePolicies"]["value"]["policies"][0]["pricing"] =
+        json!({"method":"percentage_off","value":10,"conditions":{"type":"amount","operator":"gte","value":5000}});
+    publish_fixture(&mut input);
+    let selection = input["cart"]["lines"][0]["selection"].clone();
+    input["cart"]["lines"] = json!([{
+      "id":"parent","quantity":1,"selection":selection,"sellingPlanAllocation":null,
+      "cost":{"amountPerQuantity":{"amount":"60.0"}},
+      "merchandise":{"__typename":"ProductVariant","id":"gid://shopify/ProductVariant/99",
+        "parentPolicy":{"value":{"policies":[{"schemaVersion":1,"bundleId":"bundle","revision":"r","bundleName":"Bundle"}]}},
+        "product":{"id":"gid://shopify/Product/99","runtimePolicies":null}}
+    }]);
+    input
+}
+
+fn run_published(input: Value) -> schema::CartLinesDiscountsGenerateRunResult {
+    run_function_with_input(cart_lines_discounts_generate_run, &input.to_string()).unwrap()
+}
+
+fn merged_fixture_with_addon(role: &str, scheduled: bool) -> Value {
+    let mut input = fixture(role, scheduled);
+    let policy = &mut input["cart"]["lines"][0]["merchandise"]["product"]["runtimePolicies"]["value"]["policies"][0];
+    policy["pricing"] = json!({"method":"percentage_off","value":10,"conditions":{"type":"amount","operator":"gte","value":5000}});
+    policy["groups"] = json!([
+      {"id":"g","role":"component","minQuantity":3,"maxQuantity":3},
+      {"id":"addon","role":"addon","minQuantity":0,"maxQuantity":1,
+       "tiers":[{"id":"addon-tier","condition":{"type":"amount","operator":"gte","value":5000},"percentage":25,"maxQuantity":1}]}
+    ]);
+    let mut addon = input["cart"]["lines"][0].clone();
+    addon["id"] = json!("addon");
+    addon["quantity"] = json!(1);
+    addon["selection"]["value"] = json!(json!({"bundleId":"bundle","revision":"r","instanceId":"i","groupId":"addon"}).to_string());
+    addon["cost"]["amountPerQuantity"]["amount"] = json!("20.0");
+    addon["merchandise"]["id"] = json!("gid://shopify/ProductVariant/2");
+    addon["merchandise"]["product"]["id"] = json!("gid://shopify/Product/2");
+    addon["merchandise"]["product"]["runtimePolicies"]["value"]["policies"][0]["memberships"] = json!([{
+      "groupId":"addon","tiers":[{"id":"addon-tier","variantSelection":{"mode":"all_product_variants"}}],
+      "variantSelection":{"mode":"all_product_variants"},"maxQuantity":1
+    }]);
+    input["cart"]["lines"].as_array_mut().unwrap().push(addon);
+    publish_fixture(&mut input);
+    let selection = input["cart"]["lines"][0]["selection"].clone();
+    input["cart"]["lines"][0] = json!({
+      "id":"parent","quantity":1,"selection":selection,"sellingPlanAllocation":null,
+      "cost":{"amountPerQuantity":{"amount":"60.0"}},
+      "merchandise":{"__typename":"ProductVariant","id":"gid://shopify/ProductVariant/99",
+        "parentPolicy":{"value":{"policies":[{"schemaVersion":1,"bundleId":"bundle","revision":"r","bundleName":"Bundle"}]}},
+        "product":{"id":"gid://shopify/Product/99","runtimePolicies":null}}
+    });
+    input
+}
+
+#[test]
+fn scheduled_owner_prices_an_authoritative_merged_parent() {
+    let output = run_published(merged_fixture("scheduled_initial", true));
+    assert_eq!(output.operations.len(), 1);
+    let schema::CartOperation::ProductDiscountsAdd(operation) = &output.operations[0] else { panic!("product discount"); };
+    assert_eq!(operation.candidates.len(), 1);
+    assert_eq!(operation.candidates[0].targets[0], schema::ProductDiscountCandidateTarget::CartLine(schema::CartLineTarget {
+        id: "parent".into(), quantity: None,
+    }));
+    let schema::ProductDiscountCandidateValue::FixedAmount(discount) = &operation.candidates[0].value else { panic!("fixed amount"); };
+    assert_eq!(discount.amount.as_f64(), 6.0);
+}
+
+#[test]
+fn scheduled_owner_prices_the_parent_and_keeps_addon_discount_separate() {
+    let output = run_published(merged_fixture_with_addon("scheduled_initial", true));
+    let schema::CartOperation::ProductDiscountsAdd(operation) = &output.operations[0] else { panic!("product discount"); };
+    let amounts = operation.candidates.iter().map(|candidate| {
+        let schema::ProductDiscountCandidateValue::FixedAmount(discount) = &candidate.value else { panic!("fixed amount"); };
+        discount.amount.as_f64()
+    }).collect::<Vec<_>>();
+    assert_eq!(amounts, vec![6.0, 5.0]);
+}
+
+#[test]
+fn ordinary_addon_owner_does_not_discount_the_already_priced_parent_again() {
+    let output = run_published(merged_fixture_with_addon("addons", false));
+    let schema::CartOperation::ProductDiscountsAdd(operation) = &output.operations[0] else { panic!("product discount"); };
+    assert_eq!(operation.candidates.len(), 1);
+    let schema::ProductDiscountCandidateValue::FixedAmount(discount) = &operation.candidates[0].value else { panic!("fixed amount"); };
+    assert_eq!(discount.amount.as_f64(), 5.0);
+}
+
+#[test]
+fn transformed_parent_requires_current_app_owned_evidence_and_parent_safe_pricing() {
+    for mutation in ["missing_parent_policy", "stale_revision", "wrong_variant", "quantity_tier", "buy_x_get_y"] {
+        let mut input = merged_fixture("scheduled_initial", true);
+        match mutation {
+            "missing_parent_policy" => input["cart"]["lines"][0]["merchandise"]["parentPolicy"] = Value::Null,
+            "stale_revision" => input["cart"]["lines"][0]["merchandise"]["parentPolicy"]["value"]["policies"][0]["revision"] = json!("stale"),
+            "wrong_variant" => input["cart"]["lines"][0]["merchandise"]["id"] = json!("gid://shopify/ProductVariant/100"),
+            "quantity_tier" => input["shop"]["ppbPolicyRevisions"]["value"]["bundle"]["policy"]["pricing"]["conditions"]["type"] = json!("quantity"),
+            _ => input["shop"]["ppbPolicyRevisions"]["value"]["bundle"]["policy"]["pricing"]["method"] = json!("buy_x_get_y"),
+        }
+        assert!(run_published(input).operations.is_empty(), "{mutation}");
+    }
+}
+
+#[test]
+fn recurring_scheduled_parent_has_regular_price_outside_its_window() {
+    let mut input = merged_fixture("scheduled_initial", true);
+    input["discount"]["configuration"]["value"]["scheduleMode"] = json!("recurring");
+    input["shop"]["localTime"]["afterStart"] = json!(false);
+    assert!(run_published(input).operations.is_empty());
+}
 #[test]
 fn native_scheduled_owner_prices_component_facts() {
     let output = run(fixture("scheduled_initial", true));

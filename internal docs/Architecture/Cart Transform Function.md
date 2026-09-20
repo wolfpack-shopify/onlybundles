@@ -77,9 +77,9 @@ authorize purchase or discounts; Functions evaluate the published bundle rules.
 
 ## Representation and pricing
 
-- Ordinary base selections merge from selected components. Add-ons and gifts
-  remain separate lines so their own eligibility and pricing can use facts that
-  remain visible to the Discount Function.
+- Ordinary bundles without add-ons or gifts merge from selected components.
+  Ordinary bundles with add-ons or gifts retain their component lines so the
+  Discount Function can validate every eligibility fact directly.
 - Compatible scheduled bundles keep the same representation: the base selection
   merges into the parent while add-ons and gifts remain separate. Native Shopify
   discount availability gates the active window. Outside that window the bundle

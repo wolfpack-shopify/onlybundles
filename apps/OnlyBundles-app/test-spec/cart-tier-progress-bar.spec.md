@@ -4,8 +4,8 @@ id: cart-tier-progress-bar
 title: Cart Tier Progress Bar & Bundle Savings Label Defaults
 type: test-spec
 status: active
-summary: Verify Cart Tier Progress Bar calculation, Settings Design customization and preview, and Cart Line Bundle Savings label defaults without theme suppression.
-last_audited: 2026-09-17
+summary: Verify Cart Tier Progress Bar calculation, drawer presentation, Settings Design customization, and Cart Line Bundle Savings behavior.
+last_audited: 2026-09-20
 owners:
   - engineering
 domains:
@@ -16,6 +16,8 @@ systems:
   - cart-transform
 source_paths:
   - app/storefront/cart-tier-progress-bar.ts
+  - app/assets/widgets/shared-css/app-embed-global.css
+  - app/assets/widgets/shared-css/cart-tier-progress.css
   - app/lib/settings-language-runtime.ts
   - app/lib/admin-configuration-surfaces.ts
   - extensions/bundle-cart-transform-rs/src/types.rs
@@ -41,7 +43,7 @@ keywords:
 Verify that:
 1. Cart line discount display label defaults to "Bundle Savings" while preserving merchant customization in Settings.
 2. Cart Transform emits "Bundle Savings" attribute when discount > 0 and omits it when discount == 0.
-3. Native theme elements (unit price, compare-at price, line totals) are completely unsuppressed (no CSS hiding).
+3. Merged bundle parents hide the redundant theme unit-price block while retaining the native line total.
 4. Cart Tier Progress Bar calculates progress accurately from cart bundle lines and renders top-of-drawer/page progress messaging.
 5. Settings -> Design exposes customization and live preview for the Cart Tier Progress Bar.
 
@@ -65,6 +67,13 @@ Verify that:
 | 2 | Cart with bundle at max tier | 5 items in 5-item tier | Progress: 100%, Message: "You've unlocked 20% off!" | Completion state |
 | 3 | Cart with no bundle items | Standard catalog items | Returns null / hidden | Non-intrusive |
 | 4 | Cart quantity update | Quantity changed via AJAX | Progress bar recalculates and updates | Reactive update |
+
+### CartDrawerPresentation
+
+| # | Scenario | Input | Expected Output | Notes |
+|---|---|---|---|---|
+| 1 | Side cart drawer | Progress message and milestone badge in a narrow drawer | Message and badge use separate rows above the progress track | Prevents the badge from compressing the offer message |
+| 2 | Full cart page | Progress bar mounted in the cart-page container | Retains the wider horizontal header layout | Drawer styling remains scoped |
 
 ## Acceptance Criteria
 

@@ -42,10 +42,6 @@
   animation: wpb-loading-spin 0.75s linear infinite;
 }
 
-[data-wpb-bp] .cart-items__unit-price-wrapper {
-  display: none;
-}
-
 @keyframes wpb-loading-spin {
   to {
     transform: rotate(360deg);

@@ -425,12 +425,10 @@ renderModalProducts(stepIndex: string|number, productsToRender: any = null) {
         requiredQuantity: 1,
       }])
       : null;
-    const stockBadgeElement = outOfStock || lowStockAlert ? document.createElement('div') : null;
+    const stockBadgeElement = lowStockAlert ? document.createElement('div') : null;
     if (stockBadgeElement) {
-      stockBadgeElement.className = `product-stock-badge ${outOfStock ? 'product-stock-badge--out' : 'product-stock-badge--low'}`;
-      stockBadgeElement.textContent = outOfStock
-        ? outOfStockText
-        : lowStockAlert?.message ?? '';
+      stockBadgeElement.className = 'product-stock-badge product-stock-badge--low';
+      stockBadgeElement.textContent = lowStockAlert?.message ?? '';
     }
     return createSharedProductCardElement(
       {

@@ -25,6 +25,9 @@ type ParentProductNode = {
   id: string;
   handle: string;
   status: string;
+  media?: {
+    nodes?: Array<{ id?: string | null }>;
+  } | null;
   variants?: {
     nodes?: Array<{ id?: string | null }>;
   } | null;
@@ -300,6 +303,9 @@ async function loadParentProduct(
           id
           handle
           status
+          media(first: 1) {
+            nodes { id }
+          }
           variants(first: 1) {
             nodes { id }
           }
@@ -314,6 +320,57 @@ async function loadParentProduct(
   };
   throwTransportErrors("load parent product", data.errors);
   return data.data?.product ?? null;
+}
+
+async function addMissingFpbParentPlaceholder(input: {
+  admin: ShopifyAdmin;
+  appUrl?: string;
+  bundleName: string;
+  product: ParentProductNode;
+}): Promise<void> {
+  if (input.product.media?.nodes?.length !== 0) return;
+
+  const media = buildBundleProductPlaceholderMediaInput(
+    input.appUrl,
+    input.bundleName,
+  );
+  if (!media) return;
+
+  const response = await input.admin.graphql(
+    `
+      mutation AddBundleParentPlaceholderMedia($product: ProductUpdateInput!, $media: [CreateMediaInput!]) {
+        productUpdate(product: $product, media: $media) {
+          product { id }
+          userErrors { field message }
+        }
+      }
+    `,
+    {
+      variables: {
+        product: { id: input.product.id },
+        media,
+      },
+    },
+  );
+  const data = (await response.json()) as {
+    data?: {
+      productUpdate?: {
+        product?: { id: string } | null;
+        userErrors?: ShopifyUserError[];
+      };
+    };
+    errors?: unknown[];
+  };
+  throwTransportErrors("add FPB parent placeholder media", data.errors);
+  throwUserErrors(
+    "add FPB parent placeholder media",
+    data.data?.productUpdate?.userErrors,
+  );
+  if (!data.data?.productUpdate?.product?.id) {
+    throw new BundleParentProductError("add FPB parent placeholder media", [
+      { message: "Shopify did not return the updated parent product" },
+    ]);
+  }
 }
 
 async function loadShopName(admin: ShopifyAdmin): Promise<string | null> {
@@ -536,6 +593,12 @@ export async function ensureBundleParentProduct(input: {
         liveHandle: product.handle,
       });
       product.handle = host;
+      await addMissingFpbParentPlaceholder({
+        admin: input.admin,
+        appUrl: input.appUrl,
+        bundleName: input.bundle.name,
+        product,
+      });
     }
     if (product.handle !== input.bundle.shopifyProductHandle) {
       await db.bundle.update({

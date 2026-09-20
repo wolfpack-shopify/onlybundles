@@ -5,9 +5,9 @@ import { createSdk, initializeSdk } from "../../../app/storefront/sdk";
 const snapshot = {
   id: "bundle-1",
   name: "Hydrated Bundle",
-  schemaVersion: 3,
+  schemaVersion: 4,
   bundleType: "product_page",
-  runtimeAuthorization: { version: 2 },
+  runtimePolicyRevision: "published",
   steps: [{
     id: "step-1",
     name: "Choose",

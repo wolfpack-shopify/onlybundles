@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, statSync } from "node:fs";
+import { statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -22,19 +22,6 @@ function run(command, args, options = {}) {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
-function resolveWasmSnip() {
-  const check = spawnSync("which", ["wasm-snip"], { encoding: "utf8" });
-  if (check.status === 0 && check.stdout.trim()) {
-    return check.stdout.trim();
-  }
-  const cargoBin = process.env.CARGO_HOME
-    ? resolve(process.env.CARGO_HOME, "bin/wasm-snip")
-    : resolve(process.env.HOME || "", ".cargo/bin/wasm-snip");
-  if (existsSync(cargoBin)) {
-    return cargoBin;
-  }
-  return "wasm-snip";
-}
 
 const rustc = spawnSync("rustup", ["which", "--toolchain", "stable", "rustc"], {
   encoding: "utf8",
@@ -52,13 +39,10 @@ run(
     env: {
       ...process.env,
       RUSTC: rustc.stdout.trim(),
-      RUSTFLAGS: "-C strip=none",
     },
   },
 );
 
-// Canonical Shopify Functions optimization: remove panicking code with wasm-snip
-const wasmSnip = resolveWasmSnip();
-run(wasmSnip, ["--snip-rust-panicking-code", wasmPath, "-o", wasmPath]);
-
-console.log(`Compiled and snipped Cart Transform WASM: ${statSync(wasmPath).size} bytes`);
+// Shopify CLI applies its ABI trampoline and optimizer after this compiler command.
+// Validate the final artifact through `shopify app function build` and a replay.
+console.log(`Compiled Cart Transform WASM: ${statSync(wasmPath).size} bytes`);

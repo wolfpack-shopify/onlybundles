@@ -107,3 +107,9 @@ capabilities.cart_to_order_copyable = true
 
 [build]
 automatically_update_urls_on_dev = true
+
+[product.metafields.app.bundle_runtime_memberships]
+name = "Bundle runtime memberships"
+description = "App-owned membership references validated against active shared bundle rules"
+type = "json"
+access.admin = "merchant_read"

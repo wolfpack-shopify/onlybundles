@@ -24,7 +24,7 @@ describe("CheckoutIntegrationDiscountCodeService", () => {
   const shopDomain = "test-shop.myshopify.com";
 
   beforeEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
     jest.spyOn(Date, "now").mockReturnValue(Date.UTC(2026, 6, 2, 10, 0, 0));
   });
 
@@ -39,6 +39,7 @@ describe("CheckoutIntegrationDiscountCodeService", () => {
         discountNodes: {
           nodes: [{
             id: "gid://shopify/DiscountCodeNode/100",
+            configuration: { id: "gid://shopify/Metafield/1" },
             discount: {
               __typename: "DiscountCodeApp",
               title: "WPB checkout integration - GoKwik",
@@ -55,6 +56,7 @@ describe("CheckoutIntegrationDiscountCodeService", () => {
         },
       }));
 
+    mockShopifyAdmin.graphql.mockResolvedValue(createMockGraphQLResponse({discountCodeAppUpdate: {codeAppDiscount: {discountId: "gid://shopify/DiscountCodeNode/100"}, userErrors: []}}));
     const result = await CheckoutIntegrationDiscountCodeService.createForProvider(
       mockShopifyAdmin,
       shopDomain,
@@ -68,7 +70,9 @@ describe("CheckoutIntegrationDiscountCodeService", () => {
       code: "WPB-GOKWIK",
     });
 
-    expect(mockShopifyAdmin.graphql).toHaveBeenCalledTimes(2);
+    expect(mockShopifyAdmin.graphql).toHaveBeenCalledTimes(3);
+    expect(mockShopifyAdmin.graphql.mock.calls[2][1].variables.codeAppDiscount.metafields[0].key).toBe("discount_configuration");
+    expect(mockShopifyAdmin.graphql.mock.calls[2][1].variables.codeAppDiscount.metafields[0]).not.toHaveProperty("id");
     const lookupCall = mockShopifyAdmin.graphql.mock.calls[1];
     expect(lookupCall[0]).toContain("discountNodes");
   });
@@ -113,7 +117,7 @@ describe("CheckoutIntegrationDiscountCodeService", () => {
       discountClasses: ["PRODUCT"],
       combinesWith: {
         orderDiscounts: true,
-        productDiscounts: true,
+        productDiscounts: false,
         shippingDiscounts: false,
       },
     });
@@ -122,10 +126,14 @@ describe("CheckoutIntegrationDiscountCodeService", () => {
     expect(createCall[1].variables.codeAppDiscount.metafields).toEqual([
       expect.objectContaining({
         namespace: "$app",
-        key: "checkout_integration_config",
+        key: "discount_configuration",
         type: "json",
         value: JSON.stringify({
-          mode: "checkout_integration",
+          version: 1,
+          role: "checkout_integration",
+          code: "WPB-GOKWIK",
+          windowStart: "00:00:00",
+          windowEnd: "23:59:59",
           providerId: "gokwik",
           shopDomain,
         }),
@@ -225,12 +233,14 @@ describe("CheckoutIntegrationDiscountCodeService", () => {
               __typename: "DiscountCodeApp",
               title: "WPB checkout integration - GoKwik",
               status: "ACTIVE",
+              appDiscountType: { functionId: MOCK_DISCOUNT_FUNCTION_ID },
               codes: { nodes: [{ code: "WPB-GOKWIK" }] },
             },
           }],
         },
       }));
 
+    mockShopifyAdmin.graphql.mockResolvedValue(createMockGraphQLResponse({discountCodeAppUpdate: {codeAppDiscount: {discountId: "gid://shopify/DiscountCodeNode/3"}, userErrors: []}}));
     const result = await CheckoutIntegrationDiscountCodeService.createForProvider(
       mockShopifyAdmin,
       shopDomain,

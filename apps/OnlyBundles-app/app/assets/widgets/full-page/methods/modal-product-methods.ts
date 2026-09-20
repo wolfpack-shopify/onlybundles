@@ -165,13 +165,11 @@ renderModalProducts(stepIndex: number, productsToRender: any = null) {
       }])
       : null;
 
-    // Low-stock / out-of-stock badge — shown on the image, not in the CTA.
-    const stockBadgeElement = outOfStock || lowStockAlert ? document.createElement('div') : null;
+    // Low-stock badge — shown on the image, while out of stock is shown in the CTA.
+    const stockBadgeElement = lowStockAlert ? document.createElement('div') : null;
     if (stockBadgeElement) {
-      stockBadgeElement.className = `product-stock-badge ${outOfStock ? 'product-stock-badge--out' : 'product-stock-badge--low'}`;
-      stockBadgeElement.textContent = outOfStock
-        ? outOfStockLabel
-        : lowStockAlert?.message ?? '';
+      stockBadgeElement.className = 'product-stock-badge product-stock-badge--low';
+      stockBadgeElement.textContent = lowStockAlert?.message ?? '';
     }
 
     return createSharedProductCardElement(

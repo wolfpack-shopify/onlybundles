@@ -490,6 +490,8 @@
     "title": "Terminplanung und Priorität anbieten",
     "description": "Legen Sie fest, wann dieses Paket in Only Bundles Schaufenstern erscheinen kann und welches passende Angebot zuerst angezeigt wird.",
     "shopifyOwnership": "Shopify steuert Rabattdaten und Kombinationen. Diese Einstellungen steuern nur die Sichtbarkeit des Schaufensters Only Bundles und bieten eine Auswahl an.",
+    "scheduleUnavailableHeading": "Zeitplanung für diesen Rabatt nicht verfügbar",
+    "scheduleUnavailableBody": "Dieses Bundle verwendet komponentenbezogene Berechtigungs- oder Preisregeln, die Shopify nach dem Zusammenführen der Basisprodukte nicht neu berechnen kann. Entfernen Sie diese Regeln, um die Zeitplanung zu aktivieren. Falls bereits ein Zeitplan ausgewählt ist, wählen Sie vor dem Speichern Immer aktiv.",
     "priorityLabel": "Priorität des Shops",
     "priorityDetails": "Niedrigere Zahlen werden als erste betrachtet, wenn mehrere Only Bundles die gleiche Platzierung anbietet.",
     "stopLowerLabel": "Angebote mit niedrigerer Priorität stoppen",

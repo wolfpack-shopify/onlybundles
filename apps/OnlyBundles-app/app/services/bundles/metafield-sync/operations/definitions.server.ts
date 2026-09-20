@@ -123,13 +123,18 @@ export async function ensureVariantBundleMetafieldDefinitions(admin: any): Promi
       name: "PPB Policy Revisions",
       namespace: METAFIELD_NAMESPACE,
       key: METAFIELD_KEYS.PPB_POLICY_REVISIONS,
-      description: "Current PPB policy revision per bundle for Shopify Function authorization",
+      description: "Current bundle policy revision per bundle for Shopify Function authorization",
       type: "json",
       ownerType: "SHOP",
       access: {
-        admin: "MERCHANT_READ_WRITE",
+        admin: "MERCHANT_READ",
         storefront: "NONE"
       }
+    }
+    ,{
+      name: "Bundle Parent Policy", namespace: METAFIELD_NAMESPACE, key: "bundle_parent_policy",
+      description: "Published dedicated bundle parent identity",
+      type: "json", ownerType: "PRODUCTVARIANT", access: { admin: "MERCHANT_READ", storefront: "NONE" }
     }
   ];
 
@@ -137,6 +142,7 @@ export async function ensureVariantBundleMetafieldDefinitions(admin: any): Promi
     component: "definitions.server",
   }, { count: definitions.length });
 
+  let success = true;
   for (const definition of definitions) {
     try {
       const response = await admin.graphql(CREATE_METAFIELD_DEFINITION, {
@@ -145,13 +151,23 @@ export async function ensureVariantBundleMetafieldDefinitions(admin: any): Promi
 
       const data = await response.json();
 
+      if (data.errors?.length || !data.data?.metafieldDefinitionCreate) { success = false; continue; }
       if (data.data?.metafieldDefinitionCreate?.userErrors?.length > 0) {
         const error = data.data.metafieldDefinitionCreate.userErrors[0];
         if (error.code === "TAKEN") {
+          if (definition.access.admin === "MERCHANT_READ") {
+            const updated = await admin.graphql(`mutation UpdateRuntimePolicyDefinition($definition: MetafieldDefinitionUpdateInput!) {
+              metafieldDefinitionUpdate(definition: $definition) { updatedDefinition { id access { admin storefront } } userErrors { message } }
+            }`, { variables: { definition: { namespace: definition.namespace, key: definition.key, ownerType: definition.ownerType, access: definition.access } } });
+            const payload = await updated.json();
+            const result = payload.data?.metafieldDefinitionUpdate;
+            if (payload.errors?.length || result?.userErrors?.length || result?.updatedDefinition?.access?.admin !== "MERCHANT_READ") success = false;
+          }
           AppLogger.debug("[METAFIELD_DEF] Definition already exists", {
             component: "definitions.server",
           }, { key: definition.key });
         } else {
+          success = false;
           AppLogger.error("[METAFIELD_DEF] Error creating definition", {
             component: "definitions.server",
           }, { key: definition.key, error });
@@ -162,6 +178,7 @@ export async function ensureVariantBundleMetafieldDefinitions(admin: any): Promi
         }, { key: definition.key });
       }
     } catch (error: any) {
+      success = false;
       AppLogger.error("[METAFIELD_DEF] Failed to create definition", {
         component: "definitions.server",
       }, { key: definition.key, error: error instanceof Error ? error.message : String(error) });
@@ -171,5 +188,5 @@ export async function ensureVariantBundleMetafieldDefinitions(admin: any): Promi
   AppLogger.info("[METAFIELD_DEF] Finished ensuring bundle metafield definitions", {
     component: "definitions.server",
   });
-  return true;
+  return success;
 }

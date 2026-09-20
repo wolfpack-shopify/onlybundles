@@ -6,7 +6,7 @@ export function createTargets(rootDir) {
   return {
     css: [
       {
-        source: join(rootDir, 'app/assets/widgets/full-page-css/base/bootstrap-reservation.css'),
+        source: join(rootDir, 'app/assets/widgets/shared-css/app-embed-global.css'),
         target: join(rootDir, 'extensions/bundle-builder/assets/bundle-widget-bootstrap.css'),
       },
       {

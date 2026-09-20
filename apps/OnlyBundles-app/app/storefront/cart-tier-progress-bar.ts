@@ -13,6 +13,9 @@ export interface TierRule {
   minSubtotal?: number;
   discountType?: 'percentage' | 'fixed_amount' | string;
   discountValue?: number;
+  customerBuys?: number;
+  customerGets?: number;
+  bxyDiscountType?: string;
   tierText?: string | null;
 }
 
@@ -39,6 +42,11 @@ export interface CartTierProgressState {
 
 function formatDiscountBadge(rule: TierRule, currencySymbol = '$'): string {
   const val = Number(rule.discountValue || 0);
+  if (rule.discountType === 'fixed_bundle_price') return `Bundle price: ${formatMoneyCents(val, currencySymbol)}`;
+  if (rule.discountType === 'buy_x_get_y') {
+    const saving = rule.bxyDiscountType === 'fixed_amount' ? formatMoneyCents(val, currencySymbol) : `${val}%`;
+    return `Buy ${rule.customerBuys}, get ${rule.customerGets} at ${saving} off`;
+  }
   if (rule.discountType === 'fixed_amount') {
     return `${currencySymbol}${(val / 100).toFixed(2)}`;
   }
@@ -83,45 +91,17 @@ export function calculateCartTierProgress(
       } catch {
         // Safe bypass
       }
-    } else if (item?.properties?._wolfpack_bundle_runtime) {
-      try {
-        const token = String(item.properties._wolfpack_bundle_runtime);
-        for (const part of token.split('.')) {
-          try {
-            const rawPayload = typeof atob === 'function'
-              ? atob(part.replace(/-/g, '+').replace(/_/g, '/'))
-              : Buffer.from(part, 'base64').toString('utf-8');
-            const payload = JSON.parse(rawPayload);
-            const rules = payload?.priceAdjustment?.rules;
-            if (Array.isArray(rules) && rules.length > 0) {
-              itemTierProgress = {
-                rules: rules.map((r: any) => ({
-                  conditionType: r.conditions?.type || 'quantity',
-                  minQuantity: r.conditions?.type === 'amount' ? undefined : Number(r.conditions?.value || 0),
-                  minSubtotal: r.conditions?.type === 'amount' ? Number(r.conditions?.value || 0) : undefined,
-                  discountType: r.method === 'fixed_amount_off' ? 'fixed_amount' : 'percentage',
-                  discountValue: Number(r.value || 0),
-                })),
-                progressBar: { enabled: true, type: 'simple' },
-              };
-              break;
-            }
-          } catch {
-            // Safe bypass: try next token part
-          }
-        }
-      } catch {
-        // Safe bypass
-      }
     }
 
     if (itemTierProgress?.rules && Array.isArray(itemTierProgress.rules)) {
       if (!metadata) {
         metadata = itemTierProgress;
       }
-      const qty = Number(item.quantity || 1);
+      const componentQuantity = Number(item.properties?._bundle_total_quantity);
+      const qty = Number.isSafeInteger(componentQuantity) && componentQuantity > 0 ? componentQuantity : Number(item.quantity || 1);
       totalBundleQuantity += qty;
-      const linePrice = Number(item.line_price || item.final_line_price || (item.price * qty) || 0);
+      const retailCents = Number(item.properties?._bundle_total_retail_cents);
+      const linePrice = Number.isFinite(retailCents) && retailCents >= 0 ? retailCents : Number(item.line_price || item.final_line_price || (item.price * qty) || 0);
       totalBundlePriceCents += linePrice;
     }
   }
@@ -149,7 +129,8 @@ export function calculateCartTierProgress(
   if (currentValue >= maxThreshold) {
     const maxDiscount = formatDiscountBadge(maxRule, currencySymbol);
     const successTemplate = metadata.progressBar?.successText || "You've unlocked {{discountText}} off!";
-    const message = successTemplate.replace('{{discountText}}', maxDiscount);
+    const message = !metadata.progressBar?.successText && ['fixed_bundle_price', 'buy_x_get_y'].includes(maxRule.discountType || '')
+      ? maxDiscount : successTemplate.replace('{{discountText}}', maxDiscount);
     return {
       progressPercent: 100,
       message,
@@ -190,11 +171,12 @@ export function calculateCartTierProgress(
   const nextDiscount = formatDiscountBadge(nextRule, currencySymbol);
   const activeDiscount = activeRule ? formatDiscountBadge(activeRule, currencySymbol) : null;
 
+  const suffix = ['fixed_bundle_price', 'buy_x_get_y'].includes(nextRule.discountType || '') ? '' : ' off';
   let message: string;
   if (activeDiscount) {
-    message = `${activeDiscount} unlocked! Add ${conditionText} to unlock ${nextDiscount} off!`;
+    message = `${activeDiscount} unlocked! Add ${conditionText} to unlock ${nextDiscount}${suffix}!`;
   } else {
-    message = `Add ${conditionText} to unlock ${nextDiscount} off!`;
+    message = `Add ${conditionText} to unlock ${nextDiscount}${suffix}!`;
   }
 
   const badgeText = activeDiscount ? `${activeDiscount} Unlocked` : 'Next Milestone';
@@ -210,169 +192,29 @@ export function calculateCartTierProgress(
 }
 
 const BAR_CLASS = 'wpb-cart-tier-progress-bar';
-const STYLE_ID = 'wpb-cart-tier-progress-bar-style';
-
 const TAG_ICON_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>`;
 
 const CHECK_ICON_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`;
 
-function ensureProgressStyles(doc: Document): void {
-  if (doc.getElementById(STYLE_ID)) return;
-  const style = doc.createElement('style');
-  style.id = STYLE_ID;
-  style.textContent = `
-    .${BAR_CLASS} {
-      width: 100%;
-      box-sizing: border-box;
-      margin: 0 0 20px 0;
-      padding: 14px 18px;
-      background: var(--wpb-cart-tier-progress-bg, #ffffff);
-      border: 1px solid rgba(0, 0, 0, 0.08);
-      border-radius: 12px;
-      box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.04), 0 1px 3px 0 rgba(0, 0, 0, 0.02);
-      font-family: inherit;
-      position: relative;
-      transition: background-color 0.3s ease, border-color 0.3s ease;
-    }
-    cart-drawer .${BAR_CLASS},
-    .cart-drawer .${BAR_CLASS},
-    cart-drawer-component .${BAR_CLASS},
-    #CartDrawer .${BAR_CLASS},
-    .cart-drawer__dialog .${BAR_CLASS} {
-      margin: 12px 20px;
-      width: calc(100% - 40px);
-    }
-    .${BAR_CLASS}--max-tier {
-      background: #f0fdf4;
-      border-color: rgba(34, 197, 94, 0.3);
-    }
-    .${BAR_CLASS}__header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      margin-bottom: 10px;
-    }
-    .${BAR_CLASS}__title-group {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      min-width: 0;
-      flex: 1;
-    }
-    .${BAR_CLASS}__icon {
-      flex-shrink: 0;
-      width: 20px;
-      height: 20px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--bundle-cart-footer-discount-progress-bar-filled-color, var(--wpb-cart-tier-progress-filled, #15a524));
-    }
-    .${BAR_CLASS}__message {
-      margin: 0;
-      font-size: clamp(12px, 1.8vw, 13.5px);
-      line-height: 1.4;
-      font-weight: 500;
-      color: var(--wpb-cart-tier-progress-text, #1f2937);
-    }
-    .${BAR_CLASS}__message strong {
-      font-weight: 700;
-      color: #111827;
-    }
-    .${BAR_CLASS}__badge {
-      flex-shrink: 0;
-      display: inline-flex;
-      align-items: center;
-      padding: 3px 8px;
-      border-radius: 999px;
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      background: #f3f4f6;
-      color: #4b5563;
-    }
-    .${BAR_CLASS}__badge--unlocked {
-      background: #dcfce7;
-      color: #15803d;
-    }
-    .${BAR_CLASS}__track-wrapper {
-      position: relative;
-      width: 100%;
-    }
-    .${BAR_CLASS}__track {
-      width: 100%;
-      height: 8px;
-      background: var(--bundle-cart-footer-discount-progress-bar-empty-color, var(--wpb-cart-tier-progress-empty, #e5e7eb));
-      border-radius: 999px;
-      overflow: hidden;
-      box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
-      position: relative;
-    }
-    .${BAR_CLASS}__fill {
-      height: 100%;
-      background: linear-gradient(90deg, var(--bundle-cart-footer-discount-progress-bar-filled-color, var(--wpb-cart-tier-progress-filled, #15a524)) 0%, #10b981 100%);
-      border-radius: 999px;
-      transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-      position: relative;
-    }
-    .${BAR_CLASS}__fill::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.25) 50%, rgba(255, 255, 255, 0) 100%);
-      background-size: 200% 100%;
-      animation: wpb-shimmer 2.5s infinite;
-    }
-    @keyframes wpb-shimmer {
-      0% { background-position: -200% 0; }
-      100% { background-position: 200% 0; }
-    }
-    @media (max-width: 640px) {
-      .${BAR_CLASS} {
-        padding: 12px 14px;
-        margin-bottom: 16px;
-      }
-      .${BAR_CLASS}__message {
-        font-size: 12.5px;
-      }
-      .${BAR_CLASS}__badge {
-        font-size: 10px;
-        padding: 2px 6px;
-      }
-    }
-  `;
-  doc.head?.appendChild(style);
-}
-
 const CART_CONTAINER_SELECTORS = [
-  'cart-drawer-component .cart-drawer__header',
-  'cart-drawer .drawer__header',
-  '.cart-drawer__header',
   '#cart-drawer-header',
+  'cart-drawer-component .cart-drawer__header',
+  '.cart-drawer__header',
+  'cart-drawer .drawer__header',
   '.drawer__header',
   'cart-drawer-component .cart-drawer__content',
   'cart-drawer .cart-drawer-items',
   'cart-drawer .drawer__inner',
-  'cart-drawer',
-  'cart-drawer-component',
-  '.cart-drawer',
-  '#cart-drawer',
-  '#CartDrawer',
-  '[data-cart-drawer]',
-  '[data-side-cart]',
+  '.cart-drawer__inner',
+  '.cart-drawer__dialog',
   '#sidebar-cart',
   '#rebuy-cart',
   'upcart-cart',
+  '#main-cart-items',
   '.cart-items__wrapper',
   '.cart-page__items',
   '[data-cart-items-wrapper]',
-  'form[action*="/cart"]',
-  '#main-cart-items',
+  'form[action="/cart"]',
   '.cart-items',
   '.cart__items',
 ];
@@ -380,16 +222,11 @@ const CART_CONTAINER_SELECTORS = [
 function findCartMountTarget(doc: Document): HTMLElement | null {
   for (const selector of CART_CONTAINER_SELECTORS) {
     const target = doc.querySelector<HTMLElement>(selector);
-    if (target && target.offsetParent !== null) {
+    if (target) {
       return target;
     }
   }
-  return doc.querySelector<HTMLElement>(CART_CONTAINER_SELECTORS[0])
-    || doc.querySelector<HTMLElement>('cart-drawer-component')
-    || doc.querySelector<HTMLElement>('cart-drawer')
-    || doc.querySelector<HTMLElement>('.cart-items__wrapper')
-    || doc.querySelector<HTMLElement>('form[action*="/cart"]')
-    || null;
+  return null;
 }
 
 function formatStyledMessage(rawMessage: string, isMaxTier: boolean): string {
@@ -417,7 +254,11 @@ export function renderCartTierProgressBar(
     return;
   }
 
-  ensureProgressStyles(doc);
+  const mountTarget = findCartMountTarget(doc);
+  if (!mountTarget) {
+    existing?.remove();
+    return;
+  }
 
   let barElement = existing;
   if (!barElement) {
@@ -468,19 +309,18 @@ export function renderCartTierProgressBar(
 
     barElement.appendChild(headerEl);
     barElement.appendChild(trackWrapper);
+  }
 
-    const mountTarget = findCartMountTarget(doc);
-    if (mountTarget) {
-      if (
-        mountTarget.classList.contains('drawer__header')
-        || mountTarget.classList.contains('cart-drawer__header')
-        || mountTarget.id === 'cart-drawer-header'
-      ) {
-        mountTarget.after(barElement);
-      } else {
-        mountTarget.prepend(barElement);
-      }
+  if (
+    mountTarget.classList.contains('drawer__header')
+    || mountTarget.classList.contains('cart-drawer__header')
+    || mountTarget.id === 'cart-drawer-header'
+  ) {
+    if (mountTarget.nextElementSibling !== barElement) {
+      mountTarget.after(barElement);
     }
+  } else if (barElement.parentElement !== mountTarget) {
+    mountTarget.prepend(barElement);
   }
 
   // Update dynamic state
@@ -628,7 +468,9 @@ export function extractTierProgressForBundle(bundle: any): BundleTierProgressMet
       conditionType,
       minQuantity: isAmount ? undefined : Number(r.conditionValue ?? r.minQuantity ?? 0),
       minSubtotal: isAmount ? Number(r.conditionValue ?? r.minSubtotal ?? 0) : undefined,
-      discountType: r.discountType || (bundle.pricing?.method === 'fixed_amount_off' ? 'fixed_amount' : 'percentage'),
+      discountType: ['fixed_bundle_price', 'buy_x_get_y'].includes(bundle.pricing.method) ? bundle.pricing.method
+        : r.discountType || (bundle.pricing.method === 'fixed_amount_off' ? 'fixed_amount' : 'percentage'),
+      customerBuys: r.customerBuys, customerGets: r.customerGets, bxyDiscountType: r.bxyDiscountType,
       discountValue: Number(r.discountValue ?? 0),
       tierText: r.tierText || null,
     };

@@ -5,6 +5,9 @@
  */
 
 const INTERNAL_PROPERTY_REGEX = /^\s*_(?:is_bundle_parent|bundle_name|bundle_total_retail_cents|wolfpackProductBundle|wolfpack_bundle_runtime|addon_offer_id|wpb_offer_analytics|[a-zA-Z0-9_:-]+)\s*:/;
+const BUNDLE_PARENT_PROPERTY_REGEX = /^\s*_is_bundle_parent\s*:/;
+const BUNDLE_PRICE_PROPERTY_REGEX = /^\s*Bundle Price\s*:\s*$/;
+const CART_LINE_SELECTOR = 'tr, cart-item, line-item, [data-cart-item], .cart-item, .cart__item, .line-item';
 
 export const CART_CONTAINER_SELECTORS = [
   'form[action*="/cart"]',
@@ -81,7 +84,15 @@ export function cleanupInternalCartProperties(root: ParentNode = document): void
   let currentNode: Node | null = walker.nextNode();
   while (currentNode) {
     const text = currentNode.textContent ?? '';
+    if (BUNDLE_PRICE_PROPERTY_REGEX.test(text)) {
+      const cartLine = currentNode.parentElement?.closest<HTMLElement>(CART_LINE_SELECTOR);
+      if (cartLine) cartLine.dataset.wpbBp = 'true';
+    }
     if (INTERNAL_PROPERTY_REGEX.test(text)) {
+      if (BUNDLE_PARENT_PROPERTY_REGEX.test(text)) {
+        const cartLine = currentNode.parentElement?.closest<HTMLElement>(CART_LINE_SELECTOR);
+        if (cartLine) cartLine.dataset.wpbBp = 'true';
+      }
       const wrapper = findPropertyWrapper(currentNode.parentElement);
       if (wrapper) {
         nodesToRemove.push(wrapper);
@@ -155,14 +166,19 @@ export function initCartPropertiesCleaner(): void {
     if (cartContainers.length > 0) {
       const cartObserver = new MutationObserver((mutations) => {
         for (const mutation of mutations) {
-          if (mutation.addedNodes.length > 0) {
+          if (mutation.type === 'attributes' || mutation.addedNodes.length > 0) {
             scheduleCartPropertiesCleanup(mutation.target as ParentNode);
             break;
           }
         }
       });
       cartContainers.forEach((container) => {
-        cartObserver.observe(container, { childList: true, subtree: true });
+        cartObserver.observe(container, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          attributeFilter: ['open', 'class', 'aria-hidden'],
+        });
       });
     } else {
       const bodyObserver = new MutationObserver((mutations) => {

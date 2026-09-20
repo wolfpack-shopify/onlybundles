@@ -490,6 +490,8 @@
     "title": "Oferecer agendamento e prioridade",
     "description": "Controle quando este pacote pode aparecer em Only Bundles posicionamento vitrine de loja e qual oferta correspondente é mostrada primeiro.",
     "shopifyOwnership": "O Shopify controles de datas de desconto de checkout e combinações. Estas configurações controlam apenas a visibilidade Only Bundles da frente da loja e oferecem seleção.",
+    "scheduleUnavailableHeading": "Agendamento indisponível para este desconto",
+    "scheduleUnavailableBody": "Este pacote usa regras de elegibilidade ou preço por componente que a Shopify não pode recalcular depois que os produtos base são mesclados. Remova essas regras para habilitar o agendamento. Se já houver um agendamento selecionado, escolha Sempre ativo antes de salvar.",
     "priorityLabel": "Prioridade da Loja",
     "priorityDetails": "Números inferiores são considerados primeiro quando múltiplas ofertas Only Bundles correspondem ao mesmo posicionamento.",
     "stopLowerLabel": "Parar ofertas de vitrine de baixa prioridade",

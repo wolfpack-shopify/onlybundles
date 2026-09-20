@@ -271,12 +271,12 @@ _parseBundleConfigPayload(rawValue: string) {
     return !!(
       payload &&
       typeof payload === 'object' &&
-      payload.schemaVersion === 3 &&
+      payload.schemaVersion === 4 &&
       payload.bundleType === 'product_page' &&
       typeof payload.id === 'string' &&
       payload.id.trim() !== '' &&
       Array.isArray(payload.steps) &&
-      payload.runtimeAuthorization?.version === 2
+      typeof payload.runtimePolicyRevision === 'string' && payload.runtimePolicyRevision.length > 0
     );
   },
 

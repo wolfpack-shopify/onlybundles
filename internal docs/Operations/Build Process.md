@@ -5,7 +5,7 @@ title: Build Process
 type: operations
 status: authoritative
 summary: Global Shopify CLI, Function, asset, lint, and pre-commit requirements for deployable application and storefront builds.
-last_audited: 2026-09-10
+last_audited: 2026-09-19
 owners:
   - engineering
 domains:
@@ -146,6 +146,57 @@ CLI printed `280301 bytes` and completed successfully; the configured output
 path contained the Shopify-optimized 250,491-byte WASM. Always verify that
 configured path with `wc -c` before diagnosing a size-limit failure.
 WASM output is not committed.
+
+A successful app build is not proof that the Function query or executable works
+in preview. In the 2026-09-19 investigation, preview rejected a Cart Transform
+query with complexity 33 after the app build passed. Consolidating the shopper
+selection identifiers into one bounded JSON attribute reduced the query to the
+maximum cost of 30; that attribute contains identifiers, never pricing rules.
+Removing the obsolete direct-parent self-expansion fields subsequently reduced
+the query below that limit. Dedicated parent variants require widget selections;
+their `requiresComponents` protection remains enabled.
+
+Also replay the final WASM through Shopify CLI before treating the build as
+verified. Broad `wasm-snip --snip-rust-panicking-code` removes
+`std::panicking::set_hook`, which Shopify's Rust wrapper calls on every execution.
+The optimizer can collapse the exported function to an immediate `unreachable`:
+a suspiciously small binary then passes build while every cart execution traps
+after five instructions. This was confirmed in both replay and the preview's
+`.shopify/logs` Function output. Preserve the panic initialization path.
+
+The raw Rust module imports `shopify_function_v2` functions. Shopify CLI applies
+its ABI trampoline before optimization; running the unadapted Cargo artifact
+directly in function-runner can report unknown imports. That is separate from
+the panic-snipping trap. Keep ABI adaptation and optimization owned by Shopify
+CLI, and inspect the final configured output file. For isolated diagnostics,
+use the trampoline and runner bundled with the same installed CLI.
+
+The Function crates pin `serde_json` to `1.0.146`. Version `1.0.147` replaced
+Ryū with Żmij for float formatting, while Shopify SDK 2.2.0 still uses Ryū.
+Linking both formatters increased this Cart Transform beyond the upload limit.
+With the shared formatter and self-expansion removed, the active preview artifact
+measured 254,039 bytes on 2026-09-19 and successfully replayed the three-unit
+buy-two-get-one fixture. This is executable evidence, not proof that storefront
+cart acceptance or the complete policy migration has passed. Re-measure and
+replay before upgrading the pin; do not compensate with panic snipping.
+See the [serde_json 1.0.147 release](https://github.com/serde-rs/json/releases/tag/v1.0.147).
+
+Both Function watch lists include the shared policy crate and GraphQL queries,
+so the running dev preview rebuilds when either input contract changes.
+
+Successful SIT Function logs do not exclude a failure in another installed app.
+On 2026-09-19, ordinary Ajax cart additions returned HTTP 422 even though both
+SIT Functions succeeded. A diagnostic Storefront `cartCreate` returned
+`MERCHANDISE_LINE_TRANSFORMERS_RUN_ERROR`. The Admin `cartTransforms` query is
+scoped to the querying app, so the SIT query did not show the production app's
+separate transform on the same QA store. Streaming production-app failure logs
+for that specific store exposed a five-instruction Cart Transform trap with
+`blockOnFailure: true`. Theme embed isolation does not disable installed backend
+Functions. Inspect each relevant app's registration and logs before changing
+SIT pricing code or weakening its failure handling. Removing another app's
+registration requires explicit approval and a restoration plan; do not uninstall
+the app to isolate a preview.
+See [cartTransforms ownership](https://shopify.dev/docs/api/admin-graphql/latest/queries/cartTransforms).
 
 The Discount Function build owner deliberately pins rustup's stable Cargo and
 Rustc together because Homebrew Rust can precede rustup in `PATH` while the WASM

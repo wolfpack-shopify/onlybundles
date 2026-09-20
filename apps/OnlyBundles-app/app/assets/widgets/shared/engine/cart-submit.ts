@@ -80,7 +80,6 @@ export function buildProductPageCartFormData(cartItems: any[] = [], {
   bundleName = '',
   offerId = '',
   sessionKey = '',
-  runtimeToken = '',
   sellingPlanId = '',
 }: any = {}) {
   const formData = new FormData();
@@ -96,7 +95,6 @@ export function buildProductPageCartFormData(cartItems: any[] = [], {
 
     Object.entries(item.properties || {}).forEach(([key, value]: any) => {
       if (value === undefined || value === null) return;
-      if (key === '_bundle_display_properties' || key === '_wolfpack_bundle_runtime') return;
       formData.append(`items[${index}][properties][${key}]`, String(value));
     });
     formData.append(`items[${index}][properties][_bundleName]`, bundleName);
@@ -113,19 +111,22 @@ export function buildProductPageCartFormData(cartItems: any[] = [], {
         // Safe bypass
       }
     }
-    const requiresLineRuntimeAuthorization = Boolean(
-      sellingPlanId
-      || item?.properties?._wolfpack_line_auth
-      || String(item?.properties?._bundle_step_type || '').startsWith('addon'),
-    );
-    if (runtimeToken && requiresLineRuntimeAuthorization) {
-      formData.append(`items[${index}][properties][_wolfpack_bundle_runtime]`, runtimeToken);
-    }
   });
 
   return {
     formData,
-    bundleDetailsKey: `${offerId}_${sessionKey}`,
     sourceProperties: extractBundleDetailsSourceProperties(cartItems),
   };
+}
+
+
+/** Buyer choices only. Shopify Functions resolve every rule from app-owned metafields. */
+export function buildBundleSelectionProperties(input: { bundleId: string; revision: string; instanceId: string; groupId: string }) {
+  const { bundleId, revision, instanceId, groupId } = input;
+  if ([bundleId, revision, instanceId, groupId].some(value => typeof value !== 'string' || !value.trim())) {
+    throw new Error('Bundle publication is unavailable. Refresh the bundle before selecting products.');
+  }
+  const selection = JSON.stringify({ bundleId, revision, instanceId, groupId });
+  if (selection.length > 512) throw new Error('Bundle selection identifiers exceed the supported size.');
+  return { _wpb_selection: selection };
 }

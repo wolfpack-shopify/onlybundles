@@ -10,6 +10,7 @@ const { buildCartItems } = require('../../../app/assets/sdk/cart.js');
 function makeSdkState() {
   return {
     bundleId: 'bundle_1',
+    bundleData: { runtimePolicyRevision: 'published-revision' },
     offerId: 'MIX-894502',
     bundleName: 'Test Bundle',
     steps: [{ id: 'step_1', isFreeGift: false, isDefault: false }],

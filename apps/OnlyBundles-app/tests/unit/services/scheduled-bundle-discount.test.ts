@@ -23,11 +23,9 @@ function fixture(existing: any[] = []) {
 }
 function node(id: string, discount: any) {
   return { id, discount: { __typename: 'DiscountAutomaticApp', ...discount, appDiscountType: { functionId: 'function-1' } },
-    config: discount.metafields.find((m: any) => m.key === 'scheduled_offer'),
-    role: discount.metafields.find((m: any) => m.key === 'discount_role'),
-    secret: discount.metafields.find((m: any) => m.key === 'runtime_token_secret') };
+    config: discount.metafields.find((m: any) => m.key === 'discount_configuration') };
 }
-const input = { policy, timing, title: 'Configured bundle title', secret: 'test-secret', recurringSubscription: false };
+const input = { policy, timing, title: 'Configured bundle title', recurringSubscription: false };
 it('creates and verifies a Shopify scheduled initial owner with native dates and combinations', async () => {
   const { admin, stored } = fixture();
   const ids = await syncScheduledBundleDiscounts({ ...input, admin });
@@ -35,7 +33,8 @@ it('creates and verifies a Shopify scheduled initial owner with native dates and
   const owner = [...stored.values()][0];
   expect(owner.discount).toMatchObject({ startsAt: '2026-09-14T09:00:00.000Z', endsAt: '2026-09-14T11:00:00.000Z', recurringCycleLimit: 1, discountClasses: ['PRODUCT'], combinesWith: { productDiscounts: true, orderDiscounts: true, shippingDiscounts: false } });
   expect(JSON.parse(owner.config.value)).toMatchObject({ bundleId: 'bundle-1', revision: 'revision-1', windowStart: '00:00:00', windowEnd: '23:59:59' });
-  expect(owner.role.value).toBe('scheduled_initial');
+  expect(JSON.parse(owner.config.value).role).toBe('scheduled_initial');
+  expect(owner.discount.metafields).toHaveLength(1);
 });
 it('reconciles an orphaned owner and uses separate native subscription billing-cycle ownership', async () => {
   const f = fixture();
@@ -103,7 +102,7 @@ it('updates existing metafields by namespace and key without conflicting returne
   const f = fixture();
   await syncScheduledBundleDiscounts({ ...input, admin: f.admin });
   for (const owner of f.stored.values()) {
-    for (const key of ['config', 'role', 'secret']) owner[key].id = `gid://shopify/Metafield/${key}`;
+    for (const key of ['config']) owner[key].id = `gid://shopify/Metafield/${key}`;
   }
   const real = f.admin.graphql.getMockImplementation()!;
   f.admin.graphql.mockImplementation(async (query, options) => {
@@ -115,6 +114,16 @@ it('updates existing metafields by namespace and key without conflicting returne
   await expect(syncScheduledBundleDiscounts({ ...input, admin: f.admin })).resolves.toBeDefined();
   const update = f.admin.graphql.mock.calls.find(([query]) => query.includes('UpdateScheduledDiscount'))!;
   expect(update[1].variables.discount.metafields).toEqual(expect.arrayContaining([
-    { namespace: '$app', key: 'discount_role', type: 'single_line_text_field', value: 'scheduled_initial' },
+    expect.objectContaining({ namespace: '$app', key: 'discount_configuration', type: 'json' }),
   ]));
+});
+
+it('publishes schedule boundaries at Shopify native second precision', async () => {
+  const f = fixture();
+  await syncScheduledBundleDiscounts({ ...input, admin: f.admin, timing: { ...timing,
+    startsAt: '2026-09-14T09:00:00.123Z', endsAt: '2026-09-14T11:00:00.456Z',
+  } });
+  const owner = [...f.stored.values()][0];
+  expect(owner.discount.startsAt).toBe('2026-09-14T09:00:00.000Z');
+  expect(owner.discount.endsAt).toBe('2026-09-14T11:00:00.000Z');
 });

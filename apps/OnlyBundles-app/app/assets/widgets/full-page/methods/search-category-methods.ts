@@ -77,7 +77,7 @@ updateProductGridWithSearch() {
 collectStepProductIds(step: any) {
   const productIds: any[] = [];
   const addProductId = (product: any) => {
-    const id = product?.selectionId;
+    const id = product?.id;
     if (id && !productIds.includes(id)) productIds.push(id);
   };
 

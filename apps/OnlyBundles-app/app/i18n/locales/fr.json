@@ -490,6 +490,8 @@
     "title": "Planification de l'offre et priorité",
     "description": "Contrôle quand ce bundle peut apparaître dans les emplacements de vitrine Only Bundles et quelle offre correspondante est affichée en premier.",
     "shopifyOwnership": "Shopify contrôle les dates et combinaisons de remise de commande. Ces paramètres ne contrôlent que la visibilité de la vitrine Only Bundles et proposent la sélection.",
+    "scheduleUnavailableHeading": "Planification indisponible pour cette remise",
+    "scheduleUnavailableBody": "Ce bundle utilise une admissibilité ou une tarification au niveau des composants que Shopify ne peut pas recalculer après la fusion des produits de base. Supprimez ces règles pour activer la planification. Si une planification est déjà sélectionnée, choisissez Toujours active avant d’enregistrer.",
     "priorityLabel": "Priorité de la vitrine",
     "priorityDetails": "Les nombres inférieurs sont considérés en premier lieu lorsque plusieurs offres Only Bundles correspondent au même placement.",
     "stopLowerLabel": "Arrêter les offres de vitrine de priorité inférieure",

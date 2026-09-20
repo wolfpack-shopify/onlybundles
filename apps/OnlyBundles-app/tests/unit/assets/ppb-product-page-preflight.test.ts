@@ -109,7 +109,6 @@ describe('PPB product-page preflight validation', () => {
         _getProductPageControls: () => ({}),
         _resolveText: (_key: string, fallback: string) => fallback,
         _handlePostAddToCartAction: jest.fn(),
-        syncBundleDetailsCartMetafield: jest.fn(),
         validateProductPageBoxSelectionCheckout: () => ({ valid: true, totalQuantity: 1, targetQuantity: null, difference: 0 }),
         validateStep: () => true,
         buildCartItems: () => [{
@@ -118,7 +117,6 @@ describe('PPB product-page preflight validation', () => {
           properties: {},
           _wpbProductId: 'gid://shopify/Product/1',
         }],
-        requestCartTransformRuntimeToken: jest.fn(),
         buildProductPageCartFormData: jest.fn(),
         getDiscountInfoWithSelectedAddonDiscount(value: unknown) {
           return value;

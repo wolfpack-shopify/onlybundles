@@ -15,4 +15,8 @@ description = "t:description"
   [extensions.build]
   command = "node ../../scripts/build-discount-function.mjs"
   path = "target/wasm32-unknown-unknown/release/bundle-discount-function.wasm"
-  watch = [ "src/**/*.rs" ]
+  watch = ["src/**/*.rs", "src/**/*.graphql", "Cargo.toml", "Cargo.lock", "../bundle-runtime-policy/src/**/*.rs", "../bundle-runtime-policy/Cargo.toml", "../../scripts/build-discount-function.mjs"]
+
+  [extensions.input.variables]
+  namespace = "$app"
+  key = "discount_configuration"

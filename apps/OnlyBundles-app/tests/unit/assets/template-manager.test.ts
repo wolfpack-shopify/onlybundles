@@ -89,7 +89,7 @@ describe('TemplateManager.calculateDiscountData', () => {
     expect(TemplateManager.calculateDiscountData('fixed_amount_off', 1350, cadCurrencyInfo))
       .toMatchObject({ discountText: `${formatCad(1350)} off`, discountValue: formatCad(1350), discountValueUnit: '' });
     expect(TemplateManager.calculateDiscountData('fixed_bundle_price', 2700, cadCurrencyInfo))
-      .toMatchObject({ discountText: formatCad(2700), discountValue: formatCad(2700) });
+      .toMatchObject({ discountText: `Bundle price: ${formatCad(2700)}`, discountValue: formatCad(2700) });
   });
 
   it('formats fixed money through Intl using the presentment locale and currency', () => {
@@ -107,7 +107,7 @@ describe('TemplateManager.calculateDiscountData', () => {
     expect(TemplateManager.calculateDiscountData('fixed_amount_off', 1350, eurCurrencyInfo))
       .toMatchObject({ discountText: `${formatted} off`, discountValue: formatted, discountValueUnit: '' });
     expect(TemplateManager.calculateDiscountData('fixed_bundle_price', 1350, eurCurrencyInfo))
-      .toMatchObject({ discountText: formatted, discountValue: formatted, discountValueUnit: '' });
+      .toMatchObject({ discountText: `Bundle price: ${formatted}`, discountValue: formatted, discountValueUnit: '' });
   });
 });
 
@@ -380,5 +380,14 @@ describe('TemplateManager.getDiscountMessageTemplate', () => {
     });
 
     expect(template).toBe('Tier 2 reached');
+  });
+});
+
+describe('Bundle offer messages', () => {
+  it('states the qualifying and discounted unit counts for buy X get Y', () => {
+    expect(TemplateManager.calculateDiscountData('buy_x_get_y',100,{
+      calculation:{code:'USD'},display:{code:'USD',symbol:'$',rate:1},locale:'en-US',
+    },{customerBuys:2,customerGets:1,bxyDiscountType:'percentage'}).discountText)
+      .toBe('Buy 2, get 1 at 100% off');
   });
 });

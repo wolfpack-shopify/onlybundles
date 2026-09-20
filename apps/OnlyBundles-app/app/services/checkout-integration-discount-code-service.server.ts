@@ -62,16 +62,19 @@ export class CheckoutIntegrationDiscountCodeService {
   private static async findExistingDiscount(
     admin: AdminApiContext,
     code: string,
-  ): Promise<{ discountId: string; code: string; endsAt?: string | null } | null> {
+    functionId: string,
+  ): Promise<{ discountId: string; code: string; configurationId?: string; endsAt?: string | null } | null> {
     const QUERY = `
       query FindCheckoutIntegrationDiscountNode {
         discountNodes(first: 50) {
           nodes {
             id
+            configuration: metafield(namespace: "$app", key: "discount_configuration") { id }
             discount {
               __typename
               ... on DiscountCodeApp {
                 title
+                appDiscountType { functionId }
                 status
                 codes(first: 10) {
                   nodes {
@@ -93,7 +96,7 @@ export class CheckoutIntegrationDiscountCodeService {
       const match = nodes.find((node: any) => {
         const discount = node.discount;
         if (discount?.__typename !== "DiscountCodeApp") return false;
-        if (discount.status !== "ACTIVE") return false;
+        if (discount.status !== "ACTIVE" || discount.appDiscountType?.functionId !== functionId) return false;
         const codeNodes = discount.codes?.nodes ?? [];
         return codeNodes.some((c: any) => c.code === code);
       });
@@ -102,6 +105,7 @@ export class CheckoutIntegrationDiscountCodeService {
 
       return {
         discountId: match.id,
+        configurationId: match.configuration?.id,
         code,
         endsAt: match.discount.endsAt,
       };
@@ -133,8 +137,29 @@ export class CheckoutIntegrationDiscountCodeService {
     }
 
     const code = this.buildCode(providerId);
-    const existing = await this.findExistingDiscount(admin, code);
+    const configuration = {
+      namespace: "$app", key: "discount_configuration", type: "json",
+      value: JSON.stringify({ version: 1, role: "checkout_integration", code,
+        windowStart: "00:00:00", windowEnd: "23:59:59", providerId, shopDomain }),
+    };
+    const refresh = async (existing: { discountId: string; configurationId?: string }) => {
+      const response = await admin.graphql(`mutation RefreshCheckoutIntegrationCode($id: ID!, $codeAppDiscount: DiscountCodeAppInput!) {
+        discountCodeAppUpdate(id: $id, codeAppDiscount: $codeAppDiscount) {
+          codeAppDiscount { discountId } userErrors { message }
+        }
+      }`, { variables: { id: existing.discountId, codeAppDiscount: {
+        combinesWith: { orderDiscounts: true, productDiscounts: false, shippingDiscounts: false },
+        metafields: [configuration],
+      } } });
+      const data = await response.json() as any;
+      const errors = [...(data.errors ?? []), ...(data.data?.discountCodeAppUpdate?.userErrors ?? [])];
+      if (errors.length || !data.data?.discountCodeAppUpdate?.codeAppDiscount?.discountId) {
+        throw new Error(errors.map((error: any) => error.message).join(", ") || "Discount configuration update failed");
+      }
+    };
+    const existing = await this.findExistingDiscount(admin, code, functionId);
     if (existing) {
+      try { await refresh(existing); } catch (error) { return { success: false, providerId, functionId, error: String(error) }; }
       return {
         success: true,
         providerId,
@@ -182,19 +207,10 @@ export class CheckoutIntegrationDiscountCodeService {
             discountClasses: ["PRODUCT"],
             combinesWith: {
               orderDiscounts: true,
-              productDiscounts: true,
+              productDiscounts: false,
               shippingDiscounts: false,
             },
-            metafields: [{
-              namespace: "$app",
-              key: "checkout_integration_config",
-              type: "json",
-              value: JSON.stringify({
-                mode: "checkout_integration",
-                providerId,
-                shopDomain,
-              }),
-            }],
+            metafields: [configuration],
           },
         },
       });
@@ -219,8 +235,9 @@ export class CheckoutIntegrationDiscountCodeService {
             || msg.includes("taken");
         });
         if (isCodeTaken) {
-          const recovered = await this.findExistingDiscount(admin, code);
+          const recovered = await this.findExistingDiscount(admin, code, functionId);
           if (recovered) {
+            await refresh(recovered);
             return {
               success: true,
               providerId,

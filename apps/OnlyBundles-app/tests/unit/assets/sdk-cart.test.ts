@@ -17,6 +17,7 @@ function makeState(overrides: object = {}) {
     offerId: 'MIX-894502',
     bundleName: 'Test Bundle',
     isReady: true,
+    bundleData: { runtimePolicyRevision: 'published-revision' },
     steps: [
       { id: 'step_1', isFreeGift: false, isDefault: false },
       { id: 'step_2', isFreeGift: true, isDefault: false },
@@ -35,7 +36,7 @@ function makeState(overrides: object = {}) {
 }
 
 describe('buildCartItems', () => {
-  it('produces EB-compatible product-page cart line properties', () => {
+  it('produces product-page cart selection properties', () => {
     const state = makeState();
     const { items } = buildCartItems(state);
     expect(items).toHaveLength(2);
@@ -55,6 +56,7 @@ describe('buildCartItems', () => {
   it('carries the public offer decision marker in private Shopify line properties', () => {
     const state = makeState({
       bundleData: {
+        runtimePolicyRevision: 'published-revision',
         offerDelivery: {
           offerPolicyId: 'policy-1',
           ruleVersion: 4,
@@ -72,7 +74,7 @@ describe('buildCartItems', () => {
     });
   });
 
-  it('all items in one call share the same EB offer-session key with unique item indexes', () => {
+  it('all items in one call share the same offer-session key with unique item indexes', () => {
     const state = makeState();
     const { items } = buildCartItems(state);
     const offerIds = items.map((i: { properties: { '_wolfpackProductBundle:OfferId': string } }) => i.properties['_wolfpackProductBundle:OfferId']);
@@ -127,7 +129,7 @@ describe('buildCartItems', () => {
     expect(items[0].properties).not.toHaveProperty('_bundle_you_save_amount');
     expect(items[0].properties).not.toHaveProperty('_bundle_you_save_percentage');
 
-    expect(items[0].properties).not.toHaveProperty('_bundle_display_properties');
+    expect(items[0].properties).toHaveProperty('_bundle_display_properties');
     const displayProperties = JSON.parse(sourceProperties['_bundle_display_properties']);
     expect(displayProperties).toEqual({
       box: '1',
@@ -202,7 +204,7 @@ describe('addBundleToCart', () => {
       },
     });
     expect(body.items[0].properties).not.toHaveProperty('_wolfpack_bundle_runtime');
-    expect(body.items[0].properties).not.toHaveProperty('_bundle_display_properties');
+    expect(body.items[0].properties).toHaveProperty('_bundle_display_properties');
     expect(body.items[0].properties).not.toHaveProperty('Box');
     expect(body.items[1]).toMatchObject({
       id: 789012,
@@ -263,4 +265,12 @@ describe('addBundleToCart', () => {
       error: 'Bundle validation failed. Complete all required steps.',
     });
   });
+});
+
+
+test('SDK submits published selection identifiers without minting authorization', () => {
+  const { items } = buildCartItems(makeState());
+  const selected = JSON.parse(items[0].properties._wpb_selection);
+  expect(selected).toMatchObject({ bundleId: 'bundle_1', revision: 'published-revision', groupId: 'step_1' });
+  expect(items[0].properties).not.toHaveProperty('_wolfpack_bundle_runtime');
 });

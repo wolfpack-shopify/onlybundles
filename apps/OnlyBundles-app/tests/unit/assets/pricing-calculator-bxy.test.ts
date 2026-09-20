@@ -95,7 +95,7 @@ describe('TemplateManager BXY variables', () => {
     expect(variables.discountedItems).toBe('1');
     expect(variables.discountValue).toBe('100');
     expect(variables.discountValueUnit).toBe('%');
-    expect(variables.discountText).toBe('100% off');
+    expect(variables.discountText).toBe('Buy 2, get 1 at 100% off');
     expect(TemplateManager.replaceVariables(
       'Success! You got {{discountedItems}} product(s) at {{discountValue}}{{discountValueUnit}} off',
       variables,

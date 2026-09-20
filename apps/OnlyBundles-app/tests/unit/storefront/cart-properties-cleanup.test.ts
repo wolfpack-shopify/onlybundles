@@ -83,6 +83,55 @@ describe('cleanupInternalCartProperties', () => {
     expect(listItems[0].textContent).toContain('Color:');
   });
 
+  it('marks a merged bundle parent before removing its internal parent property', () => {
+    document.body.innerHTML = `
+      <table class="cart-items">
+        <tbody>
+          <tr>
+            <td>
+              <dl>
+                <div class="cart-item__property">
+                  <dt>_is_bundle_parent:</dt>
+                  <dd>true</dd>
+                </div>
+                <div class="cart-item__property">
+                  <dt>Retail Price:</dt>
+                  <dd>$60.00</dd>
+                </div>
+              </dl>
+              <div class="cart-items__unit-price-wrapper">$60.00</div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    cleanupInternalCartProperties(document);
+
+    const row = document.querySelector('tr') as HTMLElement;
+    expect(row.dataset.wpbBp).toBe('true');
+    expect(row.textContent).not.toContain('_is_bundle_parent');
+    expect(row.textContent).toContain('Retail Price:');
+  });
+
+  it('marks a merged bundle parent from its Function-generated bundle price property', () => {
+    document.body.innerHTML = `
+      <table class="cart-items">
+        <tbody>
+          <tr data-key="bundle-parent-key">
+            <td><dl><div><dt>Bundle Price:</dt><dd>$60.00</dd></div></dl></td>
+          </tr>
+          <tr data-key="ordinary-line-key"><td>Ordinary product $20.00</td></tr>
+        </tbody>
+      </table>
+    `;
+
+    cleanupInternalCartProperties(document);
+
+    expect((document.querySelector('[data-key="bundle-parent-key"]') as HTMLElement).dataset.wpbBp).toBe('true');
+    expect((document.querySelector('[data-key="ordinary-line-key"]') as HTMLElement).dataset.wpbBp).toBeUndefined();
+  });
+
   it('preserves public line item properties without leading underscores', () => {
     document.body.innerHTML = `
       <div class="content">
@@ -145,7 +194,12 @@ describe('cleanupInternalCartProperties', () => {
       initCartPropertiesCleaner();
 
       const cartContainer = document.querySelector('.cart-drawer');
-      expect(observeMock).toHaveBeenCalledWith(cartContainer, { childList: true, subtree: true });
+      expect(observeMock).toHaveBeenCalledWith(cartContainer, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+        attributeFilter: ['open', 'class', 'aria-hidden'],
+      });
     });
   });
 });

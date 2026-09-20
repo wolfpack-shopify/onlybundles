@@ -46,3 +46,11 @@ describe("collectBundleLineRevenue", () => {
     ], ["bundle-a"])).toEqual({ "bundle-a": 0 });
   });
 });
+
+
+test('attributes component selections and transformed bundle IDs without signatures', () => {
+  expect(collectBundleLineRevenue([
+    { customAttributes: [{ key: '_wpb_selection', value: JSON.stringify({ bundleId: 'b' }) }], discountedTotalSet: { shopMoney: { amount: '20' } } },
+    { properties: { _wpb_bundle_id: 'b' }, discountedTotalSet: { shopMoney: { amount: '40' } } },
+  ], ['b'])).toEqual({ b: 6000 });
+});

@@ -19,13 +19,13 @@ function lifecycleContext(bundleConfig?: unknown) {
 }
 
 describe("Product Page Shopify-hosted initialization", () => {
-  it("hydrates a complete schema-v3 snapshot without a network request", async () => {
+  it("hydrates a complete schema-v4 snapshot without a network request", async () => {
     const snapshot = {
-      schemaVersion: 3,
+      schemaVersion: 4,
       id: "bundle-1",
       bundleType: "product_page",
       steps: [{ id: "step-1", products: [] }],
-      runtimeAuthorization: { version: 2, bundleToken: "signed", lines: [] },
+      runtimePolicyRevision: "published",
     };
     const context = lifecycleContext(snapshot);
     const fetchSpy = jest.spyOn(global, "fetch");
@@ -58,24 +58,24 @@ describe("Product Page Shopify-hosted initialization", () => {
 });
 
 describe("Product Page multipart cart payload", () => {
-  it("preserves signed authorization and stable bundle identifiers", () => {
-    const { formData, bundleDetailsKey } = buildProductPageCartFormData([{
+  it("preserves published policy selection and stable bundle identifiers", () => {
+    const context = buildProductPageCartFormData([{
       id: "11",
       quantity: 2,
       properties: {
-        _wolfpack_line_auth: "signed-line",
+        _wpb_selection: "selection",
         _bundle_display_properties: JSON.stringify({ Box: "1" }),
       },
     }], {
       bundleName: "Bundle",
       offerId: "MIX-bundle-1",
       sessionKey: "SESSION",
-      runtimeToken: "signed-bundle",
     });
 
-    expect(bundleDetailsKey).toBe("MIX-bundle-1_SESSION");
-    expect(formData.get("items[0][properties][_wolfpack_line_auth]")).toBe("signed-line");
-    expect(formData.get("items[0][properties][_wolfpack_bundle_runtime]")).toBe("signed-bundle");
+    expect(context).not.toHaveProperty("bundleDetailsKey");
+    const { formData } = context;
+    expect(formData.get("items[0][properties][_wpb_selection]")).toBe("selection");
+    expect(formData.get("items[0][properties][_wolfpack_bundle_runtime]")).toBeNull();
     expect(formData.get("items[0][properties][_wolfpackProductBundle:OfferId]")).toBe("MIX-bundle-1_SESSION_1");
   });
 });

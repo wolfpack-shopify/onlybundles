@@ -1,7 +1,7 @@
-import { withBundleCartLock } from "../../lib/bundle-cart-lock.js";
 'use strict';
 
-import { buildOfferAnalyticsCartProperties } from '../widgets/shared/engine/cart-submit.js';
+import { withBundleCartLock } from "../../lib/bundle-cart-lock.js";
+import { buildBundleSelectionProperties, buildOfferAnalyticsCartProperties } from '../widgets/shared/engine/cart-submit.js';
 import { resolvePpbSelectionMetric } from '../widgets/shared/ppb-condition-selections.js';
 
 function _generateBundleInstanceId(bundleId: string) {
@@ -106,6 +106,8 @@ export function buildCartItems(state: any) {
       if (step.isFreeGift) properties['_bundle_step_type'] = 'free_gift';
       if (step.isDefault) properties['_bundle_step_type'] = 'default';
 
+      Object.assign(properties, buildBundleSelectionProperties({ bundleId: state.bundleId,
+        revision: state.bundleData.runtimePolicyRevision, instanceId: offerId + '_' + sessionKey, groupId: step.id }));
       items.push({
         id: parseInt(variantId, 10),
         quantity: qty,
@@ -128,12 +130,12 @@ export function buildCartItems(state: any) {
     bundleName: state.bundleName,
     offerDelivery: state.bundleData && state.bundleData.offerDelivery,
   });
+  items.forEach(item => Object.assign(item.properties, sourceProperties));
   return {
     items: items,
     bundleInstanceId: bundleInstanceId,
     offerId: offerId,
     sessionKey: sessionKey,
-    bundleDetailsKey: offerId + '_' + sessionKey,
     sourceProperties: sourceProperties,
   };
 }

@@ -1,3 +1,5 @@
+import { publishBundleRuntimePolicy } from '../../../app/services/bundle-runtime-policy-publisher.server';
+import prisma from '../../../app/db.server';
 import { BundleType } from "../../../app/constants/bundle";
 import { updateBundleProductMetafields } from "../../../app/services/bundles/metafield-sync/operations/bundle-product.server";
 import { formatStepCategoryForRuntime } from "../../../app/lib/bundle-config/category-runtime";
@@ -5,6 +7,8 @@ import {
   getFirstVariantId,
   batchGetFirstVariantsWithPrices,
 } from "../../../app/utils/variant-lookup.server";
+jest.mock('../../../app/db.server', () => ({ __esModule: true, default: { bundle: { update: jest.fn().mockResolvedValue({}) } } }));
+jest.mock('../../../app/services/bundle-runtime-policy-publisher.server', () => ({ publishBundleRuntimePolicy: jest.fn().mockResolvedValue({ ok: true }) }));
 
 jest.mock('../../../app/services/scheduled-bundle-discount.server', () => ({
   syncScheduledBundleDiscounts: jest.fn().mockResolvedValue({}),
@@ -95,8 +99,7 @@ describe("Metafield Payload Slimming (Step 8)", () => {
     mockGetFirstVariantId.mockResolvedValue({
       success: true,
       variantId: "gid://shopify/ProductVariant/1230",
-      priceCents: 1000,
-      title: "Default Title",
+      productId: "gid://shopify/Product/999",
     });
     mockBatchGetFirstVariantsWithPrices.mockResolvedValue(new Map());
   });
@@ -144,10 +147,9 @@ describe("Metafield Payload Slimming (Step 8)", () => {
         admin as any,
         "gid://shopify/Product/999",
         bundleConfig as any,
-        "gid://shopify/ProductVariant/9991",
       );
 
-      const uiConfigField = result.find((f: any) => f.key === "bundle_ui_config");
+      const uiConfigField = result!.find((f: any) => f.key === "bundle_ui_config");
       expect(uiConfigField).toBeDefined();
       const uiConfig = JSON.parse(uiConfigField.value);
 
@@ -177,10 +179,9 @@ describe("Metafield Payload Slimming (Step 8)", () => {
         admin as any,
         "gid://shopify/Product/999",
         bundleConfig as any,
-        "gid://shopify/ProductVariant/9991",
       );
 
-      const uiConfigField = result.find((f: any) => f.key === "bundle_ui_config");
+      const uiConfigField = result!.find((f: any) => f.key === "bundle_ui_config");
       const uiConfig = JSON.parse(uiConfigField.value);
       expect(uiConfig.bundleUpsellConfig).toBeNull();
     });
@@ -208,10 +209,9 @@ describe("Metafield Payload Slimming (Step 8)", () => {
         admin as any,
         "gid://shopify/Product/999",
         bundleConfig as any,
-        "gid://shopify/ProductVariant/9991",
       );
 
-      const uiConfigField = result.find((f: any) => f.key === "bundle_ui_config");
+      const uiConfigField = result!.find((f: any) => f.key === "bundle_ui_config");
       const uiConfig = JSON.parse(uiConfigField.value);
       expect(uiConfig.bundleUpsellConfig).toEqual(activeUpsell);
     });
@@ -231,8 +231,7 @@ describe("Metafield Payload Slimming (Step 8)", () => {
           admin as any,
           "gid://shopify/Product/999",
           bundleConfig as any,
-          "gid://shopify/ProductVariant/9991",
-        ),
+          ),
       ).rejects.toThrow(/bundle_ui_config metafield exceeds Shopify's 64KB limit/);
     });
 
@@ -257,9 +256,22 @@ describe("Metafield Payload Slimming (Step 8)", () => {
           admin as any,
           "gid://shopify/Product/999",
           bundleConfig as any,
-          "gid://shopify/ProductVariant/9991",
-        ),
-      ).rejects.toThrow(/price_adjustment exceeds the Shopify Function metafield limit of 10000 bytes/);
+          ),
+      ).rejects.toThrow(/POLICY_TOO_LARGE/);
     });
   });
+});
+
+
+test('publishes canonical restrictive membership before exposing the revision to storefront loaders', async () => {
+  const admin = makeAdmin();
+  mockGetFirstVariantId.mockResolvedValue({ success: true, variantId: 'gid://shopify/ProductVariant/1230', productId: 'gid://shopify/Product/999' });
+  mockBatchGetFirstVariantsWithPrices.mockResolvedValue(new Map());
+  const bundle = makeBundleConfig(BundleType.PRODUCT_PAGE, { steps: [{ id: 'g', StepProduct: [{ productId: 'gid://shopify/Product/123', variants: [{ id: 'gid://shopify/ProductVariant/5' }] }] }] });
+  const result = await updateBundleProductMetafields(admin as any, 'gid://shopify/Product/999', bundle as any);
+  const ui = JSON.parse(result!.find((field: any) => field.key === 'bundle_ui_config').value);
+  expect(ui).toMatchObject({ schemaVersion: 4, runtimePolicyRevision: expect.any(String) });
+  const publication = (publishBundleRuntimePolicy as jest.Mock).mock.calls.at(-1)[0];
+  expect(publication.compiled.productPolicies[0].metafield.policies[0].memberships[0].variantSelection).toEqual({ mode: 'listed_variants', variantIds: ['gid://shopify/ProductVariant/5'] });
+  expect(prisma.bundle.update).toHaveBeenLastCalledWith({ where: { id: 'bundle-1', shopId: 'test-shop.myshopify.com' }, data: { runtimePolicyRevision: ui.runtimePolicyRevision } });
 });

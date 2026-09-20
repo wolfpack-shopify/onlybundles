@@ -72,6 +72,7 @@ async function syncFullPageBundleFromDb(
   await ensureBundleParentProduct({
     admin,
     shopDomain,
+    appUrl: process.env.SHOPIFY_APP_URL,
     bundle,
   });
 

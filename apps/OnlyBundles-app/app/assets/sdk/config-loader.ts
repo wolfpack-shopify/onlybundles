@@ -23,12 +23,12 @@ export function loadBundleConfig(container: HTMLElement, state: any, locale?: st
     return { success: false, error: 'data-bundle-config is missing required "id" field.' };
   }
   if (
-    bundleData.schemaVersion !== 3
+    bundleData.schemaVersion !== 4
     || bundleData.bundleType !== 'product_page'
     || !Array.isArray(bundleData.steps)
-    || bundleData.runtimeAuthorization?.version !== 2
+    || typeof bundleData.runtimePolicyRevision !== 'string' || !bundleData.runtimePolicyRevision
   ) {
-    return { success: false, error: 'data-bundle-config must be a valid schema-v3 Product Page Bundle snapshot.' };
+    return { success: false, error: 'data-bundle-config must be a valid schema-v4 Product Page Bundle snapshot.' };
   }
 
   state.bundleId = bundleData.id;

@@ -509,7 +509,9 @@ findProductById(stepIndex: string|number, productId: any) {
     const directDefaultQuantity = Number(directDefaultQuantities[String(productId)] || 0);
     const conditionNewQuantity = Math.max(0, Number(newQuantity || 0) - directDefaultQuantity);
     const stepProducts = this.stepProductData[stepIndex] || [];
-    const isAmountOrWeight = step.conditionType === 'amount' || step.conditionType === 'weight';
+    const addonConditions = step.isFreeGift ? (this.getAddonTierEvaluation(step)?.tier?.conditions ?? []) : [];
+  const isAmountOrWeight = step.conditionType === 'amount' || step.conditionType === 'weight'
+    || addonConditions.some((rule: any) => rule.type === 'amount' || rule.type === 'weight');
     const conditionSelectionTotals = isAmountOrWeight
       ? this._buildConditionAwareStepSelections(stepProducts, conditionSelections)
       : conditionSelections;
@@ -521,18 +523,19 @@ findProductById(stepIndex: string|number, productId: any) {
       }
       : null;
 
-    const { allowed, conditionOperator, conditionValue } = ConditionValidator.canUpdateQuantity(
+    const { allowed, conditionType, conditionOperator, conditionValue } = ConditionValidator.canUpdateQuantity(
       step,
       conditionSelectionTotals,
       productId,
       conditionNewQuantity,
       targetValues,
+      addonConditions,
     ) as any;
 
   // Only block and toast on increases — decreases are always permitted.
   if (!allowed && newQuantity > currentQty) {
     const violatedRule = conditionOperator && Number(conditionValue) > 0
-      ? { ...step, conditionOperator, conditionValue }
+      ? { ...step, conditionType: conditionType || step.conditionType, conditionOperator, conditionValue }
       : step;
     const toastMessage = getFullPageStepConditionValidationMessage(
       violatedRule,
@@ -548,6 +551,11 @@ findProductById(stepIndex: string|number, productId: any) {
   validateStep(stepIndex: string|number) {
     const step = this.selectedBundle.steps[stepIndex];
     const currentSelections = this.selectedProducts[stepIndex] || {};
+  if (step.isFreeGift) {
+    return ConditionValidator.isAddonStepSatisfied(this.getAddonTierEvaluation(step),
+      this._buildConditionAwareStepSelections(this.stepProductData[stepIndex] || [], currentSelections));
+  }
+
     const conditionSelections = typeof this._getStepConditionSelections === 'function'
       ? this._getStepConditionSelections(stepIndex, currentSelections)
       : currentSelections;

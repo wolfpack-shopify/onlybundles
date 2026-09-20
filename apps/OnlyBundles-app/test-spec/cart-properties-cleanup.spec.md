@@ -19,6 +19,13 @@ Ensure internal cart line item properties (prefixed with `_` such as `_bundle_na
 | 5 | Coalesced scheduling | Multiple rapid calls to `scheduleCartPropertiesCleanup` | Coalesces into a single animation frame pass | Throttling |
 | 6 | Mutation filtering | Mutation outside cart container (e.g. carousel slide) | Ignored without invoking cleanup pass | Performance safeguard |
 
+### BundleParentPresentation
+| # | Scenario | Input | Expected Output | Notes |
+|---|---|---|---|---|
+| 7 | Merged bundle parent property | Cart row containing `_is_bundle_parent: true` | Marks the containing line as a bundle parent before removing the internal property | Allows theme-neutral presentation rules without matching prices or bundle names |
+| 8 | Theme suppresses internal properties | Rendered merged line contains the Function-generated `Bundle Price` property | Marks only the merged bundle-parent row | Uses the Cart Transform display contract already rendered by Shopify |
+| 9 | Existing cart drawer opens after initial cleanup | Cart container changes `open`, `class`, or `aria-hidden` | Schedules another scoped cleanup pass | Supports themes that hydrate or reveal an existing drawer without inserting a new cart root |
+
 ## Acceptance Criteria
 - [ ] All listed test cases pass
 - [ ] 0 ESLint errors

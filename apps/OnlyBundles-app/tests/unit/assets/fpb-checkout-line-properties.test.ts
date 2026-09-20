@@ -28,13 +28,7 @@ afterAll(() => {
   }
 });
 function createCartAddFetchMock() {
-  return jest.fn(async (url: string, _options?: RequestInit) => ({
-    ok: true,
-    json: async () =>
-      url === "/apps/product-bundles/api/cart-transform-runtime-token"
-        ? { token: "runtime-token" }
-        : {},
-  }));
+  return jest.fn(async (_url: string, _options?: RequestInit) => ({ ok: true, json: async () => ({}) }));
 }
 
 describe("FPB checkout cart-line properties", () => {
@@ -79,7 +73,7 @@ describe("FPB checkout cart-line properties", () => {
       await fullPageStepFooterMethods.addBundleToCart.call({
         _isWidgetActionBusy: false,
         container: null,
-        selectedBundle: {
+        selectedBundle: { runtimePolicyRevision: "published",
           id: "bundle-1",
           name: "Daily Essentials",
           steps: [{ id: "paid-step", isFreeGift: false }],
@@ -99,6 +93,7 @@ describe("FPB checkout cart-line properties", () => {
           price: 82900,
         }]],
         areBundleConditionsMet: () => true,
+        validateStep: () => true,
         expandProductsByVariant: (products: unknown[]) => products,
         extractId: (value: string) => value.split("/").pop(),
         getVariantAvailable: () => ({ available: null, outOfStock: false, acceptsBackorder: false }),
@@ -111,7 +106,6 @@ describe("FPB checkout cart-line properties", () => {
         _setWidgetBusy: jest.fn(),
         showLoadingOverlay: jest.fn(),
         hideLoadingOverlay: jest.fn(),
-        syncBundleDetailsCartMetafield: jest.fn(),
         _emitStorefrontEvent: jest.fn(),
         _handlePostAddToCartAction: jest.fn(),
         _getLandingPageControls: () => ({ checkout: null }),
@@ -129,42 +123,6 @@ describe("FPB checkout cart-line properties", () => {
     }));
     expect(fetchMock).not.toHaveBeenCalledWith("/apps/product-bundles/api/cart-transform-runtime-token", expect.any(Object));
     expect(fetchMock).not.toHaveBeenCalledWith("/cart/add.js", expect.any(Object));
-  });
-
-  it("includes the configured product identity when requesting a runtime token", async () => {
-    const fetchMock = createCartAddFetchMock();
-    const originalFetch = (global as any).fetch;
-    (global as any).fetch = fetchMock;
-
-    try {
-      await fullPageStepFooterMethods.requestCartTransformRuntimeToken.call(
-        { selectedBundle: { id: "bundle-1" } },
-        [{
-          id: "501",
-          quantity: 1,
-          productId: "gid://shopify/Product/5",
-          properties: {},
-        }],
-        { offerGroupId: "FBP-1_ABC", bundleType: "full_page" },
-      );
-    } finally {
-      (global as any).fetch = originalFetch;
-    }
-
-    const tokenRequest = fetchMock.mock.calls.find(
-      ([url]: any) => url === "/apps/product-bundles/api/cart-transform-runtime-token",
-    )!;
-    const body = JSON.parse(String(tokenRequest[1]?.body));
-
-    expect(tokenRequest[1]).toMatchObject({
-      method: "POST",
-      credentials: "same-origin",
-    });
-    expect(body.components).toEqual([{
-      variantId: "501",
-      productId: "gid://shopify/Product/5",
-      quantity: 1,
-    }]);
   });
 
     it("keeps paid add-on savings out of parent pricing metadata", () => {
@@ -189,7 +147,7 @@ describe("FPB checkout cart-line properties", () => {
             [{ selectionId: "paidVariant", title: "Paid product", price: 82900 }],
             [{ selectionId: "addonVariant", title: "Paid add-on", price: 82900 }],
           ],
-          selectedBundle: {
+          selectedBundle: { runtimePolicyRevision: "published",
             pricing: { enabled: false, rules: [] },
             steps: [paidStep, paidAddonStep],
           },
@@ -279,15 +237,11 @@ describe("FPB checkout cart-line properties", () => {
       getPropertyValue: () => "",
     });
     (global as any).setTimeout = jest.fn();
-    const syncBundleDetailsCartMetafield = jest.fn(async () => {
-      callOrder.push("cart-metafield");
-    });
-
     try {
       await fullPageStepFooterMethods.addBundleToCart.call({
         _isWidgetActionBusy: false,
         container: null,
-        selectedBundle: {
+        selectedBundle: { runtimePolicyRevision: "published",
           id: "bundle-1",
           name: "Daily Essentials",
           steps: [{ id: "paid-step", isFreeGift: false }],
@@ -313,6 +267,7 @@ describe("FPB checkout cart-line properties", () => {
           }],
         ],
         areBundleConditionsMet: () => true,
+        validateStep: () => true,
         expandProductsByVariant: (products: unknown[]) => products,
         extractId: (value: string) => value.split("/").pop(),
         getVariantAvailable: () => ({ available: null, outOfStock: false, acceptsBackorder: false }),
@@ -325,7 +280,6 @@ describe("FPB checkout cart-line properties", () => {
         _setWidgetBusy: jest.fn(),
         showLoadingOverlay: jest.fn(),
         hideLoadingOverlay: jest.fn(),
-        syncBundleDetailsCartMetafield,
         _emitStorefrontEvent: jest.fn(),
         _handlePostAddToCartAction: jest.fn(),
         _getLandingPageControls: () => ({ checkout: null }),
@@ -342,15 +296,11 @@ describe("FPB checkout cart-line properties", () => {
     expect(addRequest).toBeDefined();
     const body = JSON.parse(String(addRequest[1]?.body));
     expect(body.items).toEqual([expect.objectContaining({ id: "111" })]);
-    expect(body.items[0].properties).not.toHaveProperty("_bundle_display_properties");
+    expect(JSON.parse(body.items[0].properties._wpb_selection)).toMatchObject({bundleId: "bundle-1", revision: "published", groupId: "paid-step"});
+    expect(fetchMock.mock.calls.every(([url]: any) => !url.includes("runtime-token") && !url.includes("cart-bundle-details"))).toBe(true);
+    expect(body.items[0].properties).toHaveProperty("_bundle_display_properties");
     expect(body.items[0].properties).not.toHaveProperty("_wolfpack_bundle_runtime");
-    expect(syncBundleDetailsCartMetafield).toHaveBeenCalledWith(
-      "FBP-1_ABC",
-      expect.objectContaining({ _bundle_display_properties: expect.any(String) }),
-      "runtime-token",
-      1,
-    );
-    expect(callOrder).toEqual(["cart-metafield", "cart-add"]);
+    expect(callOrder).toEqual(["cart-add"]);
   });
 
   it("omits Box cart properties for BXY when bundle quantity options are hidden", async () => {
@@ -392,7 +342,7 @@ describe("FPB checkout cart-line properties", () => {
       await fullPageStepFooterMethods.addBundleToCart.call({
         _isWidgetActionBusy: false,
         container: null,
-        selectedBundle: {
+        selectedBundle: { runtimePolicyRevision: "published",
           id: "bundle-1",
           name: "Daily Essentials",
           pricing: {
@@ -437,6 +387,7 @@ describe("FPB checkout cart-line properties", () => {
           ],
         ],
         areBundleConditionsMet: () => true,
+        validateStep: () => true,
         expandProductsByVariant: (products: unknown[]) => products,
         extractId: (value: string) => value.split("/").pop(),
         generateBundleSessionKey: () => "ABC",
@@ -449,7 +400,6 @@ describe("FPB checkout cart-line properties", () => {
         _setWidgetBusy: jest.fn(),
         showLoadingOverlay: jest.fn(),
         hideLoadingOverlay: jest.fn(),
-        syncBundleDetailsCartMetafield: jest.fn(),
         _emitStorefrontEvent: jest.fn(),
         _handlePostAddToCartAction: jest.fn(),
         _getLandingPageControls: () => ({ checkout: null }),
@@ -469,7 +419,7 @@ describe("FPB checkout cart-line properties", () => {
     expect(body.items).toHaveLength(2);
     body.items.forEach((item: { properties: Record<string, string> }) => {
       expect(item.properties).not.toHaveProperty("Box");
-      expect(item.properties).not.toHaveProperty("_bundle_display_properties");
+      expect(item.properties).toHaveProperty("_bundle_display_properties");
       expect(item.properties).not.toHaveProperty("_wolfpack_bundle_runtime");
     });
   });
@@ -514,7 +464,8 @@ describe("FPB checkout cart-line properties", () => {
       await fullPageStepFooterMethods.addBundleToCart.call({
         _isWidgetActionBusy: false,
         container: null,
-        selectedBundle: {
+        selectedBundle: { runtimePolicyRevision: "published",
+          id: "bundle-1",
           name: "Daily Essentials",
           steps: [
             { id: "paid-step", isFreeGift: false },
@@ -530,6 +481,7 @@ describe("FPB checkout cart-line properties", () => {
           [{ selectionId: "gid://shopify/ProductVariant/222", variantId: "gid://shopify/ProductVariant/222", title: "Paid add-on" }],
         ],
         areBundleConditionsMet: () => true,
+        validateStep: () => true,
         expandProductsByVariant: (products: unknown[]) => products,
         extractId: (value: string) => value.split("/").pop(),
         generateBundleSessionKey: () => "ABC",
@@ -545,7 +497,6 @@ describe("FPB checkout cart-line properties", () => {
         _setWidgetBusy: jest.fn(),
         showLoadingOverlay: jest.fn(),
         hideLoadingOverlay: jest.fn(),
-        syncBundleDetailsCartMetafield: jest.fn(),
         _emitStorefrontEvent: emitMock,
         _handlePostAddToCartAction: jest.fn(),
         _getLandingPageControls: () => ({ checkout: null }),
@@ -567,8 +518,8 @@ describe("FPB checkout cart-line properties", () => {
     );
 
     expect(addonLine.properties).not.toHaveProperty("Box");
-    expect(addonLine.properties).not.toHaveProperty("_bundle_display_properties");
-    expect(addonLine.properties).toHaveProperty("_wolfpack_bundle_runtime", "runtime-token");
+    expect(addonLine.properties).toHaveProperty("_bundle_display_properties");
+    expect(addonLine.properties).not.toHaveProperty("_wolfpack_bundle_runtime");
     expect(addonLine.properties).not.toHaveProperty("Items");
     expect(addonLine.properties).not.toHaveProperty("Retail Price");
     expect(addonLine.properties).not.toHaveProperty("You Save");
@@ -614,7 +565,8 @@ describe("FPB checkout cart-line properties", () => {
       await fullPageStepFooterMethods.addBundleToCart.call({
         _isWidgetActionBusy: false,
         container: null,
-        selectedBundle: {
+        selectedBundle: { runtimePolicyRevision: "published",
+          id: "bundle-1",
           name: "Daily Essentials",
           steps: [{ id: "paid-step", isFreeGift: false }],
         },
@@ -632,6 +584,7 @@ describe("FPB checkout cart-line properties", () => {
           }],
         ],
         areBundleConditionsMet: () => true,
+        validateStep: () => true,
         expandProductsByVariant: (products: unknown[]) => products,
         extractId: (value: string) => value.split("/").pop(),
         generateBundleSessionKey: () => "ABC",
@@ -644,7 +597,6 @@ describe("FPB checkout cart-line properties", () => {
         _setWidgetBusy: jest.fn(),
         showLoadingOverlay: jest.fn(),
         hideLoadingOverlay: jest.fn(),
-        syncBundleDetailsCartMetafield: jest.fn(),
         _emitStorefrontEvent: jest.fn(),
         _handlePostAddToCartAction: jest.fn(),
         _getLandingPageControls: () => ({
@@ -709,7 +661,8 @@ describe("FPB checkout cart-line properties", () => {
       await fullPageStepFooterMethods.addBundleToCart.call({
         _isWidgetActionBusy: false,
         container: null,
-        selectedBundle: {
+        selectedBundle: { runtimePolicyRevision: "published",
+          id: "bundle-1",
           name: "Daily Essentials",
           steps: [{ id: "paid-step", isFreeGift: false }],
         },
@@ -727,6 +680,7 @@ describe("FPB checkout cart-line properties", () => {
           }],
         ],
         areBundleConditionsMet: () => true,
+        validateStep: () => true,
         expandProductsByVariant: (products: unknown[]) => products,
         extractId: (value: string) => value.split("/").pop(),
         generateBundleSessionKey: () => "ABC",
@@ -739,7 +693,6 @@ describe("FPB checkout cart-line properties", () => {
         _setWidgetBusy: jest.fn(),
         showLoadingOverlay: jest.fn(),
         hideLoadingOverlay: jest.fn(),
-        syncBundleDetailsCartMetafield: jest.fn(),
         _emitStorefrontEvent: jest.fn(),
         _handlePostAddToCartAction: jest.fn(),
         _getLandingPageControls: () => ({
@@ -827,7 +780,8 @@ describe("FPB checkout cart-line properties", () => {
       await fullPageStepFooterMethods.addBundleToCart.call({
         _isWidgetActionBusy: false,
         container: null,
-        selectedBundle: {
+        selectedBundle: { runtimePolicyRevision: "published",
+          id: "bundle-1",
           name: "Daily Essentials",
           steps: [{ id: "paid-step", isFreeGift: false }],
         },
@@ -846,6 +800,7 @@ describe("FPB checkout cart-line properties", () => {
           }],
         ],
         areBundleConditionsMet: () => true,
+        validateStep: () => true,
         expandProductsByVariant: (products: unknown[]) => products,
         extractId: (value: string) => value.split("/").pop(),
         generateBundleSessionKey: () => "ABC",
@@ -857,7 +812,6 @@ describe("FPB checkout cart-line properties", () => {
         _setWidgetBusy: jest.fn(),
         showLoadingOverlay: jest.fn(),
         hideLoadingOverlay: jest.fn(),
-        syncBundleDetailsCartMetafield: jest.fn(),
         _emitStorefrontEvent: jest.fn(),
         _handlePostAddToCartAction: jest.fn(),
         _getLandingPageControls: () => ({
@@ -932,7 +886,8 @@ describe("FPB checkout cart-line properties", () => {
       await fullPageStepFooterMethods.addBundleToCart.call({
         _isWidgetActionBusy: false,
         container: null,
-        selectedBundle: {
+        selectedBundle: { runtimePolicyRevision: "published",
+          id: "bundle-1",
           name: "Daily Essentials",
           pricing: { enabled: false, rules: [] },
           steps: [{ id: "paid-step", isFreeGift: false }, addonStep],
@@ -960,6 +915,7 @@ describe("FPB checkout cart-line properties", () => {
           ],
         ],
         areBundleConditionsMet: () => true,
+        validateStep: () => true,
         expandProductsByVariant: (products: unknown[]) => products,
         extractId: (value: string) => value.split("/").pop(),
         generateBundleSessionKey: () => "ABC",
@@ -981,7 +937,6 @@ describe("FPB checkout cart-line properties", () => {
         _setWidgetBusy: jest.fn(),
         showLoadingOverlay: jest.fn(),
         hideLoadingOverlay: jest.fn(),
-        syncBundleDetailsCartMetafield: jest.fn(),
         _emitStorefrontEvent: jest.fn(),
         _handlePostAddToCartAction: jest.fn(),
         _getLandingPageControls: () => ({ checkout: null }),
@@ -1010,7 +965,7 @@ describe("FPB checkout cart-line properties", () => {
     expect(addonLine.properties._addon_product).toBe("true");
     expect(addonLine.properties._addonTierId).toBe("tier2");
     expect(addonLine.properties._bundle_step_type).not.toBe("free_gift");
-    expect(paidLine.properties).not.toHaveProperty("_bundle_display_properties");
+    expect(paidLine.properties).toHaveProperty("_bundle_display_properties");
     expect(paidLine.properties).not.toHaveProperty("_wolfpack_bundle_runtime");
   });
 
@@ -1067,7 +1022,8 @@ describe("FPB checkout cart-line properties", () => {
         ...fullPageValidationAddonsMethods,
         _isWidgetActionBusy: false,
         container: null,
-        selectedBundle: {
+        selectedBundle: { runtimePolicyRevision: "published",
+          id: "bundle-1",
           name: "Daily Essentials",
           pricing: { enabled: false, rules: [] },
           steps: [{ id: "paid-step", isFreeGift: false }, addonStep],
@@ -1095,6 +1051,7 @@ describe("FPB checkout cart-line properties", () => {
           ],
         ],
         areBundleConditionsMet: () => true,
+        validateStep: () => true,
         expandProductsByVariant: (products: unknown[]) => products,
         extractId: (value: string) => value.split("/").pop(),
         generateBundleSessionKey: () => "ABC",
@@ -1112,7 +1069,6 @@ describe("FPB checkout cart-line properties", () => {
         _setWidgetBusy: jest.fn(),
         showLoadingOverlay: jest.fn(),
         hideLoadingOverlay: jest.fn(),
-        syncBundleDetailsCartMetafield: jest.fn(),
         _emitStorefrontEvent: jest.fn(),
         _handlePostAddToCartAction: jest.fn(),
         _getLandingPageControls: () => ({ checkout: null }),
@@ -1178,7 +1134,8 @@ describe("FPB checkout cart-line properties", () => {
       await fullPageStepFooterMethods.addBundleToCart.call({
         _isWidgetActionBusy: false,
         container: null,
-        selectedBundle: {
+        selectedBundle: { runtimePolicyRevision: "published",
+          id: "bundle-1",
           name: "Daily Essentials",
           pricing: {
             enabled: true,
@@ -1216,6 +1173,7 @@ describe("FPB checkout cart-line properties", () => {
           ],
         ],
         areBundleConditionsMet: () => true,
+        validateStep: () => true,
         expandProductsByVariant: (products: unknown[]) => products,
         extractId: (value: string) => value.split("/").pop(),
         generateBundleSessionKey: () => "ABC",
@@ -1236,7 +1194,6 @@ describe("FPB checkout cart-line properties", () => {
         _setWidgetBusy: jest.fn(),
         showLoadingOverlay: jest.fn(),
         hideLoadingOverlay: jest.fn(),
-        syncBundleDetailsCartMetafield: jest.fn(),
         _emitStorefrontEvent: jest.fn(),
         _handlePostAddToCartAction: jest.fn(),
         _getLandingPageControls: () => ({ checkout: null }),
@@ -1257,7 +1214,21 @@ describe("FPB checkout cart-line properties", () => {
       item.properties._bundle_step_type === "fixed_price_display_only"
     )).toBe(false);
     expect(body.items[0].properties._bundle_price_adjustment_mode).toBeUndefined();
-    expect(body.items[0].properties).not.toHaveProperty("_bundle_display_properties");
+    expect(body.items[0].properties).toHaveProperty("_bundle_display_properties");
     expect(body.items[0].properties).not.toHaveProperty("_wolfpack_bundle_runtime");
   });
+});
+
+test('does not submit selected add-ons that fail their active tier conditions', async () => {
+  const fetchMock=jest.fn(); const originalFetch=global.fetch; global.fetch=fetchMock;
+  const validateStep=jest.fn(()=>false);
+  try {
+    await fullPageStepFooterMethods.addBundleToCart.call({
+      container:null,selectedBundle:{steps:[{isFreeGift:true}]},validateStep,
+      areBundleConditionsMet:()=>true,_setWidgetBusy:jest.fn(),showLoadingOverlay:jest.fn(),hideLoadingOverlay:jest.fn(),
+    });
+    expect(validateStep).toHaveBeenCalledWith(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(ToastManager.show).toHaveBeenCalledWith('Please complete all bundle steps before adding to cart.');
+  } finally {global.fetch=originalFetch;}
 });

@@ -9,15 +9,16 @@ name = "bundle_cart_transform_rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-shopify_function = "=2.2.0"
+bundle-runtime-policy = { path = "../bundle-runtime-policy" }
+shopify_function = "2.1.0"
 serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
-serde_json = { version = "1.0", default-features = false, features = ["alloc", "raw_value"] }
-hmac = { version = "0.12.1", default-features = false }
-sha2 = { version = "0.10.9", default-features = false, features = ["force-soft-compact"] }
+# Share Shopify SDK's Ryū formatter; 1.0.147 adds a second formatter and exceeds the WASM limit.
+serde_json = { version = "=1.0.146", default-features = false, features = ["alloc", "raw_value"] }
 
 [profile.release]
 lto = true        # link-time optimization — smaller binary
 opt-level = 'z'   # optimize for size over speed
-strip = false     # preserve symbols for wasm-snip; wasm-opt strips them in next stage
+strip = true     # strip debug symbols from final .wasm
 panic = "abort"   # omit unwinding machinery; Shopify Functions fail closed
 codegen-units = 1 # maximize cross-module size optimization
+overflow-checks = false

@@ -490,6 +490,8 @@
     "title": "Offer scheduling and priority",
     "description": "Control when this bundle can appear in Only Bundles storefront placements and which matching offer is shown first.",
     "shopifyOwnership": "Shopify controls checkout discount dates and combinations. These settings only control Only Bundles storefront visibility and offer selection.",
+    "scheduleUnavailableHeading": "Scheduling unavailable for this discount",
+    "scheduleUnavailableBody": "This bundle uses component-level eligibility or pricing that Shopify cannot recalculate after the base products are merged. Remove those rules to enable scheduling. If a schedule is already selected, choose Always active before saving.",
     "priorityLabel": "Storefront priority",
     "priorityDetails": "Lower numbers are considered first when multiple Only Bundles offers match the same placement.",
     "stopLowerLabel": "Stop lower-priority storefront offers",

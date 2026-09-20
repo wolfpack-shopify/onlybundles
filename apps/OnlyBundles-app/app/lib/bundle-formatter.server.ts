@@ -50,6 +50,7 @@ interface FormattedBundle {
   variantSelectorEnabled: boolean;
   useSingleStepCategoriesAsBundleSteps: boolean;
   shopifyProductId: string | null;
+  runtimePolicyRevision: string | null;
   steps: FormattedStep[];
   pricing: FormattedPricing | null;
   offerDelivery: {
@@ -190,6 +191,35 @@ export function formatBundleForWidget(bundle: any): FormattedBundle {
       const firstVariant = dbVariants[0];
       const productId = getProductId(sp);
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const formattedVariants = dbVariants.map((v: any): FormattedVariant => {
+        const variantImageUrl = getImageUrl(v.imageUrl ?? v.image);
+        const isVariantAvailable = v.available !== undefined
+          ? Boolean(v.available)
+          : v.availableForSale !== undefined
+            ? Boolean(v.availableForSale)
+            : true;
+        return {
+          id: extractNumericId(v.id ?? ''),
+          gid: v.id ?? '',
+          title: v.title ?? 'Default Title',
+          price: Math.round(parseFloat(v.price ?? '0') * 100),
+          compareAtPrice: v.compareAtPrice
+            ? Math.round(parseFloat(v.compareAtPrice) * 100)
+            : null,
+          image: variantImageUrl ? { url: variantImageUrl } : null,
+          available: isVariantAvailable,
+        };
+      });
+
+      const isProductAvailable = sp.available !== undefined
+        ? Boolean(sp.available)
+        : sp.availableForSale !== undefined
+          ? Boolean(sp.availableForSale)
+          : formattedVariants.length > 0
+            ? formattedVariants.some((v) => v.available)
+            : true;
+
       return {
         id: productId,
         title: sp.title,
@@ -198,22 +228,8 @@ export function formatBundleForWidget(bundle: any): FormattedBundle {
         compareAtPrice: firstVariant?.compareAtPrice
           ? Math.round(parseFloat(firstVariant.compareAtPrice) * 100)
           : null,
-        available: true,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        variants: dbVariants.map((v: any): FormattedVariant => {
-          const variantImageUrl = getImageUrl(v.imageUrl ?? v.image);
-          return {
-            id: extractNumericId(v.id ?? ''),
-            gid: v.id ?? '',
-            title: v.title ?? 'Default Title',
-            price: Math.round(parseFloat(v.price ?? '0') * 100),
-            compareAtPrice: v.compareAtPrice
-              ? Math.round(parseFloat(v.compareAtPrice) * 100)
-              : null,
-            image: variantImageUrl ? { url: variantImageUrl } : null,
-            available: true,
-          };
-        }),
+        available: isProductAvailable,
+        variants: formattedVariants,
       };
     }).filter((product) => product.id);
 
@@ -284,6 +300,7 @@ export function formatBundleForWidget(bundle: any): FormattedBundle {
   variantSelectorEnabled: bundle.variantSelectorEnabled ?? true,
   useSingleStepCategoriesAsBundleSteps: bundle.useSingleStepCategoriesAsBundleSteps ?? false,
   shopifyProductId: bundle.shopifyProductId,
+  runtimePolicyRevision: bundle.runtimePolicyRevision ?? null,
     steps,
     pricing: bundle.pricing
       ? {

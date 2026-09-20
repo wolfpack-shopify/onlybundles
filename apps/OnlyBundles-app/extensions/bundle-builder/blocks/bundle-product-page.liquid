@@ -35,7 +35,7 @@
 {% endif %}
 
 {% assign bundle_config_json = 'null' %}
-{% if bundle_ui_config and bundle_ui_config.schemaVersion == 3 %}
+{% if bundle_ui_config and bundle_ui_config.schemaVersion == 4 %}
   {% assign bundle_config_json = bundle_ui_config | json %}
 {% endif %}
 

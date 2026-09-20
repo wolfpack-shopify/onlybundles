@@ -11,6 +11,7 @@ import {
   parseLowStockAlertSettings,
   validateLowStockAlertSettings,
 } from "../low-stock-alert";
+import { getScheduledBundleIncompatibilities } from "../scheduled-bundle-compatibility";
 
 export type BundleConfigureKind = "fpb" | "ppb";
 
@@ -480,6 +481,24 @@ export function validateBundleConfigureFormData(
 
   const discount = readJson(formData, "discountData", {});
   validateDiscounts(issues, discount);
+  const scheduleMode = text(formData.get("offerScheduleMode")) || "always";
+  const addonDraft = readJson(formData, "validationAddonDraft", {});
+  if (
+    scheduleMode !== "always"
+    && getScheduledBundleIncompatibilities({
+      discountData: discount,
+      steps,
+      addonTiers: addonDraft?.addonProductsEnabled === true
+        ? addonDraft?.addonTiers
+        : [],
+    }).length > 0
+  ) {
+    issues.push(issue(
+      "offerDelivery.scheduleMode",
+      "Scheduling is unavailable because this configuration depends on component details that Shopify cannot recalculate after the base bundle is merged. Choose Always active or remove the incompatible rules.",
+      "bundle_visibility",
+    ));
+  }
   validateSettings(issues, formData);
   const upsell = readJson(formData, "bundleUpsellConfig", {});
   validateWidget(issues, formData, upsell);

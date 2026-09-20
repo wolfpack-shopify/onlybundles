@@ -1,4 +1,4 @@
-.product-image .product-stock-badge--low {
+.product-image > .product-stock-badge {
   position: absolute;
   inset-block-start: clamp(0.375rem, 1.5cqi, 0.625rem);
   inset-inline-end: clamp(0.375rem, 1.5cqi, 0.625rem);
@@ -15,4 +15,10 @@
   overflow-wrap: anywhere;
   text-align: center;
   pointer-events: none;
+}
+
+.product-image > .product-stock-badge--out {
+  background: var(--bundle-out-of-stock-badge-bg, #1e1e1e);
+  color: var(--bundle-out-of-stock-badge-color, #ffffff);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
 }

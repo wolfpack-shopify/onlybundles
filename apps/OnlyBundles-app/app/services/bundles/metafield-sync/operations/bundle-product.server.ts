@@ -1,4 +1,7 @@
-import { buildBundleAuthorizationPolicy, buildBundlePolicyMetafield } from "../../../bundle-authorization-policy.server";
+import { compileBundleRuntimePolicy } from "../../../bundle-runtime-policy.server";
+import { publishBundleRuntimePolicy } from "../../../bundle-runtime-policy-publisher.server";
+import { AddOnDiscountFunctionService } from "../../../addon-discount-function-service.server";
+import prisma from "../../../../db.server";
 import { syncScheduledBundleDiscounts } from "../../../scheduled-bundle-discount.server";
 /**
  * Bundle Product Metafield Operations
@@ -22,8 +25,6 @@ import { resolveShowProductComparedAtPrice } from "../../../../lib/bundle-config
 import { normalizeShopifyComponentQuantity } from "../utils/component-quantity";
 import { buildCheckoutOfferRuntime } from "../../../checkout-bundle-offers.server";
 import { buildPublicBundleSubscriptionConfig } from "../../../../lib/bundle-subscriptions";
-import { buildPpbStaticAuthorization } from "../../../ppb-static-authorization.server";
-import { generateCartTransformRuntimeTokenSecret } from "../../../cart-transform-runtime-token.server";
 import { parsePricingRule } from "../../../../lib/pricing-rule-parser";
 import { buildOfferCountryTargetingRule, encodeOfferCountryTargetingRule } from "../../../../lib/offer-country-eligibility";
 
@@ -212,16 +213,25 @@ async function resolveCollectionProductIds(
       `, {
         variables: Object.fromEntries(batch.map((handle, index) => [`handle${index}`, handle])),
       });
-      const data = (await response.json()).data ?? {};
+      const payload = await response.json() as {data?: Record<string, any>; errors?: unknown[]};
+      if (payload.errors?.length || !payload.data) throw new Error("Incomplete collection product response");
+      const data = payload.data;
 
       for (const [index, handle] of batch.entries()) {
         const connection = data[`collection${index}`]?.products;
-        const productIds = (connection?.nodes ?? [])
+        if (!connection?.pageInfo || !Array.isArray(connection.nodes)) throw new Error(`Missing collection ${handle}`);
+        const productIds = connection.nodes
           .map((node: any) => node?.id)
           .filter((id: unknown): id is string => typeof id === "string" && !isUUID(id));
-        let pageInfo = connection?.pageInfo;
+        let pageInfo = connection.pageInfo;
+        const seenCursors = new Set<string>();
+        if (typeof pageInfo.hasNextPage !== "boolean") throw new Error(`Incomplete collection pagination ${handle}`);
 
-        while (pageInfo?.hasNextPage && pageInfo.endCursor) {
+        while (pageInfo.hasNextPage) {
+          if (typeof pageInfo.endCursor !== "string" || !pageInfo.endCursor || seenCursors.has(pageInfo.endCursor)) {
+            throw new Error(`Incomplete collection pagination ${handle}`);
+          }
+          seenCursors.add(pageInfo.endCursor);
           try {
             const pageResponse = await admin.graphql(`
               query CollectionProductIdsPage($handle: String!, $after: String!) {
@@ -233,32 +243,28 @@ async function resolveCollectionProductIds(
                 }
               }
             `, { variables: { handle, after: pageInfo.endCursor } });
-            const pageConnection = (await pageResponse.json()).data?.collectionByIdentifier?.products;
+            const pagePayload = await pageResponse.json() as {data?: Record<string, any>; errors?: unknown[]};
+            const pageConnection = pagePayload.data?.collectionByIdentifier?.products;
+            if (pagePayload.errors?.length || !pageConnection?.pageInfo || !Array.isArray(pageConnection.nodes)) throw new Error(`Incomplete collection ${handle}`);
             for (const node of pageConnection?.nodes ?? []) {
               if (typeof node?.id === "string" && !isUUID(node.id)) productIds.push(node.id);
             }
-            pageInfo = pageConnection?.pageInfo;
-          } catch {
+            pageInfo = pageConnection.pageInfo;
+            if (typeof pageInfo.hasNextPage !== "boolean") throw new Error(`Incomplete collection pagination ${handle}`);
+          } catch (error) {
             AppLogger.warn("Could not fetch the next collection product page", {
               component: "metafield-sync",
               operation: "updateBundleProductMetafields",
               handle,
             });
-            break;
+            throw error;
           }
         }
 
         productsByHandle.set(handle, productIds);
       }
-    } catch {
-      for (const handle of batch) {
-        productsByHandle.set(handle, []);
-        AppLogger.warn("Could not fetch products from collection", {
-          component: "metafield-sync",
-          operation: "updateBundleProductMetafields",
-          handle,
-        });
-      }
+    } catch (error) {
+      throw new Error(`Cannot publish collection membership: ${String(error)}`);
     }
   }
 
@@ -490,7 +496,27 @@ export async function updateBundleProductMetafields(
   }
 
   const shopDomain = String(bundleConfiguration.shopId ?? "").trim();
-  const authorizationPolicy = buildBundleAuthorizationPolicy({ bundle: bundleConfiguration, shop: shopDomain, parentVariantId: bundleVariantId });
+  const runtimeSteps = bundleConfiguration.steps.map((step: any, index: number) => {
+    const stepKey = String(step.id ?? index);
+    const products = new Map<string, any>((step.StepProduct ?? []).map((product: any) => [product.productId ?? product.id, product]));
+    for (const productId of resolvedStepProductIds.get(stepKey) ?? []) {
+      if (!products.has(productId)) products.set(productId, { productId });
+    }
+    const categories = (Array.isArray(step.StepCategory) ? step.StepCategory : []).map((category: any, categoryIndex: number) => {
+      const key = `${stepKey}:${String(category.id ?? categoryIndex)}`;
+      const selected = new Map<string, any>((category.products ?? [])
+        .filter((product: any) => products.has(product.productId ?? product.id))
+        .map((product: any) => [product.productId ?? product.id, product]));
+      for (const productId of resolvedCategoryProductIds.get(key) ?? []) if (!selected.has(productId)) selected.set(productId, { id: productId });
+      return { ...category, products: [...selected.values()] };
+    });
+    return { ...step, StepProduct: [...products.values()], StepCategory: categories };
+  });
+  const compiled = compileBundleRuntimePolicy({ bundle: { ...bundleConfiguration, steps: runtimeSteps }, parentVariantId: bundleVariantId });
+  if (!compiled.ok) throw new Error(`Bundle policy publication failed: ${compiled.error}: ${compiled.details ?? ''}`);
+  const authorizationPolicy = { shop: shopDomain, bundleId: bundleConfiguration.id, parentVariantId: bundleVariantId,
+    revision: compiled.revision, active: compiled.active, pricingMode: compiled.pricingMode,
+    countryRule: encodeOfferCountryTargetingRule(buildOfferCountryTargetingRule(bundleConfiguration.offerPolicy)) };
   const priceAdjustment = buildPriceAdjustmentConfig(bundleConfiguration.pricing);
   // Parent-only policy: keep it out of the shared signed-token pricing type.
   const parentPriceAdjustment = {
@@ -659,19 +685,8 @@ export async function updateBundleProductMetafields(
   };
 
 
-  if (bundleUiConfig.bundleType === BundleType.PRODUCT_PAGE) {
-    const staticAuthorization = buildPpbStaticAuthorization({
-      bundle: bundleUiConfig,
-      revision: authorizationPolicy.revision,
-      shop: shopDomain,
-      parentVariantId: bundleVariantId,
-      secret: generateCartTransformRuntimeTokenSecret(shopDomain),
-      subscription: publicSubscriptionConfig,
-      offerPolicy: bundleConfiguration.offerPolicy,
-    });
-    bundleUiConfig.schemaVersion = 3;
-    bundleUiConfig.runtimeAuthorization = staticAuthorization.authorization;
-  }
+  bundleUiConfig.schemaVersion = 4;
+  bundleUiConfig.runtimePolicyRevision = compiled.revision;
 
   // Check metafield sizes and log warnings
   const uiConfigSizeCheck = checkMetafieldSize(bundleUiConfig, 'bundle_ui_config', 'updateBundleProductMetafields');
@@ -691,13 +706,21 @@ export async function updateBundleProductMetafields(
     throw new Error(`component_pricing metafield exceeds Shopify's 64KB limit (size: ${componentPricingSizeCheck.size} bytes). Bundle has too many components.`);
   }
 
+  const runtimePolicy = compiled.productPolicies[0]?.metafield.policies[0];
+  const subscriptionPolicy = runtimePolicy?.subscription;
   await syncScheduledBundleDiscounts({
     admin, policy: authorizationPolicy, timing: bundleConfiguration.offerPolicy ?? {},
-    title: bundleConfiguration.name, secret: generateCartTransformRuntimeTokenSecret(shopDomain),
-    recurringSubscription: publicSubscriptionConfig?.recurringBundleDiscount === true
-      && publicSubscriptionConfig.bundleDiscountAppliesOn !== 'one_time',
+    title: bundleConfiguration.name,
+    recurringSubscription: subscriptionPolicy?.recurring === true
+      && subscriptionPolicy.discountAppliesOn !== 'one_time',
   });
-  const policyMetafield = await buildBundlePolicyMetafield({ admin, ...authorizationPolicy });
+  const groups = runtimePolicy?.groups ?? [];
+  const setup = async (result: { success: boolean; error?: string }) => { if (!result.success) throw new Error(result.error ?? 'Bundle discount setup failed'); };
+  if (groups.some(group => group.role === 'addon' || group.role === 'free_gift')) await setup(await AddOnDiscountFunctionService.completeSetup(admin as never, shopDomain));
+  if (subscriptionPolicy) {
+    await setup(await AddOnDiscountFunctionService.completeSubscriptionInitialSetup(admin as never, shopDomain));
+    if (subscriptionPolicy.recurring) await setup(await AddOnDiscountFunctionService.completeSubscriptionRecurringSetup(admin as never, shopDomain));
+  }
 
   // Set all 5 metafields on the bundle variant
   const SET_METAFIELDS = `
@@ -749,7 +772,6 @@ export async function updateBundleProductMetafields(
       type: "json",
       value: JSON.stringify(bundleUiConfig)
     },
-    policyMetafield,
     {
       ownerId: bundleVariantId,
       namespace: "$app",
@@ -779,6 +801,10 @@ export async function updateBundleProductMetafields(
         && isDeepStrictEqual(JSON.parse(written.value), JSON.parse(String(field.value)))))) {
     throw new Error('Failed to update bundle metafields: Shopify did not confirm every published value');
   }
+
+  const publication = await publishBundleRuntimePolicy({ admin, shopId: shopDomain, parentVariantId: bundleVariantId, compiled });
+  if (!publication.ok) throw new Error(`Bundle policy publication failed: ${publication.error}: ${publication.details ?? ''}`);
+  await prisma.bundle.update({ where: { id: bundleConfiguration.id, shopId: shopDomain }, data: { runtimePolicyRevision: compiled.revision } });
 
   AppLogger.info("[METAFIELD] Bundle variant metafields updated", {
     component: "bundle-product.server",

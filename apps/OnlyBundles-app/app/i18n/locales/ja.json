@@ -490,6 +490,8 @@
     "title": "スケジューリングと優先度",
     "description": "このバンドルがOnly Bundlesストアの店舗配置に表示され、最初にどのマッチングオファーが表示されるかを制御します。",
     "shopifyOwnership": "Shopifyのコントロールチェックアウト割引日時と組み合わせ. これらの設定はOnly Bundlesストアの表示と選択を制御します.",
+    "scheduleUnavailableHeading": "この割引ではスケジュールを利用できません",
+    "scheduleUnavailableBody": "このバンドルには、基本商品を統合した後にShopifyが再計算できないコンポーネント単位の対象条件または価格設定があります。スケジュールを有効にするには、それらのルールを削除してください。すでにスケジュールが選択されている場合は、保存する前に「常に有効」を選択してください。",
     "priorityLabel": "ストアフロント優先",
     "priorityDetails": "複数のOnly Bundlesが同じ配置に一致する場合、低い数字が最初に考慮されます。",
     "stopLowerLabel": "優先度の低い店舗のオファーを停止する",

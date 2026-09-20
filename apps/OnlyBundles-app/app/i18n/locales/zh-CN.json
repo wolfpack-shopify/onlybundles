@@ -490,6 +490,8 @@
     "title": "提供时间安排和优先级",
     "description": "当这个捆包可以出现在Only Bundles 商店前台并且首先显示匹配的报价时进行控制。",
     "shopifyOwnership": "购物控制结算折扣日期和组合。这些设置只控制Only Bundles商店面可见性并提供选择。",
+    "scheduleUnavailableHeading": "此折扣无法使用排期",
+    "scheduleUnavailableBody": "此捆绑包使用组件级资格或定价规则，而 Shopify 无法在基础商品合并后重新计算这些规则。请移除这些规则以启用排期。如果已选择排期，请在保存前选择始终有效。",
     "priorityLabel": "店面优先级",
     "priorityDetails": "当多个Only Bundles 提供匹配相同位置时，数字会被视为较低。",
     "stopLowerLabel": "停止较低优先级的商店报价",

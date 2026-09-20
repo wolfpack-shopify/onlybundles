@@ -8,6 +8,7 @@ import { SpecificLinkOfferSection } from "../shared/SpecificLinkOfferSection";
 import { OfferOperationsSection } from "../shared/OfferOperationsSection";
 import { CountryTargetingSection } from "../shared/CountryTargetingSection";
 import type { PpbConfigureFlow } from "./usePpbConfigureFlow";
+import type { ScheduledBundleIncompatibility } from "../../../lib/scheduled-bundle-compatibility";
 
 type PpbBundleVisibilityFlowProps = Pick<
   PpbConfigureFlow,
@@ -41,6 +42,7 @@ type PpbBundleVisibilityFlowProps = Pick<
   | "themeEditorUrl"
 > & {
   validationErrors?: Record<string, string>;
+  scheduleIncompatibilities?: ScheduledBundleIncompatibility[];
 };
 
 export type PpbBundleVisibilitySectionProps =
@@ -79,6 +81,7 @@ export function PpbBundleVisibilitySection({
   specificLinkOfferBusy,
   themeEditorUrl,
   validationErrors,
+  scheduleIncompatibilities,
 }: PpbBundleVisibilitySectionProps) {
   const shopify = useAppBridge();
   const link = buildBundleLinkModel({
@@ -150,6 +153,7 @@ export function PpbBundleVisibilitySection({
           onRecurrenceEndsOnChange={setOfferRecurrenceEndsOn}
           onRecurrenceRunCountChange={setOfferRecurrenceRunCount}
           validationErrors={validationErrors}
+          scheduleIncompatibilities={scheduleIncompatibilities}
         />
         <CountryTargetingSection
           active={activeSection === "bundle_visibility"}

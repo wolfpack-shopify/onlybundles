@@ -21,6 +21,7 @@ import type {
 } from "../../../types/pricing";
 import { ADDON_MESSAGE_KEY } from "./configure-constants";
 import type { AddonTierDraft } from "./addon-draft.types";
+import { getScheduledBundleIncompatibilities } from "../../../lib/scheduled-bundle-compatibility";
 
 const FreeGiftAddonsSection = lazy(() =>
   import("./sections/FreeGiftAddonsSection").then((module) => ({
@@ -99,6 +100,11 @@ function ConfigureBundleFlow() {
     ? flow.addonDraft.addonTiers
     : [];
   const selectedAddonTier = addonTiers[selectedAddonTierIndex] ?? addonTiers[0];
+  const scheduleIncompatibilities = getScheduledBundleIncompatibilities({
+    discountData: flow.pricingState,
+    steps: flow.stepsState?.steps ?? [],
+    addonTiers: flow.addonDraft?.addonProductsEnabled ? addonTiers : [],
+  });
   const selectedAddonProducts = Array.isArray(
     selectedAddonTier?.selectedAddonProducts
   )
@@ -636,6 +642,7 @@ function ConfigureBundleFlow() {
               onRecurrenceEndsOnChange: flow.setOfferRecurrenceEndsOn,
               onRecurrenceRunCountChange: flow.setOfferRecurrenceRunCount,
               validationErrors: flow.validationErrors,
+              scheduleIncompatibilities,
             }}
             specificLinkOffer={{
               active: flow.activeSection === "bundle_visibility",

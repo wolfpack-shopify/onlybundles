@@ -41,6 +41,83 @@ describe("validateBundleConfigureFormData", () => {
     expect(validateBundleConfigureFormData(form(), "fpb")).toEqual([]);
   });
 
+  it.each(["fpb", "ppb"] as const)(
+    "rejects an incompatible scheduled discount for %s",
+    (kind) => {
+      const issues = validateBundleConfigureFormData(form({
+        offerScheduleMode: "one_time",
+        discountData: JSON.stringify({
+          discountEnabled: true,
+          discountType: "buy_x_get_y",
+          discountRules: [{
+            id: "rule-1",
+            conditionType: "quantity",
+            conditionValue: 2,
+            customerBuys: 2,
+            customerGets: 1,
+            discountValue: 100,
+            bxyDiscountType: "percentage",
+            bxyApplyMode: "lowest_priced",
+          }],
+        }),
+      }), kind);
+
+      expect(issues).toEqual(expect.arrayContaining([
+        expect.objectContaining({
+          path: "offerDelivery.scheduleMode",
+          section: "bundle_visibility",
+        }),
+      ]));
+    },
+  );
+
+  it("allows the same component-dependent discount when scheduling is inactive", () => {
+    const issues = validateBundleConfigureFormData(form({
+      offerScheduleMode: "always",
+      discountData: JSON.stringify({
+        discountEnabled: true,
+        discountType: "buy_x_get_y",
+        discountRules: [{
+          id: "rule-1",
+          conditionType: "quantity",
+          conditionValue: 2,
+          customerBuys: 2,
+          customerGets: 1,
+          discountValue: 100,
+          bxyDiscountType: "percentage",
+          bxyApplyMode: "lowest_priced",
+        }],
+      }),
+    }), "fpb");
+
+    expect(issues).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: "offerDelivery.scheduleMode" }),
+    ]));
+  });
+
+  it("rejects scheduled FPB add-on eligibility based on hidden component quantity", () => {
+    const issues = validateBundleConfigureFormData(form({
+      offerScheduleMode: "recurring",
+      validationAddonDraft: JSON.stringify({
+        addonProductsEnabled: true,
+        addonTiers: [{
+          tierId: "tier-1",
+          title: "Extras",
+          selectedAddonProducts: [{ id: "gid://shopify/Product/1" }],
+          eligibilityCondition: { type: "QUANTITY", value: 2 },
+          discount: { type: "PERCENTAGE", value: 10 },
+        }],
+      }),
+    }), "fpb");
+
+    expect(issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        path: "offerDelivery.scheduleMode",
+        section: "bundle_visibility",
+      }),
+    ]));
+  });
+
   it("does not accept legacy step JSON products as configured resources", () => {
     const issues = validateBundleConfigureFormData(form({
       stepsData: JSON.stringify([{

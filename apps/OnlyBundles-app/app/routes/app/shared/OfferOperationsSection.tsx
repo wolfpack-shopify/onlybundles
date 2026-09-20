@@ -1,6 +1,7 @@
 import { i18n } from "../../../i18n/config";
 import type { OfferOperationsAdminState } from "../../../lib/offer-policy-admin";
 import { resolveOfferSchedule } from "../../../lib/offer-policy-decision";
+import type { ScheduledBundleIncompatibility } from "../../../lib/scheduled-bundle-compatibility";
 import { ConfigureHelpPopover } from "../_shared/bundle-configure/ConfigureHelpPopover";
 
 interface OfferOperationsSectionProps {
@@ -25,6 +26,7 @@ interface OfferOperationsSectionProps {
   onRecurrenceEndsOnChange: (date: string | null) => void;
   onRecurrenceRunCountChange: (count: number | null) => void;
   validationErrors?: Record<string, string>;
+  scheduleIncompatibilities?: ScheduledBundleIncompatibility[];
 }
 
 function minuteValue(value: string | null): number | null {
@@ -48,6 +50,7 @@ export function OfferOperationsSection({
   onRecurrenceEndsOnChange,
   onRecurrenceRunCountChange,
   validationErrors,
+  scheduleIncompatibilities = [],
 }: OfferOperationsSectionProps) {
   if (!active) return null;
 
@@ -70,6 +73,7 @@ export function OfferOperationsSection({
       : schedule.state === "invalid"
       ? "critical"
       : "info";
+  const schedulingUnavailable = scheduleIncompatibilities.length > 0;
 
   return (
     <s-section>
@@ -84,6 +88,18 @@ export function OfferOperationsSection({
             {i18n.t("offerOperations.shopifyOwnership")}
           </s-paragraph>
         </s-banner>
+        {schedulingUnavailable ? (
+          <s-box paddingBlockEnd="large-100">
+            <s-banner
+              heading={i18n.t("offerOperations.scheduleUnavailableHeading")}
+              tone="info"
+            >
+              <s-paragraph>
+                {i18n.t("offerOperations.scheduleUnavailableBody")}
+              </s-paragraph>
+            </s-banner>
+          </s-box>
+        ) : null}
         <s-number-field
           id="configure-offerDelivery-priority"
           label={i18n.t("offerOperations.priorityLabel")}
@@ -128,14 +144,15 @@ export function OfferOperationsSection({
                 .value as OfferOperationsAdminState["scheduleMode"]
             )
           }
+          error={validationErrors?.["offerDelivery.scheduleMode"]}
         >
           <s-option value="always">
             {i18n.t("offerOperations.scheduleModeAlways")}
           </s-option>
-          <s-option value="one_time">
+          <s-option value="one_time" disabled={schedulingUnavailable}>
             {i18n.t("offerOperations.scheduleModeOneTime")}
           </s-option>
-          <s-option value="recurring">
+          <s-option value="recurring" disabled={schedulingUnavailable}>
             {i18n.t("offerOperations.scheduleModeRecurring")}
           </s-option>
         </s-select>
@@ -148,6 +165,7 @@ export function OfferOperationsSection({
               value={state.startsAt ?? ""}
               placeholder={i18n.t("offerOperations.datePlaceholder")}
               error={validationErrors?.["offerDelivery.startsAt"]}
+              disabled={schedulingUnavailable}
               onInput={(event) => {
                 const value = (event.target as HTMLInputElement).value.trim();
                 onStartsAtChange(value || null);
@@ -160,6 +178,7 @@ export function OfferOperationsSection({
               value={state.endsAt ?? ""}
               placeholder={i18n.t("offerOperations.datePlaceholder")}
               error={validationErrors?.["offerDelivery.endsAt"]}
+              disabled={schedulingUnavailable}
               onInput={(event) => {
                 const value = (event.target as HTMLInputElement).value.trim();
                 onEndsAtChange(value || null);
@@ -179,6 +198,7 @@ export function OfferOperationsSection({
             <s-select
               label={i18n.t("offerOperations.recurrenceFrequencyLabel")}
               value={state.recurrenceFrequency ?? "weekly"}
+              disabled={schedulingUnavailable}
               onChange={(event) =>
                 onRecurrenceFrequencyChange(
                   event.currentTarget
@@ -197,6 +217,7 @@ export function OfferOperationsSection({
               label={i18n.t("offerOperations.recurrenceAnchorDateLabel")}
               details={i18n.t("offerOperations.recurrenceAnchorDateDetails")}
               value={state.recurrenceAnchorDate ?? ""}
+              disabled={schedulingUnavailable}
               onInput={(event) =>
                 onRecurrenceAnchorDateChange(event.currentTarget.value || null)
               }
@@ -212,6 +233,7 @@ export function OfferOperationsSection({
                   "offerOperations.recurrenceTimePlaceholder"
                 )}
                 value={state.recurrenceWindowStart ?? ""}
+                disabled={schedulingUnavailable}
                 onInput={(event) =>
                   onRecurrenceWindowStartChange(
                     (event.target as HTMLInputElement).value || null
@@ -225,6 +247,7 @@ export function OfferOperationsSection({
                   "offerOperations.recurrenceTimePlaceholder"
                 )}
                 value={state.recurrenceWindowEnd ?? ""}
+                disabled={schedulingUnavailable}
                 onInput={(event) =>
                   onRecurrenceWindowEndChange(
                     (event.target as HTMLInputElement).value || null
@@ -235,6 +258,7 @@ export function OfferOperationsSection({
             <s-select
               label={i18n.t("offerOperations.recurrenceTerminationLabel")}
               value={state.recurrenceTermination}
+              disabled={schedulingUnavailable}
               onChange={(event) =>
                 onRecurrenceTerminationChange(
                   event.currentTarget
@@ -256,6 +280,7 @@ export function OfferOperationsSection({
               <s-date-field
                 label={i18n.t("offerOperations.recurrenceEndsOnLabel")}
                 value={state.recurrenceEndsOn ?? ""}
+                disabled={schedulingUnavailable}
                 onInput={(event) =>
                   onRecurrenceEndsOnChange(event.currentTarget.value || null)
                 }
@@ -270,6 +295,7 @@ export function OfferOperationsSection({
                     ? ""
                     : String(state.recurrenceRunCount)
                 }
+                disabled={schedulingUnavailable}
                 onInput={(event) => {
                   const value = (event.target as HTMLInputElement).value;
                   onRecurrenceRunCountChange(value ? Number(value) : null);

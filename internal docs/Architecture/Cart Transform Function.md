@@ -25,6 +25,8 @@ source_paths:
   - app/lib/shopify-product-gid.ts
   - app/services/bundle-runtime-policy.server.ts
   - app/services/bundle-runtime-policy-publisher.server.ts
+  - app/lib/scheduled-bundle-compatibility.ts
+  - app/routes/app/shared/OfferOperationsSection.tsx
   - extensions/bundle-runtime-policy/src/lib.rs
 related_docs:
   - Shopify Integration/Cart Transform API.md
@@ -75,13 +77,24 @@ authorize purchase or discounts; Functions evaluate the published bundle rules.
 
 ## Representation and pricing
 
-- Ordinary bundles without add-ons merge from selected components.
-- Bundles with add-ons or gifts retain components so the Discount Function has
-  actual paid component facts for tier eligibility and line discounts.
-- Scheduled bundles retain components. Native discount dates enforce one-time
-  schedules; recurring schedules use Shopify local-time input and published
-  owner configuration. Outside the window, components remain purchasable at
-  regular price.
+- Ordinary base selections merge from selected components. Add-ons and gifts
+  remain separate lines so their own eligibility and pricing can use facts that
+  remain visible to the Discount Function.
+- Compatible scheduled bundles keep the same representation: the base selection
+  merges into the parent while add-ons and gifts remain separate. Native Shopify
+  discount availability gates the active window. Outside that window the bundle
+  remains purchasable at regular price.
+- Admin and server save validation reject scheduling when the result would need
+  hidden merged-component facts: lowest-priced buy-X-get-Y targets, tiers selected
+  by hidden component quantity or identity, add-on pricing selected by hidden
+  groups, variant-triggered gifts, and per-component discount allocation. The
+  Admin leaves Always active available so an existing incompatible schedule can
+  be corrected.
+- Shopify's discount and Cart Transform Function outputs do not provide a
+  non-blocking cart warning for an inactive schedule. Only Bundles therefore does
+  not fabricate an "expired" Function message: Shopify removes the inactive
+  discount and the cart displays regular pricing. A validation error is reserved
+  for cases where purchase must be blocked.
 - Subscription selections remain components and require an allowed actual
   selling-plan allocation. Native discount roles preserve initial versus
   recurring behavior.

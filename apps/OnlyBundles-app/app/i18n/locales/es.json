@@ -490,6 +490,8 @@
     "title": "Programación de ofertas y prioridad",
     "description": "Controla cuándo este paquete puede aparecer en las ubicaciones de la tienda Only Bundles y qué oferta se muestra primero.",
     "shopifyOwnership": "Shopify controla las fechas de descuento y combinaciones. Estos ajustes sólo controlan la visibilidad del escaparate de Only Bundles y la selección de ofertas.",
+    "scheduleUnavailableHeading": "La programación no está disponible para este descuento",
+    "scheduleUnavailableBody": "Este paquete usa reglas de elegibilidad o precios por componente que Shopify no puede volver a calcular después de combinar los productos base. Elimina esas reglas para habilitar la programación. Si ya hay una programación seleccionada, elige Siempre activa antes de guardar.",
     "priorityLabel": "Prioridad del escaparate",
     "priorityDetails": "Los números más bajos se consideran primero cuando múltiples Only Bundles ofrecen coinciden con la misma posición.",
     "stopLowerLabel": "Detener ofertas de escaparate de prioridad inferior",

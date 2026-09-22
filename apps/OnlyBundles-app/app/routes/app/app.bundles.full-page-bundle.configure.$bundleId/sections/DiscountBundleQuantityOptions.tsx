@@ -48,6 +48,9 @@ export function FpbBundleQuantityOptions({
               </div>
               <QuestionHelpTooltip tooltipKey="bundleQuantityOptions" />
               <s-switch
+                accessibilityLabel={translateAdmin(
+                  "tooltips.bundleQuantityOptions.title"
+                )}
                 checked={
                   pricingState.pricingDisplayOptions.bundleQuantityOptions
                     .enabled || undefined

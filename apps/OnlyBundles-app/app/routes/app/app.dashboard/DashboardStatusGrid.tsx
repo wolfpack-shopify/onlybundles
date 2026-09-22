@@ -1,204 +1,228 @@
-import { type NormalizedThemeExtensionResource } from "../../../lib/theme-extension-status";
 import { useTranslation } from "react-i18next";
-import { useEffect, useState } from "react";
-import { useBannerSessionState } from "../../../lib/banner-session-state";
-
-export const DASHBOARD_STOREFRONT_SETUP_BANNER_KEY =
-  "dashboard_storefront_setup";
+import type {
+  NormalizedThemeExtensionResource,
+  ThemeExtensionStatus,
+} from "../../../lib/theme-extension-status";
 
 type DashboardStatusGridProps = {
   resources: NormalizedThemeExtensionResource[];
   error: boolean;
-  appEmbedEnabled?: boolean;
-  appEmbedStatusLoading?: boolean;
+  loading: boolean;
   themeEditorUrl: string | null;
+  onOpenEnableInstructions: () => void;
   onOpenThemeEditor: () => void;
+  onRefresh: () => void | Promise<unknown>;
   enableActionRef?: { current: any };
 };
 
-const CORE_STORE_FRONT_RESOURCES = [
-  "bundle-app-embed",
-  "bundle-product-page",
-] as const;
-
-type StorefrontStatusResource = NormalizedThemeExtensionResource;
-
-type StorefrontSetupSummaryInput = {
-  enabledCoreCount: number;
-  totalCoreCount: number;
-  loading: boolean;
-  error: boolean;
+const RESOURCE_LABEL_KEYS: Record<
+  NormalizedThemeExtensionResource["handle"],
+  string
+> = {
+  "bundle-app-embed": "dashboard.storefrontSetup.resourceLabels.bundleAppEmbed",
+  "bundle-product-page": "dashboard.storefrontSetup.resourceLabels.bundleProductPage",
+  "bundle-product-page-embed":
+    "dashboard.storefrontSetup.resourceLabels.bundleProductPageEmbed",
+  "bundle-page-builder-embed":
+    "dashboard.storefrontSetup.resourceLabels.bundlePageBuilderEmbed",
+  "bundle-upsell": "dashboard.storefrontSetup.resourceLabels.bundleUpsell",
 };
 
-type StorefrontSetupSummary = {
-  state: "loading" | "error" | "incomplete" | "complete";
-  titleKey: string;
-  descriptionKey: string;
-  remainingCoreCount: number;
-};
-
-export function getStorefrontSetupSummary({
-  enabledCoreCount,
-  error,
-  loading,
-  totalCoreCount,
-}: StorefrontSetupSummaryInput): StorefrontSetupSummary {
-  const remainingCoreCount = Math.max(0, totalCoreCount - enabledCoreCount);
-  if (loading) {
-    return {
-      state: "loading",
-      titleKey: "dashboard.storefrontSetup.loadingTitle",
-      descriptionKey: "dashboard.storefrontSetup.loadingDescription",
-      remainingCoreCount,
-    };
-  }
-  if (error) {
-    return {
-      state: "error",
-      titleKey: "dashboard.storefrontSetup.errorTitle",
-      descriptionKey: "dashboard.storefrontSetup.errorDescription",
-      remainingCoreCount,
-    };
-  }
-  if (remainingCoreCount > 0) {
-    return {
-      state: "incomplete",
-      titleKey: "dashboard.storefrontSetup.incompleteTitle",
-      descriptionKey: "dashboard.storefrontSetup.incompleteDescription",
-      remainingCoreCount,
-    };
-  }
+export function getStorefrontStatusGroups(
+  resources: NormalizedThemeExtensionResource[],
+) {
   return {
-    state: "complete",
-    titleKey: "dashboard.storefrontSetup.completeTitle",
-    descriptionKey: "dashboard.storefrontSetup.completeDescription",
-    remainingCoreCount,
+    appEmbeds: resources.filter((resource) => resource.kind === "embed"),
+    appBlocks: resources.filter((resource) => resource.kind === "block"),
   };
 }
 
-export function getStorefrontStatusRows(
-  resources: NormalizedThemeExtensionResource[]
-): {
-  core: StorefrontStatusResource[];
+export function getStorefrontStatusPresentation(status: ThemeExtensionStatus): {
+  tone: "success" | "info" | "neutral";
+  labelKey: string;
 } {
-  const resourceRows =
-    resources.length > 0
-      ? resources
-      : ([] as NormalizedThemeExtensionResource[]);
-
-  const coreResources = resourceRows.filter((resource) =>
-    CORE_STORE_FRONT_RESOURCES.includes(
-      resource.handle as (typeof CORE_STORE_FRONT_RESOURCES)[number]
-    )
-  );
-
+  if (status === "active") {
+    return {
+      tone: "success",
+      labelKey: "dashboard.storefrontSetup.status.enabled",
+    };
+  }
+  if (status === "available") {
+    return {
+      tone: "info",
+      labelKey: "dashboard.storefrontSetup.status.ready",
+    };
+  }
   return {
-    core: coreResources,
+    tone: "neutral",
+    labelKey: "dashboard.storefrontSetup.status.unavailable",
   };
+}
+
+function StatusGrid({
+  columns,
+  resources,
+  statusPlacement = "inline",
+}: {
+  columns: string;
+  resources: NormalizedThemeExtensionResource[];
+  statusPlacement?: "inline" | "trailing";
+}) {
+  const { t } = useTranslation();
+  return (
+    <s-grid gridTemplateColumns={columns} gap="small-200">
+      {resources.map((resource) => {
+        const presentation = getStorefrontStatusPresentation(resource.status);
+        return (
+          <s-box
+            key={resource.handle}
+            padding="small-200"
+            background="subdued"
+            borderRadius="base"
+            blockSize="100%"
+          >
+            {statusPlacement === "trailing" ? (
+              <s-grid
+                gridTemplateRows="1fr auto"
+                gap="small-200"
+                blockSize="100%"
+              >
+                <s-text>{t(RESOURCE_LABEL_KEYS[resource.handle])}</s-text>
+                <s-stack direction="inline" justifyContent="end">
+                  <s-badge tone={presentation.tone}>
+                    {t(presentation.labelKey)}
+                  </s-badge>
+                </s-stack>
+              </s-grid>
+            ) : (
+              <s-stack
+                direction="inline"
+                alignItems="center"
+                justifyContent="space-between"
+                gap="base"
+              >
+                <s-text>{t(RESOURCE_LABEL_KEYS[resource.handle])}</s-text>
+                <s-badge tone={presentation.tone}>
+                  {t(presentation.labelKey)}
+                </s-badge>
+              </s-stack>
+            )}
+          </s-box>
+        );
+      })}
+    </s-grid>
+  );
 }
 
 export function DashboardStatusGrid({
-  error,
-  appEmbedEnabled = false,
-  appEmbedStatusLoading = false,
   enableActionRef,
+  error,
+  loading,
+  onOpenEnableInstructions,
   onOpenThemeEditor,
+  onRefresh,
   resources,
   themeEditorUrl,
 }: DashboardStatusGridProps) {
   const { t } = useTranslation();
-  const [dismissed, dismiss] = useBannerSessionState(
-    DASHBOARD_STOREFRONT_SETUP_BANNER_KEY
+  const { appEmbeds, appBlocks } = getStorefrontStatusGroups(resources);
+  const appEmbedActive = appEmbeds.some(
+    (resource) => resource.status === "active",
   );
-  const [hydrated, setHydrated] = useState(false);
-
-  useEffect(() => {
-    setHydrated(true);
-  }, []);
-
-  if (dismissed && !appEmbedStatusLoading) return null;
-
-  const { core: coreResources } = getStorefrontStatusRows(resources);
-
-  const coreResourcesWithOverrides = coreResources.map((resource) => {
-    if (resource.handle !== "bundle-app-embed") return resource;
-    return appEmbedEnabled ? { ...resource, enabled: true } : resource;
-  });
-
-  const remainingCoreCount = Math.max(
-    0,
-    coreResourcesWithOverrides.length -
-      coreResourcesWithOverrides.filter((resource) => resource.enabled).length
-  );
-  const storefrontSummary = getStorefrontSetupSummary({
-    loading: appEmbedStatusLoading,
-    error,
-    enabledCoreCount: coreResourcesWithOverrides.filter(
-      (resource) => resource.enabled
-    ).length,
-    totalCoreCount: coreResourcesWithOverrides.length,
-  });
-  const summaryDescriptionKey = appEmbedStatusLoading
-    ? storefrontSummary.descriptionKey
-    : appEmbedEnabled
-    ? "dashboard.storefrontSetup.completeDescription"
-    : storefrontSummary.descriptionKey;
-  const summaryDescription = t(summaryDescriptionKey, {
-    count: remainingCoreCount,
-  });
-  const setupComplete = appEmbedEnabled;
-  const title = t(
-    appEmbedStatusLoading
-      ? storefrontSummary.titleKey
-      : "dashboard.storefrontSetup.incompleteTitle"
-  );
-  const tone = appEmbedStatusLoading
-    ? "info"
-    : setupComplete
-    ? "success"
-    : "warning";
 
   return (
-    <s-box paddingBlockEnd="small-200">
-      <s-banner
-        tone={tone}
-        heading={title}
-        hidden={false}
-        {...(!appEmbedStatusLoading
-          ? {
-              dismissible: true,
-              onDismiss: hydrated ? dismiss : undefined,
-            }
-          : {})}
-      >
-        <s-box minBlockSize="28px">
-          {appEmbedStatusLoading ? (
-            <s-stack direction="inline" alignItems="center" gap="small">
-              <s-spinner size="base" accessibilityLabel={summaryDescription} />
-              <s-text>{summaryDescription}</s-text>
-            </s-stack>
-          ) : !setupComplete ? (
-            <s-stack
-              direction="inline"
-              justifyContent="space-between"
-              alignItems="start"
-              gap="base"
-            >
-              <s-text>{summaryDescription}</s-text>
+    <s-section heading={t("dashboard.storefrontSetup.sectionHeading")}>
+      <s-query-container containerName="storefront-status">
+        <s-stack direction="block" gap="base">
+          <s-grid
+            gridTemplateColumns="@container (inline-size <= 600px) 1fr, 1fr auto"
+            gap="base"
+            alignItems="center"
+          >
+            <s-paragraph color="subdued">
+              {t("dashboard.storefrontSetup.publishedThemeDescription")}
+            </s-paragraph>
+            <s-stack direction="inline" gap="base" alignItems="center">
               <s-button
-                ref={enableActionRef}
-                variant="tertiary"
+                variant="secondary"
+                icon="edit"
                 onClick={onOpenThemeEditor}
                 disabled={!themeEditorUrl}
               >
-                {t("dashboard.storefrontSetup.activate")}
+                {t("dashboard.storefrontSetup.openThemeEditor")}
+              </s-button>
+              <s-button
+                variant="secondary"
+                icon="refresh"
+                onClick={() => void onRefresh()}
+                loading={loading}
+              >
+                {t("dashboard.storefrontSetup.refresh")}
               </s-button>
             </s-stack>
+          </s-grid>
+
+          {error ? (
+            <s-banner tone="critical">
+              <s-stack direction="inline" alignItems="center" gap="base">
+                <s-text>{t("dashboard.storefrontSetup.errorDescription")}</s-text>
+                <s-button variant="tertiary" onClick={() => void onRefresh()}>
+                  {t("dashboard.storefrontSetup.retry")}
+                </s-button>
+              </s-stack>
+            </s-banner>
+          ) : loading && resources.length === 0 ? (
+            <s-stack direction="inline" alignItems="center" gap="small">
+              <s-spinner
+                size="base"
+                accessibilityLabel={t(
+                  "dashboard.storefrontSetup.loadingDescription",
+                )}
+              />
+              <s-text>{t("dashboard.storefrontSetup.loadingDescription")}</s-text>
+            </s-stack>
           ) : (
-            <s-text>{summaryDescription}</s-text>
+            <s-grid
+              gridTemplateColumns="@container (inline-size <= 700px) 1fr, 1fr 1fr"
+              gap="base"
+            >
+              <s-stack direction="block" gap="small-200">
+                <s-stack
+                  direction="inline"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  gap="base"
+                >
+                  <s-heading>
+                    {t("dashboard.storefrontSetup.appEmbedsHeading")}
+                  </s-heading>
+                  {!appEmbedActive && (
+                    <s-button
+                      ref={enableActionRef}
+                      variant="tertiary"
+                      onClick={onOpenEnableInstructions}
+                      disabled={!themeEditorUrl}
+                    >
+                      {t("dashboard.storefrontSetup.activate")}
+                    </s-button>
+                  )}
+                </s-stack>
+                <StatusGrid columns="1fr" resources={appEmbeds} />
+              </s-stack>
+              <s-stack direction="block" gap="small-200">
+                <s-heading>
+                  {t("dashboard.storefrontSetup.appBlocksHeading")}
+                </s-heading>
+                <StatusGrid
+                  columns="@container (inline-size <= 500px) 1fr, 1fr 1fr"
+                  resources={appBlocks}
+                  statusPlacement="trailing"
+                />
+              </s-stack>
+            </s-grid>
           )}
-        </s-box>
-      </s-banner>
-    </s-box>
+        </s-stack>
+      </s-query-container>
+    </s-section>
   );
 }

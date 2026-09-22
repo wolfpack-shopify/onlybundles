@@ -14,6 +14,7 @@ export function ControlsContentCards({
   description,
   fields,
   values,
+  fieldErrors = {},
   onFieldChange,
   onFieldAction,
 }: {
@@ -21,6 +22,7 @@ export function ControlsContentCards({
   description?: string;
   fields: SettingsField[];
   values: Record<string, string>;
+  fieldErrors?: Record<string, string>;
   onFieldChange: (label: string, value: string) => void;
   onFieldAction?: (label: string) => void;
 }) {
@@ -82,6 +84,7 @@ export function ControlsContentCards({
                   key={`${title}-${getFieldValueKey(field)}`}
                   field={displayField}
                   value={values[getFieldValueKey(field)] ?? ""}
+                  error={fieldErrors[getFieldValueKey(field)]}
                   disabled={disabledFields.has(getFieldValueKey(field))}
                   onChange={(value) =>
                     onFieldChange(getFieldValueKey(field), value)
@@ -262,12 +265,14 @@ export function ControlsField({
   field,
   value,
   disabled = false,
+  error,
   onChange,
   onAction,
 }: {
   field: SettingsField;
   value: string;
   disabled?: boolean;
+  error?: string;
   onChange: (value: string) => void;
   onAction?: () => void;
 }) {
@@ -420,6 +425,7 @@ export function ControlsField({
             .join(" ") || undefined
         }
         value={value}
+        error={error ? translateAdmin(error) : undefined}
         rows={4}
         disabled={disabled || undefined}
         onInput={(event: Event) =>

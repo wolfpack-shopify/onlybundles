@@ -1,9 +1,13 @@
 import { JSDOM } from 'jsdom';
 import {
   calculateCartTierProgress,
+  extractTierProgressForBundle as extractCartTierProgressForBundle,
   renderCartTierProgressBar,
   type CartTierProgressState,
 } from '../../../app/storefront/cart-tier-progress-bar';
+import {
+  extractTierProgressForBundle as extractLineTierProgressForBundle,
+} from '../../../app/assets/widgets/shared/engine/cart-lines';
 
 describe('Cart Tier Progress Bar', () => {
   describe('calculateCartTierProgress', () => {
@@ -153,6 +157,71 @@ describe('Cart Tier Progress Bar', () => {
       expect(result?.message).toBe('Add 1 more to unlock 10% off!');
       expect(result?.isMaxTier).toBe(false);
     });
+
+    it('does not calculate progress when any participating bundle line disables the cart bar', () => {
+      const enabledMetadata = {
+        rules: sampleTierRules,
+        progressBar: { enabled: true },
+      };
+      const disabledMetadata = {
+        rules: sampleTierRules,
+        progressBar: { enabled: false },
+      };
+
+      const result = calculateCartTierProgress([
+        {
+          quantity: 2,
+          price: 2000,
+          properties: {
+            _bundle_tier_progress: JSON.stringify(enabledMetadata),
+          },
+        },
+        {
+          quantity: 2,
+          price: 2000,
+          properties: {
+            _bundle_tier_progress: JSON.stringify(disabledMetadata),
+          },
+        },
+      ]);
+
+      expect(result).toBeNull();
+    });
+
+    it.each([
+      ['cart runtime', extractCartTierProgressForBundle],
+      ['cart-line builder', extractLineTierProgressForBundle],
+    ])('publishes an explicit disabled marker from the %s extractor', (_name, extract) => {
+      const metadata = extract({
+        pricing: {
+          enabled: true,
+          method: 'percentage_off',
+          rules: sampleTierRules,
+          displayOptions: { progressBar: { enabled: false } },
+        },
+      });
+
+      expect(metadata).toMatchObject({
+        progressBar: { enabled: false },
+      });
+    });
+
+    it.each([
+      ['cart runtime', extractCartTierProgressForBundle],
+      ['cart-line builder', extractLineTierProgressForBundle],
+    ])('defaults missing %s progress configuration to disabled', (_name, extract) => {
+      const metadata = extract({
+        pricing: {
+          enabled: true,
+          method: 'percentage_off',
+          rules: sampleTierRules,
+        },
+      });
+
+      expect(metadata).toMatchObject({
+        progressBar: { enabled: false },
+      });
+    });
   });
 
   describe('renderCartTierProgressBar', () => {
@@ -176,7 +245,7 @@ describe('Cart Tier Progress Bar', () => {
       document = dom.window.document;
     });
 
-    it('mounts into cart drawer and renders progress and message', () => {
+    it('leaves the theme cart drawer untouched', () => {
       const state: CartTierProgressState = {
         progressPercent: 67,
         message: 'Add 1 more to unlock 10% off!',
@@ -185,29 +254,44 @@ describe('Cart Tier Progress Bar', () => {
 
       renderCartTierProgressBar(document, state);
 
-      const el = document.querySelector('.wpb-cart-tier-progress-bar');
-      expect(el).not.toBeNull();
-      expect(el?.textContent).toContain('Add 1 more to unlock 10% off!');
-
-      const fill = el?.querySelector('.wpb-cart-tier-progress-bar__fill') as HTMLElement;
-      expect(fill?.style.width).toBe('67%');
+      expect(document.querySelector('.wpb-cart-tier-progress-bar')).toBeNull();
     });
 
-    it('removes progress bar element when state is null', () => {
+    it('renders merchant message markup as inert text with controlled emphasis on the cart page', () => {
+      const cartPageDom = new JSDOM('<div id="main-cart-items"></div>');
+      const cartPageDocument = cartPageDom.window.document;
+      renderCartTierProgressBar(cartPageDocument, {
+        progressPercent: 50,
+        message: '<img src=x onerror="window.__xss=true"> Add 1 more to unlock 10% off!',
+        isMaxTier: false,
+      });
+
+      const message = cartPageDocument.querySelector('.wpb-cart-tier-progress-bar__message')!;
+      expect(message.querySelector('img')).toBeNull();
+      expect(message.textContent).toContain('<img src=x onerror="window.__xss=true">');
+      expect(Array.from(message.querySelectorAll('strong')).map((node) => node.textContent)).toEqual([
+        '1 more',
+        '10% off',
+      ]);
+    });
+
+    it('removes progress bar element from the cart page when state is null', () => {
+      const cartPageDom = new JSDOM('<div id="main-cart-items"></div>');
+      const cartPageDocument = cartPageDom.window.document;
       const state: CartTierProgressState = {
         progressPercent: 100,
         message: "You've unlocked 20% off!",
         isMaxTier: true,
       };
 
-      renderCartTierProgressBar(document, state);
-      expect(document.querySelector('.wpb-cart-tier-progress-bar')).not.toBeNull();
+      renderCartTierProgressBar(cartPageDocument, state);
+      expect(cartPageDocument.querySelector('.wpb-cart-tier-progress-bar')).not.toBeNull();
 
-      renderCartTierProgressBar(document, null);
-      expect(document.querySelector('.wpb-cart-tier-progress-bar')).toBeNull();
+      renderCartTierProgressBar(cartPageDocument, null);
+      expect(cartPageDocument.querySelector('.wpb-cart-tier-progress-bar')).toBeNull();
     });
 
-    it('mounts inside Horizon theme dialog after #cart-drawer-header instead of outer cart-drawer-component', () => {
+    it('does not mount inside the Horizon theme drawer', () => {
       const horizonDom = new JSDOM(`
         <!DOCTYPE html>
         <html>
@@ -237,13 +321,7 @@ describe('Cart Tier Progress Bar', () => {
 
       renderCartTierProgressBar(horizonDoc, state);
 
-      const bar = horizonDoc.querySelector('.wpb-cart-tier-progress-bar');
-      expect(bar).not.toBeNull();
-      // Must be inside the dialog after cart-drawer-header
-      expect(bar?.parentElement?.tagName).toBe('CART-ITEMS-COMPONENT');
-      expect(horizonDoc.getElementById('cart-drawer-header')?.nextElementSibling).toBe(bar);
-      // Must NOT be a direct child of cart-drawer-component
-      expect(horizonDoc.querySelector('cart-drawer-component > .wpb-cart-tier-progress-bar')).toBeNull();
+      expect(horizonDoc.querySelector('.wpb-cart-tier-progress-bar')).toBeNull();
     });
 
     it('does not mount on product pages when only a product purchase form is present', () => {
@@ -310,7 +388,7 @@ describe('Cart pricing method messages', () => {
     [{discountType:'fixed_bundle_price',discountValue:3500},'Bundle price: $35.00'],
     [{discountType:'buy_x_get_y',discountValue:100,customerBuys:2,customerGets:1,bxyDiscountType:'percentage'},'Buy 2, get 1 at 100% off'],
   ])('describes the actual offer instead of treating every value as a percentage', (rule,message) => {
-    const result=calculateCartTierProgress([{quantity:3,price:2000,properties:{_bundle_tier_progress:JSON.stringify({rules:[{...rule,minQuantity:3}]})}}]);
+    const result=calculateCartTierProgress([{quantity:3,price:2000,properties:{_bundle_tier_progress:JSON.stringify({rules:[{...rule,minQuantity:3}],progressBar:{enabled:true}})}}]);
     expect(result?.message).toBe(message);
   });
 });

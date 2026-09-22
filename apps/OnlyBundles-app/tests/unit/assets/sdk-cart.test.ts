@@ -164,89 +164,61 @@ describe('buildCartItems', () => {
 });
 
 describe('addBundleToCart', () => {
+  const installShopifyActions = (updateCart: jest.Mock) => {
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: { Shopify: { actions: { updateCart } } },
+    });
+  };
+
   afterEach(() => {
     jest.restoreAllMocks();
+    delete (globalThis as any).window;
   });
 
-  it('directly submits clean Shopify component lines via single POST /cart/add.js call', async () => {
-    const calls: Array<{ url: string; init?: RequestInit }> = [];
-    global.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      calls.push({ url, init });
-      if (url === '/cart/add.js') {
-        return {
-          ok: true,
-          status: 200,
-          text: async () => JSON.stringify({ items: [] }),
-          json: async () => ({ items: [] }),
-        } as Response;
-      }
-      throw new Error(`Unexpected request: ${url}`);
-    }) as jest.Mock;
+  it('submits clean Shopify component lines through the native cart action', async () => {
+    const updateCart = jest.fn().mockResolvedValue({ cart: { id: 'cart-1' }, userErrors: [], warnings: [] });
+    installShopifyActions(updateCart);
     const emit = jest.fn();
 
     await addBundleToCart(makeState(), () => ({ valid: true, errors: {} }), emit);
 
-    expect(calls).toHaveLength(1);
-    expect(calls[0].url).toBe('/cart/add.js');
-    expect(calls[0].init?.method).toBe('POST');
-    expect(calls[0].init?.headers).toEqual({ 'Content-Type': 'application/json' });
-
-    const body = JSON.parse(String(calls[0].init?.body));
-    expect(body.items).toHaveLength(2);
-    expect(body.items[0]).toMatchObject({
-      id: 123456,
+    const body = updateCart.mock.calls[0][0];
+    expect(body.lines).toHaveLength(2);
+    expect(body.lines[0]).toMatchObject({
+      merchandiseId: 'gid://shopify/ProductVariant/123456',
       quantity: 2,
-      properties: {
-        _bundleName: 'Test Bundle',
-        '_wolfpackProductBundle:OfferId': expect.stringMatching(/^MIX-894502_[A-Z0-9]{12}_1$/),
-        '_wolfpackProductBundle:prodQty': '2',
-      },
     });
-    expect(body.items[0].properties).not.toHaveProperty('_wolfpack_bundle_runtime');
-    expect(body.items[0].properties).toHaveProperty('_bundle_display_properties');
-    expect(body.items[0].properties).not.toHaveProperty('Box');
-    expect(body.items[1]).toMatchObject({
-      id: 789012,
+    expect(body.lines[0].attributes).toEqual(expect.arrayContaining([
+      { key: '_bundleName', value: 'Test Bundle' },
+      { key: '_wolfpackProductBundle:prodQty', value: '2' },
+    ]));
+    expect(body.lines[1]).toMatchObject({
+      merchandiseId: 'gid://shopify/ProductVariant/789012',
       quantity: 1,
-      properties: {
-        _bundleName: 'Test Bundle',
-        '_wolfpackProductBundle:OfferId': expect.stringMatching(/^MIX-894502_[A-Z0-9]{12}_2$/),
-        '_wolfpackProductBundle:prodQty': '1',
-        _bundle_step_type: 'free_gift',
-      },
     });
-    expect(emit).toHaveBeenCalledWith('wbp:cart-success', { bundleId: 'bundle_1' });
+    expect(body.lines[1].attributes).toContainEqual({ key: '_bundle_step_type', value: 'free_gift' });
+    expect(emit).toHaveBeenCalledWith('wbp:cart-success', { bundleId: 'bundle_1', warnings: [] });
   });
 
-  it('does not invoke cart-transform-runtime-token, /cart.js, or cart-bundle-details', async () => {
-    const urls: string[] = [];
-    global.fetch = jest.fn(async (input: RequestInfo | URL) => {
-      const url = String(input);
-      urls.push(url);
-      return {
-        ok: true,
-        status: 200,
-        text: async () => JSON.stringify({ items: [] }),
-      } as Response;
-    }) as jest.Mock;
+  it('does not invoke any Ajax cart or app-proxy authorization endpoint', async () => {
+    const updateCart = jest.fn().mockResolvedValue({ cart: {}, userErrors: [], warnings: [] });
+    installShopifyActions(updateCart);
+    global.fetch = jest.fn();
     const emit = jest.fn();
 
     await addBundleToCart(makeState(), () => ({ valid: true, errors: {} }), emit);
 
-    expect(urls).toEqual(['/cart/add.js']);
-    expect(urls.some((u) => u.includes('cart-transform-runtime-token'))).toBe(false);
-    expect(urls.some((u) => u.includes('cart.js'))).toBe(false);
-    expect(urls.some((u) => u.includes('cart/update.js'))).toBe(false);
-    expect(urls.some((u) => u.includes('cart-bundle-details'))).toBe(false);
+    expect(updateCart).toHaveBeenCalledTimes(1);
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it('emits wbp:cart-failed when /cart/add.js returns an error status', async () => {
-    global.fetch = jest.fn(async () => ({
-      ok: false,
-      status: 422,
-      text: async () => JSON.stringify({ message: 'Product is sold out', description: 'Item unavailable' }),
-    })) as jest.Mock;
+  it('emits wbp:cart-failed when Shopify returns a user error', async () => {
+    installShopifyActions(jest.fn().mockResolvedValue({
+      cart: null,
+      userErrors: [{ message: 'Product is sold out' }],
+      warnings: [],
+    }));
     const emit = jest.fn();
 
     await addBundleToCart(makeState(), () => ({ valid: true, errors: {} }), emit);

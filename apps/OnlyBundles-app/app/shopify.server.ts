@@ -15,6 +15,7 @@ import { AppLogger } from "./lib/logger";
 import { ensureShopIdentity, recordBusinessEvent } from "./services/app-events.server";
 import { normalizeSavedCustomUtmParameters } from "./lib/analytics/attribution-controls";
 import { syncPpbStorefrontRuntime } from "./services/ppb-storefront-runtime.server";
+import { syncFpbStorefrontRuntime } from "./services/fpb-storefront-runtime.server";
 
 const sessionStorage = new PrismaSessionStorage(prisma);
 
@@ -40,12 +41,10 @@ const shopify = shopifyApp({
       let shopifyShopGid = existingShop?.shopifyShopGid ?? null;
       const setupAdmin: Pick<typeof admin, "graphql"> = admin;
 
-      // Create variant-level metafield definitions with storefront access.
-      // These enable the Liquid widget to read bundle_ui_config and other metafields.
       try {
         await ensureVariantBundleMetafieldDefinitions(setupAdmin);
       } catch (error: any) {
-        AppLogger.error("Failed to create metafield definitions", { shop: session.shop }, error);
+        AppLogger.error("Failed to ensure variant metafield definitions", { shop: session.shop }, error);
       }
 
       // Create or reactivate the shop record. Shopify App Pricing is verified separately.
@@ -113,13 +112,16 @@ const shopify = shopifyApp({
       }
 
       try {
-        await syncPpbStorefrontRuntime(
-          setupAdmin,
-          session.shop,
-          process.env.STOREFRONT_PROXY_ROOT,
-        );
+        await Promise.all([
+          syncPpbStorefrontRuntime(
+            setupAdmin,
+            session.shop,
+            process.env.STOREFRONT_PROXY_ROOT,
+          ),
+          syncFpbStorefrontRuntime(setupAdmin, session.shop),
+        ]);
       } catch (error: any) {
-        AppLogger.error("Failed to sync Shopify-hosted PPB runtime", { shop: session.shop }, error);
+        AppLogger.error("Failed to sync Shopify-hosted storefront runtime", { shop: session.shop }, error);
       }
 
       // Auto-activate UTM pixel on install/re-auth so bundle revenue tracking is on

@@ -37,6 +37,7 @@ describe("Polaris wrapper ownership", () => {
     };
     const view = SettingsControlsWorkspace({
       activeControlLayout: layout.label,
+      controlFieldErrors: {},
       controlFieldValues: {},
       controlsNavigationRef: { current: null },
       hasNestedControlGroups: false,

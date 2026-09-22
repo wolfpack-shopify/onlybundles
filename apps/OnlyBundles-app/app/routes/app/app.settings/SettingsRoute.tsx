@@ -130,6 +130,7 @@ export function SettingsRoute({
     ...getInitialControlFieldValues(),
     ...(persistedControlState ?? {}),
   });
+  const [controlFieldErrors, setControlFieldErrors] = useState<Record<string, string>>({});
   const [savedControlFieldValues, setSavedControlFieldValues] = useState<
     Record<string, string>
   >({
@@ -289,6 +290,7 @@ export function SettingsRoute({
     }
     if (settingsView === "controls") {
       setControlFieldValues(savedControlFieldValues);
+      setControlFieldErrors({});
     }
   }
 
@@ -394,6 +396,13 @@ export function SettingsRoute({
   useEffect(() => {
     const response = controlsFetcher.data;
     if (!response) return;
+    const nextFieldErrors = response.success === false
+      && "fieldErrors" in response
+      && response.fieldErrors
+      && typeof response.fieldErrors === "object"
+      ? response.fieldErrors as Record<string, string>
+      : {};
+    setControlFieldErrors(nextFieldErrors);
     const confirmedValues = getConfirmedControlValues(
       response,
       pendingSavedControlValuesRef.current
@@ -509,6 +518,7 @@ export function SettingsRoute({
     return (
       <SettingsControlsWorkspace
         activeControlLayout={activeControlLayout}
+        controlFieldErrors={controlFieldErrors}
         controlFieldValues={controlFieldValues}
         controlsNavigationRef={controlsNavigationRef}
         hasNestedControlGroups={hasNestedControlGroups}
@@ -538,12 +548,18 @@ export function SettingsRoute({
             setSettingsHelpArticle("inventory");
           }
         }}
-        onFieldChange={(label, value) =>
+        onFieldChange={(label, value) => {
+          setControlFieldErrors((current) => {
+            if (!(label in current)) return current;
+            const next = { ...current };
+            delete next[label];
+            return next;
+          });
           setControlFieldValues((current) => ({
             ...current,
             [label]: value,
-          }))
-        }
+          }));
+        }}
         onGroupChange={(groupTitle) =>
           navigateWithinControls(() => {
             setActiveControlGroup(groupTitle);

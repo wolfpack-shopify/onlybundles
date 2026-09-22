@@ -137,6 +137,12 @@
       "saveError": "Admin-Sprache konnte nicht gespeichert werden"
     },
     "storefrontSetup": {
+      "sectionHeading": "Storefront-Status",
+      "publishedThemeDescription": "App-Einbettungen und Blöcke im veröffentlichten Theme",
+      "appEmbedsHeading": "App-Einbettungen",
+      "appBlocksHeading": "Theme-App-Blöcke",
+      "refresh": "Status aktualisieren",
+      "retry": "Erneut versuchen",
       "loadingTitle": "Überprüfe die Shop-Front-Einrichtung",
       "loadingDescription": "Überprüfen Sie Ihre veröffentlichten Theme-Komponenten und die App.",
       "errorTitle": "Shop-Front-Status benötigt Aufmerksamkeit",
@@ -185,7 +191,27 @@
         "enabled": "Aktiviert",
         "ready": "Bereit zum Aktivieren",
         "unavailable": "Nicht verfügbar"
+      },
+      "resourceLabels": {
+        "bundleAppEmbed": "Bundle-Storefront-Funktionen",
+        "bundleProductPage": "Produktseiten-Bundle-Builder",
+        "bundleProductPageEmbed": "Platzierung für Produktseiten-Bundles",
+        "bundlePageBuilderEmbed": "Platzierung für Page-Builder-Bundles",
+        "bundleUpsell": "Upsell für Full-Page-Bundles"
       }
+    },
+    "commercialMetrics": {
+      "heading": "Bundle-Leistung",
+      "description": "Letzte {{days}} Tage in {{currency}}",
+      "bundleRevenue": "Bundle-Umsatz",
+      "ordersWithBundles": "Bestellungen mit Bundles",
+      "averageOrderValue": "Durchschnittlicher Bestellwert",
+      "viewToOrderConversion": "Ansicht-zu-Bestellung-Conversion",
+      "unavailable": "Nicht verfügbar",
+      "loading": "Bundle-Leistung wird geladen",
+      "errorHeading": "Bundle-Leistung nicht verfügbar",
+      "errorDescription": "Diese Kennzahlen konnten nicht von Shopify geladen werden.",
+      "retry": "Erneut versuchen"
     }
   },
   "settingsDcp": {
@@ -1159,6 +1185,8 @@
       "theCompleteBundleSolutionForShopifyBuildCustomizeAndPromoteProdu": "Die komplette Paketlösung für Shopify – Herstellung, Anpassung und Förderung von Produktpaketen, die konvertieren.",
       "getStarted": "<unk> Los geht's",
       "goToDashboard": "Zum Dashboard wechseln →",
+      "takeMeToMyDashboard": "Bring mich zu meinem Dashboard",
+      "valueStatement": "Steigern Sie Umsatz und Bestellwert mit anpassbaren Bundles.",
       "everythingIncluded": "Alles enthalten",
       "documentation": "Dokumentation"
     },
@@ -1490,6 +1518,7 @@
     }
   },
   "adminAttributes": {
+    "invalidJavaScriptSyntax": "Beheben Sie vor dem Speichern die JavaScript-Syntax.",
     "searchCampaigns": "Kampagnen suchen",
     "searchByCampaignName": "Suche nach Kampagnennamen",
     "sortTopCampaigns": "Top-Kampagnen sortieren",

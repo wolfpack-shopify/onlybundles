@@ -6,11 +6,11 @@ import {
 } from "./checkout-integrations";
 import { processCss } from "./css-sanitizer";
 
-export const SETTINGS_CONTROLS_SCHEMA_VERSION = 1 as const;
+export const SETTINGS_CONTROLS_SCHEMA_VERSION = 2 as const;
 export const SETTINGS_CONTROLS_BUNDLE_TYPES = [BundleType.PRODUCT_PAGE, BundleType.FULL_PAGE] as const;
 
 type ControlsPayload = Record<string, unknown>;
-export type ControlsRedirectAction = "side_cart" | "checkout" | "cart";
+export type ControlsRedirectAction = "stay" | "checkout" | "cart";
 
 export type BundleCartLineMessagingRuntime = {
   isEnabled: boolean;
@@ -28,9 +28,10 @@ export type SettingsControlsRuntime = {
   landingPage: {
     hideIrrelevantVariantImages: boolean;
     trackInventoryOnAddToCart: boolean;
+    showCompareAtPrices: boolean;
     redirectCollectionQuickAddToBundle: boolean;
     checkout: {
-      action: Exclude<ControlsRedirectAction, "side_cart">;
+      action: Exclude<ControlsRedirectAction, "stay">;
       providerId: CheckoutIntegrationProviderId;
       executeScript: string;
     };
@@ -65,15 +66,44 @@ export type SettingsControlsRuntime = {
     css: { mixAndMatchBundles: string };
     scripts: { executeCustomScript: string };
     selectors: {
-      sideCart: string;
-      sideCartSectionId: string;
-      cartPageItems: string;
-      cartPageItemsSectionId: string;
-      sideCartOpenButton: string;
       productPagePrice: string;
     };
   };
 };
+
+export type SettingsControlFieldErrors = Record<string, string>;
+
+const PLAIN_SCRIPT_FIELDS = [
+  "landingPage.checkout.executeScript",
+  "landingPage.scripts.bundlePage",
+  "landingPage.integrations.customThemeIntegrationScript",
+  "productPage.scripts.executeCustomScript",
+  "productPage.redirect.executeScript",
+] as const;
+const CART_INTEGRATION_SCRIPT_FIELD = "landingPage.integrations.customCartIntegrationScript";
+
+export function validateSettingsControlScripts(payload: ControlsPayload): SettingsControlFieldErrors {
+  const fieldErrors: SettingsControlFieldErrors = {};
+  for (const key of PLAIN_SCRIPT_FIELDS) {
+    const source = textValue(payload, key);
+    if (!source) continue;
+    try {
+      Function("window", "document", `"use strict";\n${source}`);
+    } catch {
+      fieldErrors[key] = "adminAttributes.invalidJavaScriptSyntax";
+    }
+  }
+
+  const cartIntegration = textValue(payload, CART_INTEGRATION_SCRIPT_FIELD);
+  if (cartIntegration) {
+    try {
+      Function("window", "document", `"use strict"; return (${cartIntegration});`);
+    } catch {
+      fieldErrors[CART_INTEGRATION_SCRIPT_FIELD] = "adminAttributes.invalidJavaScriptSyntax";
+    }
+  }
+  return fieldErrors;
+}
 
 type SettingsControlsRuntimeResult = {
   settingsControls: SettingsControlsRuntime;
@@ -109,7 +139,7 @@ function productRedirect(payload: ControlsPayload): ControlsRedirectAction {
   const selected = textValue(payload, "productPage.redirect.action");
   if (selected === "Redirect to Checkout") return "checkout";
   if (selected === "Redirect to Cart") return "cart";
-  return "side_cart";
+  return "stay";
 }
 
 function joinCss(parts: string[]) {
@@ -133,6 +163,7 @@ export function buildSettingsControlsRuntime(payload: ControlsPayload): Settings
     landingPage: {
       hideIrrelevantVariantImages: booleanValue(payload, "landingPage.hideIrrelevantVariantImages"),
       trackInventoryOnAddToCart: booleanValue(payload, "landingPage.trackInventoryOnAddToCart"),
+      showCompareAtPrices: booleanValue(payload, "landingPage.showCompareAtPrices", true),
       redirectCollectionQuickAddToBundle: booleanValue(payload, "landingPage.redirectCollectionQuickAddToBundle", true),
       checkout: {
         action: textValue(payload, "landingPage.checkout.action") === "Redirect to Cart" ? "cart" : "checkout",
@@ -167,7 +198,7 @@ export function buildSettingsControlsRuntime(payload: ControlsPayload): Settings
       hideOutOfStockProducts: booleanValue(payload, "productPage.hideOutOfStockProducts", true),
       trackInventoryOnAddToCart: booleanValue(payload, "productPage.trackInventoryOnAddToCart"),
       addBundleToCartAfterLastStepCompleted: booleanValue(payload, "productPage.addBundleToCartAfterLastStepCompleted"),
-      showCompareAtPrices: booleanValue(payload, "productPage.showCompareAtPrices"),
+      showCompareAtPrices: booleanValue(payload, "productPage.showCompareAtPrices", true),
       displayEmptyStateBoxesBasedOnBundleCondition: booleanValue(payload, "productPage.displayEmptyStateBoxesBasedOnBundleCondition", true),
       hideStepTitlesInCompletedState: booleanValue(payload, "productPage.hideStepTitlesInCompletedState"),
       validateConditionsBeforeAddToCart: booleanValue(payload, "productPage.validateConditionsBeforeAddToCart", true),
@@ -180,11 +211,6 @@ export function buildSettingsControlsRuntime(payload: ControlsPayload): Settings
       css: { mixAndMatchBundles: cssValue(payload, "productPage.css.mixAndMatchBundles") },
       scripts: { executeCustomScript: textValue(payload, "productPage.scripts.executeCustomScript") },
       selectors: {
-        sideCart: textValue(payload, "productPage.selectors.sideCart"),
-        sideCartSectionId: textValue(payload, "productPage.selectors.sideCartSectionId"),
-        cartPageItems: textValue(payload, "productPage.selectors.cartPageItems"),
-        cartPageItemsSectionId: textValue(payload, "productPage.selectors.cartPageItemsSectionId"),
-        sideCartOpenButton: textValue(payload, "productPage.selectors.sideCartOpenButton"),
         productPagePrice: textValue(payload, "productPage.selectors.productPagePrice"),
       },
     },
@@ -253,6 +279,7 @@ export function buildSettingsControlsFormValues(runtime: SettingsControlsRuntime
     "shared.cartMessaging.discountDisplay.format": discountFormat,
     "landingPage.hideIrrelevantVariantImages": checkedValue(landing.hideIrrelevantVariantImages),
     "landingPage.trackInventoryOnAddToCart": checkedValue(landing.trackInventoryOnAddToCart),
+    "landingPage.showCompareAtPrices": checkedValue(landing.showCompareAtPrices),
     "landingPage.redirectCollectionQuickAddToBundle": checkedValue(landing.redirectCollectionQuickAddToBundle),
     "landingPage.checkout.action": landing.checkout.action === "cart" ? "Redirect to Cart" : "Redirect to Checkout",
     "landingPage.checkout.providerId": CHECKOUT_INTEGRATION_PROVIDER_LABELS[landing.checkout.providerId],
@@ -277,21 +304,17 @@ export function buildSettingsControlsFormValues(runtime: SettingsControlsRuntime
     "productPage.hideOutOfStockProducts": checkedValue(product.hideOutOfStockProducts),
     "productPage.trackInventoryOnAddToCart": checkedValue(product.trackInventoryOnAddToCart),
     "productPage.addBundleToCartAfterLastStepCompleted": checkedValue(product.addBundleToCartAfterLastStepCompleted),
+    "productPage.showCompareAtPrices": checkedValue(product.showCompareAtPrices),
     "productPage.displayEmptyStateBoxesBasedOnBundleCondition": checkedValue(product.displayEmptyStateBoxesBasedOnBundleCondition),
     "productPage.hideStepTitlesInCompletedState": checkedValue(product.hideStepTitlesInCompletedState),
     "productPage.addToCartWhenProductCardClicked": checkedValue(product.addToCartWhenProductCardClicked),
     "productPage.redirectCollectionQuickAddToBundle": checkedValue(product.redirectCollectionQuickAddToBundle),
     "productPage.redirect.action": product.redirect.action === "checkout"
       ? "Redirect to Checkout"
-      : product.redirect.action === "cart" ? "Redirect to Cart" : "Execute Default Side Cart Update",
+      : product.redirect.action === "cart" ? "Redirect to Cart" : "Stay on product page",
     "productPage.redirect.executeScript": product.redirect.executeScript,
     "productPage.css.mixAndMatchBundles": product.css.mixAndMatchBundles,
     "productPage.scripts.executeCustomScript": product.scripts.executeCustomScript,
-    "productPage.selectors.sideCart": product.selectors.sideCart,
-    "productPage.selectors.sideCartSectionId": product.selectors.sideCartSectionId,
-    "productPage.selectors.cartPageItems": product.selectors.cartPageItems,
-    "productPage.selectors.cartPageItemsSectionId": product.selectors.cartPageItemsSectionId,
-    "productPage.selectors.sideCartOpenButton": product.selectors.sideCartOpenButton,
     "productPage.selectors.productPagePrice": product.selectors.productPagePrice,
   };
 }

@@ -155,7 +155,7 @@ describe("Shopify-native Admin locale wiring contract", () => {
   });
 
   it("translates the global embedded Admin navigation", () => {
-    expect(appShell).toContain('t("nav.dashboard")');
+    expect(appShell).not.toContain('t("nav.dashboard")');
     expect(appShell).toContain('t("nav.settings")');
     expect(appShell).toContain('t("nav.integrations")');
     expect(appShell).toContain('t("nav.analytics")');

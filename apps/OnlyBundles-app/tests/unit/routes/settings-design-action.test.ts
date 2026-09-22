@@ -4,6 +4,7 @@ const findMany = jest.fn();
 const upsert = jest.fn();
 const transaction = jest.fn();
 const syncPpbStorefrontRuntime = jest.fn();
+const syncFpbStorefrontRuntime = jest.fn();
 
 jest.mock("../../../app/shopify.server", () => ({ authenticate: { admin: requireAdminSession } }));
 jest.mock("../../../app/db.server", () => ({
@@ -17,6 +18,7 @@ jest.mock("../../../app/services/cart-transform-service.server", () => ({
   CartTransformService: { syncCartLineMessagingSettings: jest.fn() },
 }));
 jest.mock("../../../app/services/ppb-storefront-runtime.server", () => ({ syncPpbStorefrontRuntime }));
+jest.mock("../../../app/services/fpb-storefront-runtime.server", () => ({ syncFpbStorefrontRuntime }));
 jest.mock("../../../app/services/subscriptions/subscription-service.server", () => ({
   resolveShopEntitlements: jest.fn().mockResolvedValue({
     entitlements: {
@@ -61,6 +63,7 @@ describe("Settings Design action", () => {
     upsert.mockResolvedValue({});
     transaction.mockImplementation(async (operations) => Promise.all(operations));
     syncPpbStorefrontRuntime.mockResolvedValue({});
+    syncFpbStorefrontRuntime.mockResolvedValue({});
     resolveEntitlements.mockResolvedValue({
       entitlements: {
         capabilities: { advancedDesign: true },
@@ -91,6 +94,7 @@ describe("Settings Design action", () => {
     expect(upsert).toHaveBeenCalledTimes(2);
     expect(transaction).toHaveBeenCalledTimes(1);
     expect(syncPpbStorefrontRuntime).toHaveBeenCalledWith({}, "shop.test");
+    expect(syncFpbStorefrontRuntime).toHaveBeenCalledWith({}, "shop.test");
     expect(body).toEqual(expect.objectContaining({
       success: true,
       intent: "saveSettingsDesign",

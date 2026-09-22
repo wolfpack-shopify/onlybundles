@@ -61,6 +61,21 @@ describe("FPB runtime metafield config", () => {
     expect(config.bundleType).toBe("full_page");
   });
 
+  it("publishes the explicit FPB template identity used to scope storefront CSS", () => {
+    const config = buildFullPageBundleMetafieldConfig({
+      id: "bundle-1",
+      name: "Bundle",
+      status: "active",
+      bundleType: "full_page",
+      bundleDesignTemplate: "FBP_SIDE_FOOTER",
+      bundleDesignPresetId: "STANDARD",
+      steps: [],
+    });
+
+    expect(config.bundleDesignTemplate).toBe("FBP_SIDE_FOOTER");
+    expect(config.bundleDesignPresetId).toBe("STANDARD");
+  });
+
   it.each([undefined, "product_page"])(
     "rejects non-FPB bundle type %s",
     (bundleType) => {

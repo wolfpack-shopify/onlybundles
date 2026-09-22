@@ -8,6 +8,7 @@ import { BundleSubscriptionConfiguration } from "../../../app/routes/app/_shared
 import { FpbStepCategoryFooter } from "../../../app/routes/app/app.bundles.full-page-bundle.configure.$bundleId/sections/StepSetupCategoryFooter";
 import { FpbStepRuleModeContent } from "../../../app/routes/app/app.bundles.full-page-bundle.configure.$bundleId/sections/StepSetupRuleModeContent";
 import { FpbProgressBarOptions } from "../../../app/routes/app/app.bundles.full-page-bundle.configure.$bundleId/sections/DiscountProgressBarOptions";
+import { FpbDiscountMessagingOptions } from "../../../app/routes/app/app.bundles.full-page-bundle.configure.$bundleId/sections/DiscountMessagingOptions";
 import { PpbRulesConfigurationCard } from "../../../app/routes/app/app.bundles.product-page-bundle.configure.$bundleId/PpbRulesConfigurationCard";
 import { PpbStepCategoriesCard } from "../../../app/routes/app/app.bundles.product-page-bundle.configure.$bundleId/PpbStepCategoriesCard";
 import { PpbStepConfigCard } from "../../../app/routes/app/app.bundles.product-page-bundle.configure.$bundleId/PpbStepConfigCard";
@@ -314,6 +315,14 @@ describe("configure Polaris semantics", () => {
     );
 
     expect(choiceLists).toHaveLength(1);
+    const progressSwitch = findElements(
+      view,
+      (element) =>
+        element.type === "s-switch" &&
+        element.props.accessibilityLabel ===
+          "tooltips.discountProgressBar.title"
+    );
+    expect(progressSwitch).toHaveLength(1);
     expect(
       findElements(view, (element) => element.type === "s-choice")
     ).toHaveLength(2);
@@ -321,6 +330,43 @@ describe("configure Polaris semantics", () => {
 
     choiceLists[0].props.onChange({ currentTarget: { values: ["simple"] } });
     expect(setProgressBarType).toHaveBeenCalledWith("simple");
+  });
+
+  it("gives the FPB discount-messaging switch an accessible name", () => {
+    const view = FpbDiscountMessagingOptions({
+      localization: {
+        activeLocale: "en",
+        enabled: false,
+        globalSuccessMessage: "",
+        locales: [],
+        ruleMessagesByLocale: {},
+        setActiveLocale: jest.fn(),
+        setEnabled: jest.fn(),
+        setGlobalSuccessMessage: jest.fn(),
+        setRuleMessagesByLocale: jest.fn(),
+        setSuccessMessageByLocale: jest.fn(),
+        successMessageByLocale: {},
+      },
+      markAsDirty: jest.fn(),
+      normalizedRuleMessages: {},
+      onShowVariables: jest.fn(),
+      pricingState: {
+        discountMessagingEnabled: false,
+        discountRules: [],
+        discountType: "percentage_off",
+        setDiscountMessagingEnabled: jest.fn(),
+      } as never,
+      styles: {},
+    });
+    const messagingSwitch = findElements(
+      view,
+      (element) =>
+        element.type === "s-switch" &&
+        element.props.accessibilityLabel ===
+          "tooltips.discountMessaging.title"
+    );
+
+    expect(messagingSwitch).toHaveLength(1);
   });
 
   it("uses one choice list for the subscription discount purchase scope", () => {

@@ -87,6 +87,9 @@ export function FpbDiscountMessagingOptions({
             </div>
             <QuestionHelpTooltip tooltipKey="discountMessaging" />
             <s-switch
+              accessibilityLabel={translateAdmin(
+                "tooltips.discountMessaging.title"
+              )}
               checked={pricingState.discountMessagingEnabled || undefined}
               onChange={(e) =>
                 pricingState.setDiscountMessagingEnabled(
@@ -108,11 +111,17 @@ export function FpbDiscountMessagingOptions({
           )}
         </s-stack>
         {pricingState.discountType === DiscountMethod.BUY_X_GET_Y && (
-          <s-paragraph>
-            {translateAdmin(
-              "adminExtracted.appBundlesFullPageBundleConfigure.sections.discountmessagingoptions.discountMessagingDisplaysTheTotalQuantityToClaimOfferBuyGetToEns"
-            )}
-          </s-paragraph>
+          <s-box paddingBlockStart="small-200">
+            <s-banner
+              tone="info"
+              heading={translateAdmin("tooltips.discountMessaging.title")}
+              dismissible
+            >
+              {translateAdmin(
+                "adminExtracted.appBundlesFullPageBundleConfigure.sections.discountmessagingoptions.discountMessagingDisplaysTheTotalQuantityToClaimOfferBuyGetToEns"
+              )}
+            </s-banner>
+          </s-box>
         )}
         <DisabledConfigurationRegion
           disabled={!pricingState.discountMessagingEnabled}

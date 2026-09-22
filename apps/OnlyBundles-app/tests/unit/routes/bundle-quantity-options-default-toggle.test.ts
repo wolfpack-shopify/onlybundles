@@ -64,7 +64,15 @@ describe("Bundle Quantity Options Default Rule Toggle", () => {
           el.type === "s-switch" &&
           el.props.label === "adminDynamic.makeRuleDefault",
       );
+      const enableSwitch = findElements(
+        view,
+        (el) =>
+          el.type === "s-switch" &&
+          el.props.accessibilityLabel ===
+            "tooltips.bundleQuantityOptions.title",
+      );
 
+      expect(enableSwitch).toHaveLength(1);
       expect(switches).toHaveLength(2);
       expect(switches[0].props.checked).toBe(true);
       expect(switches[1].props.checked).toBeUndefined();
@@ -129,7 +137,15 @@ describe("Bundle Quantity Options Default Rule Toggle", () => {
           el.type === "s-switch" &&
           el.props.label === "adminDynamic.makeRuleDefault",
       );
+      const enableSwitch = findElements(
+        view,
+        (el) =>
+          el.type === "s-switch" &&
+          el.props.accessibilityLabel ===
+            "tooltips.bundleQuantityOptions.title",
+      );
 
+      expect(enableSwitch).toHaveLength(1);
       expect(switches).toHaveLength(2);
       expect(switches[0].props.checked).toBe(true);
       expect(switches[1].props.checked).toBeUndefined();

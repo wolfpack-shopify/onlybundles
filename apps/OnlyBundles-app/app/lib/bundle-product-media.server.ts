@@ -1,6 +1,7 @@
-// Prefer AVIF for lower transfer size; keep filename-level compatibility via a stable
-// `bundle-product-placeholder` prefix for cleanup/duplication detection.
-const BUNDLE_PRODUCT_PLACEHOLDER_IMAGE_PATH = "/bundle-product-placeholder.avif";
+// Shopify's media processor requires the public source to use an image MIME type.
+// The deployed PNG is served as image/png, while the optimized AVIF is currently
+// served as application/octet-stream by the app host.
+const BUNDLE_PRODUCT_PLACEHOLDER_IMAGE_PATH = "/bundle-product-placeholder.png";
 const BUNDLE_PRODUCT_PLACEHOLDER_IMAGE_FILENAME = "bundle-product-placeholder.";
 
 type ProductMediaInput = {

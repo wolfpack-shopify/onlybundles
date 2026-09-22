@@ -1,4 +1,4 @@
-import { sanitizeRichHtmlFragment } from '../shared/rich-html.js';
+import { ensureFpbProductModalRuntime } from './product-modal-runtime.js';
 
 type ProductMedia = { id?: string | number; alt?: string | null; src?: string; url?: string };
 
@@ -72,12 +72,13 @@ export async function fetchJudgeMePreviewBadges({
   return Object.keys(badges).length > 0 ? { badges } : null;
 }
 
-export async function hydrateJudgeMeReviewCards({ root, products, shop, token, fetcher = fetch }: any) {
+export async function hydrateJudgeMeReviewCards({ root, products, shop, token, controller, fetcher = fetch }: any) {
   const productIds = products.map((product: { parentProductId: any; productId: any; id: any; }) => (
     product.parentProductId || product.productId || product.id
   )).filter(Boolean);
   const result = await fetchJudgeMePreviewBadges({ shop, token, productIds, fetcher });
   if (!result) return;
+  const modalRuntime = await ensureFpbProductModalRuntime(controller);
   Array.from(root.children as HTMLCollectionOf<HTMLElement>).forEach((card, index) => {
     const product = products[index];
     const productId = product?.parentProductId || product?.productId || product?.id;
@@ -86,7 +87,7 @@ export async function hydrateJudgeMeReviewCards({ root, products, shop, token, f
     const runtimeDocument = root.ownerDocument || document;
     const mount = runtimeDocument.createElement('div');
     mount.setAttribute('data-wpb-judgeme-badge', String(productId));
-    mount.append(sanitizeRichHtmlFragment(
+    mount.append(modalRuntime.sanitize(
       badge,
       'review-badge',
       runtimeDocument.defaultView as unknown as Window,

@@ -137,6 +137,12 @@
       "saveError": "No se pudo guardar el idioma de administración"
     },
     "storefrontSetup": {
+      "sectionHeading": "Estado de la tienda",
+      "publishedThemeDescription": "Inserciones y bloques de aplicación del tema publicado",
+      "appEmbedsHeading": "Inserciones de aplicación",
+      "appBlocksHeading": "Bloques de aplicación del tema",
+      "refresh": "Actualizar estado",
+      "retry": "Volver a intentar",
       "loadingTitle": "Comprobando configuración de tienda",
       "loadingDescription": "Comprobando los componentes del tema publicado e incrustando la aplicación.",
       "errorTitle": "Estado de escaparate requiere atención",
@@ -185,7 +191,27 @@
         "enabled": "Activado",
         "ready": "Listo para habilitar",
         "unavailable": "No disponible"
+      },
+      "resourceLabels": {
+        "bundleAppEmbed": "Funciones de paquetes en la tienda",
+        "bundleProductPage": "Creador de paquetes para páginas de producto",
+        "bundleProductPageEmbed": "Ubicación de paquete en página de producto",
+        "bundlePageBuilderEmbed": "Ubicación de paquete en creador de páginas",
+        "bundleUpsell": "Venta adicional de paquete de página completa"
       }
+    },
+    "commercialMetrics": {
+      "heading": "Rendimiento de paquetes",
+      "description": "Últimos {{days}} días en {{currency}}",
+      "bundleRevenue": "Ingresos de paquetes",
+      "ordersWithBundles": "Pedidos con paquetes",
+      "averageOrderValue": "Valor medio del pedido",
+      "viewToOrderConversion": "Conversión de vista a pedido",
+      "unavailable": "No disponible",
+      "loading": "Cargando rendimiento",
+      "errorHeading": "Rendimiento no disponible",
+      "errorDescription": "No pudimos cargar estas métricas desde Shopify.",
+      "retry": "Volver a intentar"
     }
   },
   "settingsDcp": {
@@ -1159,6 +1185,8 @@
       "theCompleteBundleSolutionForShopifyBuildCustomizeAndPromoteProdu": "La solución completa de paquetes para Shopify — construir, personalizar y promover paquetes de productos que se convierten.",
       "getStarted": "► Comencemos",
       "goToDashboard": "Ir al panel →",
+      "takeMeToMyDashboard": "Llévame a mi panel",
+      "valueStatement": "Aumenta las ventas y el valor medio del pedido con paquetes personalizables.",
       "everythingIncluded": "Todo incluido",
       "documentation": "Documentación"
     },
@@ -1490,6 +1518,7 @@
     }
   },
   "adminAttributes": {
+    "invalidJavaScriptSyntax": "Corrige la sintaxis de JavaScript antes de guardar.",
     "searchCampaigns": "Buscar campañas",
     "searchByCampaignName": "Buscar por nombre de campaña",
     "sortTopCampaigns": "Ordenar campañas superiores",

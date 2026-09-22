@@ -1,4 +1,3 @@
-import { withBundleCartLock } from "../../../../lib/bundle-cart-lock.js";
 import { BUNDLE_WIDGET } from '../../shared/constants.js';
 import { CurrencyManager } from '../../shared/currency-manager.js';
 import { PricingCalculator } from '../../shared/pricing-calculator.js';
@@ -10,7 +9,7 @@ import {
   extractTierProgressForBundle,
 } from '../../shared/engine/cart-lines.js';
 import { shouldDisplayClassicFixedBundleRawTotal } from '../shared/summary-pricing-display.js';
-import { preflightVariantOnStorefront } from '../../shared/variant-preflight.js';
+import { updateShopifyCart } from '../../shared/shopify-cart-actions.js';
 import {
   buildBundleSelectionProperties,
   applySellingPlanToJsonCartItems,
@@ -205,7 +204,6 @@ export const fullPageStepFooterMethods: Record<string, any> & ThisType<any> = {
     const offerId = this.resolveFullPageOfferId();
     const baseOfferId = `${offerId}_${sessionKey}`;
     const selectedLines: any[] = [];
-    const variantPreflightCache = new Map();
     const unavailableLines: any[] = [];
     let itemNumber = 0;
     const hasAddonStepConfigured = (this.selectedBundle?.steps || []).some((candidateStep: any) => {
@@ -244,21 +242,6 @@ export const fullPageStepFooterMethods: Record<string, any> & ThisType<any> = {
         );
         if (!numericVariantId || !/^\d+$/.test(numericVariantId)) {
           unavailableLines.push(`runtime-preflight blocked: invalid variant id ${String(product?.title || variantId || resolvedSelectionId)} in step ${stepIndex + 1}.`);
-          continue;
-        }
-
-        let preflightResult = variantPreflightCache.get(numericVariantId);
-        if (!preflightResult) {
-          preflightResult = await preflightVariantOnStorefront(
-            numericVariantId,
-            typeof fetch === 'function' ? fetch : null,
-          );
-        }
-        variantPreflightCache.set(numericVariantId, preflightResult);
-        if (!preflightResult.ok) {
-          unavailableLines.push(
-            `runtime-preflight blocked: step ${stepIndex + 1} product ${productsInStep.indexOf(product) + 1} variant ${numericVariantId} (status ${preflightResult.status})`,
-          );
           continue;
         }
 
@@ -351,32 +334,11 @@ export const fullPageStepFooterMethods: Record<string, any> & ThisType<any> = {
     try {
       items = mergeDuplicateCartLines(items);
       items.forEach(item => Object.assign(item.properties, sourceProperties));
-      const response = await withBundleCartLock(async () => {
-      // Add to Shopify cart
-      return fetch('/cart/add.js', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ items })
-      });
-      });
-
-      if (!response.ok) {
-        const responseText = await response.text();
-        let errorMessage = `Failed to add bundle to cart (${response.status})`;
-        try {
-          const payload = JSON.parse(responseText);
-          errorMessage = payload?.message || payload?.description || errorMessage;
-        } catch {
-          if (responseText) {
-            errorMessage = responseText;
-          }
-        }
-        throw new Error(errorMessage);
-      }
-
-      await response.json();
+      const cartResult = await updateShopifyCart(items);
+      const warning = Array.isArray(cartResult?.warnings)
+        ? cartResult.warnings.find((entry: any) => entry?.message)?.message
+        : null;
+      if (warning) ToastManager.show(warning);
 
       // Storefront analytics: bundle successfully added to cart.
       this._sendEngagementBeacon?.('bundle-add-to-cart-success');

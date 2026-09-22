@@ -113,7 +113,7 @@ describe("PPB Shopify-hosted storefront runtime", () => {
     expect(admin.graphql.mock.calls[1][1].variables.input.title).toBe(PPB_STOREFRONT_TOKEN_TITLE);
   });
 
-  it("builds locale-keyed language and Product Page controls without an origin URL", () => {
+  it("builds locale-keyed runtime without duplicating the Controls contract", () => {
     const runtime = buildPpbStorefrontRuntime({
       storefrontAccessToken: "public-token",
       storefrontProxyRoot: "/apps/product-bundles-sit",
@@ -121,12 +121,12 @@ describe("PPB Shopify-hosted storefront runtime", () => {
     });
 
     expect(runtime).toMatchObject({
-      schemaVersion: 2,
+      schemaVersion: 3,
       storefrontApiVersion: "2026-07",
       storefrontAccessToken: "public-token",
       storefrontProxyRoot: "/apps/product-bundles-sit",
-      controls: { bundleType: "product_page" },
     });
+    expect(runtime).not.toHaveProperty("controls");
     expect(runtime.languages.en.activeLocale).toBe("en");
     expect(JSON.stringify(runtime)).not.toContain("serverUrl");
   });

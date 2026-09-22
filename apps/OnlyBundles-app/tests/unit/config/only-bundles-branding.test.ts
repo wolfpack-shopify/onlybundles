@@ -43,4 +43,27 @@ describe("Only Bundles Shopify configuration", () => {
     expect(pixelConfig).toContain('name = "Only Bundles Attribution"');
     expect(pixelConfig).not.toMatch(/Wolfpack app server|Wolfpack to capture/);
   });
+
+  it("names every theme resource by its storefront function", () => {
+    const themeSchema = JSON.parse(
+      read("extensions/bundle-builder/locales/en.default.schema.json"),
+    );
+    const resources = Object.values(themeSchema.theme_resources) as Array<{
+      name: string;
+      description: string;
+    }>;
+
+    expect(resources.map((resource) => resource.name)).toEqual([
+      "Bundle storefront features",
+      "Product page bundle builder",
+      "Product page bundle placement",
+      "Page builder bundle placement",
+      "Full page bundle upsell",
+    ]);
+    expect(
+      resources.every((resource) =>
+        resource.description.includes("Only Bundles"),
+      ),
+    ).toBe(true);
+  });
 });

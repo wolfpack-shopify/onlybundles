@@ -137,6 +137,12 @@
       "saveError": "Impossible d'enregistrer la langue d'administration"
     },
     "storefrontSetup": {
+      "sectionHeading": "État de la vitrine",
+      "publishedThemeDescription": "Intégrations et blocs d’application du thème publié",
+      "appEmbedsHeading": "Intégrations d’application",
+      "appBlocksHeading": "Blocs d’application de thème",
+      "refresh": "Actualiser l’état",
+      "retry": "Réessayer",
       "loadingTitle": "Vérification de la configuration de la vitrine",
       "loadingDescription": "Vérification de vos composants de thème publiés et de l'application intégrée.",
       "errorTitle": "L'état de la vitrine nécessite une attention",
@@ -185,7 +191,27 @@
         "enabled": "Activé",
         "ready": "Prêt à activer",
         "unavailable": "Indisponible"
+      },
+      "resourceLabels": {
+        "bundleAppEmbed": "Fonctionnalités de bundles en vitrine",
+        "bundleProductPage": "Créateur de bundle de page produit",
+        "bundleProductPageEmbed": "Placement de bundle de page produit",
+        "bundlePageBuilderEmbed": "Placement de bundle dans un créateur de pages",
+        "bundleUpsell": "Vente incitative de bundle pleine page"
       }
+    },
+    "commercialMetrics": {
+      "heading": "Performance des bundles",
+      "description": "Les {{days}} derniers jours en {{currency}}",
+      "bundleRevenue": "Revenus des bundles",
+      "ordersWithBundles": "Commandes avec bundles",
+      "averageOrderValue": "Valeur moyenne des commandes",
+      "viewToOrderConversion": "Conversion vue-commande",
+      "unavailable": "Non disponible",
+      "loading": "Chargement des performances",
+      "errorHeading": "Performances indisponibles",
+      "errorDescription": "Impossible de charger ces indicateurs depuis Shopify.",
+      "retry": "Réessayer"
     }
   },
   "settingsDcp": {
@@ -1159,6 +1185,8 @@
       "theCompleteBundleSolutionForShopifyBuildCustomizeAndPromoteProdu": "La solution groupée complète pour Shopify — construire, personnaliser et promouvoir les packs de produits convertis.",
       "getStarted": "<unk> Commencer",
       "goToDashboard": "Aller au tableau de bord →",
+      "takeMeToMyDashboard": "Accéder à mon tableau de bord",
+      "valueStatement": "Augmentez les ventes et le panier moyen grâce à des offres groupées personnalisables.",
       "everythingIncluded": "Tout inclus",
       "documentation": "Documentation"
     },
@@ -1490,6 +1518,7 @@
     }
   },
   "adminAttributes": {
+    "invalidJavaScriptSyntax": "Corrigez la syntaxe JavaScript avant d’enregistrer.",
     "searchCampaigns": "Rechercher des campagnes",
     "searchByCampaignName": "Recherche par nom de campagne",
     "sortTopCampaigns": "Trier les meilleures campagnes",

@@ -1,4 +1,26 @@
 {
+  "theme_resources": {
+    "storefront_features": {
+      "name": "Bundle storefront features",
+      "description": "Activates Only Bundles storefront features, including bundle builders, product offers, upsells, cart behavior, and storefront controls."
+    },
+    "product_page_builder": {
+      "name": "Product page bundle builder",
+      "description": "Displays the Only Bundles product page bundle builder for a bundle product."
+    },
+    "product_page_placement": {
+      "name": "Product page bundle placement",
+      "description": "Places an eligible Only Bundles product page bundle on a product template."
+    },
+    "page_builder_placement": {
+      "name": "Page builder bundle placement",
+      "description": "Places an Only Bundles bundle inside a page builder section. Enable the app embed before using this block."
+    },
+    "full_page_upsell": {
+      "name": "Full page bundle upsell",
+      "description": "Places an Only Bundles full page bundle upsell on a product template."
+    }
+  },
   "bundle_product_page": {
     "name": "Only Bundles - Product Page Bundle",
     "settings": {

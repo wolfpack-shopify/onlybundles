@@ -46,6 +46,10 @@ jest.mock("../../../app/services/ppb-storefront-runtime.server", () => ({
   syncPpbStorefrontRuntime: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock("../../../app/services/fpb-storefront-runtime.server", () => ({
+  syncFpbStorefrontRuntime: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock(
   "../../../app/routes/app/app.bundles.full-page-bundle.configure.$bundleId/handlers/shared.server",
   () => ({
@@ -128,6 +132,39 @@ describe("storefront sync direct flow", () => {
       synced: true,
     });
     expect(getDb().bundle.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("ensures the parent product contract during PPB storefront sync", async () => {
+    getDb().bundle.findUnique.mockResolvedValueOnce({
+      id: "bundle-1",
+      publicNumber: 1,
+      shopId: "test.myshopify.com",
+      bundleType: "product_page",
+      status: "active",
+      name: "Daily Essentials",
+      description: null,
+      shopifyProductId: "gid://shopify/Product/1",
+      shopifyProductHandle: "daily-essentials",
+      steps: [],
+      pricing: null,
+    });
+
+    await syncBundleStorefrontNow({
+      admin: { graphql: jest.fn() } as any,
+      shopDomain: "test.myshopify.com",
+      bundleId: "bundle-1",
+      bundleType: "product_page",
+      reason: "save",
+    });
+
+    expect(ensureBundleParentProduct).toHaveBeenCalledWith(expect.objectContaining({
+      shopDomain: "test.myshopify.com",
+      appUrl: "https://app.example.test",
+      bundle: expect.objectContaining({
+        id: "bundle-1",
+        bundleType: "product_page",
+      }),
+    }));
   });
 
   it("propagates direct sync failures without persisting operational status", async () => {

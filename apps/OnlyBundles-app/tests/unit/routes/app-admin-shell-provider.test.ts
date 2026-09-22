@@ -137,9 +137,8 @@ describe("app Admin shell provider", () => {
     const view = renderToStaticMarkup(React.createElement(App));
 
     expect(view).toContain("<s-app-nav>");
-    expect(view).toContain(
-      '<s-link href="/app/dashboard">nav.dashboard</s-link>'
-    );
+    expect(view).not.toContain('href="/app/dashboard"');
+    expect(view).not.toContain("nav.dashboard");
     expect(view).toContain(
       '<s-link href="/app/settings">nav.settings</s-link>'
     );

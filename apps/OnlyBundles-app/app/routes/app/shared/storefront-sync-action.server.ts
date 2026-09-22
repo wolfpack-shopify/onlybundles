@@ -11,7 +11,6 @@ import {
   appendFpbPreviewToken,
   buildFpbStorefrontUrl,
 } from "../../../lib/fpb-storefront-url";
-import { recordFirstBundlePreviewEvent } from "../../../services/bundles/bundle-preview-event.server";
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Storefront sync failed";
@@ -52,20 +51,12 @@ export async function handleSyncStorefrontNow(
 }
 
 export async function handlePrepareStorefrontPreview(
-  admin: ShopifyAdmin,
+  _admin: ShopifyAdmin,
   session: Session,
   bundleId: string,
   bundleType: "full_page" | "product_page",
 ) {
   try {
-    await syncBundleStorefrontNow({
-      admin,
-      shopDomain: session.shop,
-      bundleId,
-      bundleType,
-      reason: "preview",
-    });
-
     const previewToken = createBundlePreviewToken({
       shop: session.shop,
       bundleId,
@@ -81,18 +72,14 @@ export async function handlePrepareStorefrontPreview(
         throw new Error("Bundle not found");
       }
 
-      const publicNumber = bundle.publicNumber ?? 1;
+      if (bundle.publicNumber === null) {
+        throw new Error("Bundle public number is missing");
+      }
+      const publicNumber = bundle.publicNumber;
       shareablePreviewUrl = appendFpbPreviewToken(
         buildFpbStorefrontUrl(session.shop, publicNumber),
         previewToken,
       );
-      await recordFirstBundlePreviewEvent({
-        admin,
-        shopDomain: session.shop,
-        bundle,
-        bundleLink: shareablePreviewUrl,
-        routeFamily: "fpb_configure",
-      });
     }
 
     return json({

@@ -81,12 +81,7 @@ export function usePpbPreviewReadinessHandlers({
     const pendingPreviewWindow = openPendingDashboardPreview();
     setIsPreviewBundleLoading(true);
     try {
-      let preview: any = null;
-      try {
-        preview = await prepareStorefrontPreviewForOpen();
-      } catch (err: any) {
-        AppLogger.warn("Storefront preview preparation warning in PPB:", {}, err);
-      }
+      const preview = await prepareStorefrontPreviewForOpen();
       const bundleStatusForPreview = String(
         (base.bundle as any).status ?? "",
       ).toLowerCase();

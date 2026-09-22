@@ -10,6 +10,8 @@ import { syncBundleStorefrontNow } from "../app/services/bundles/storefront-sync
 import { ensureVariantBundleMetafieldDefinitions } from "../app/services/bundles/metafield-sync/operations/definitions.server";
 import { AddOnDiscountFunctionService } from "../app/services/addon-discount-function-service.server";
 import { syncPpbStorefrontRuntime } from "../app/services/ppb-storefront-runtime.server";
+import { syncStorefrontControlsRuntime } from "../app/services/storefront-controls-runtime.server";
+import { syncFpbStorefrontRuntime } from "../app/services/fpb-storefront-runtime.server";
 
 async function main() {
   const summary = await runDeploymentGeneralSync(
@@ -28,6 +30,10 @@ async function main() {
           shopDomain,
           process.env.STOREFRONT_PROXY_ROOT,
         ),
+      syncFpbRuntime: (admin, shopDomain) =>
+        syncFpbStorefrontRuntime(admin as any, shopDomain),
+      syncStorefrontControlsRuntime: (admin, shopDomain) =>
+        syncStorefrontControlsRuntime(admin as any, shopDomain),
       syncBundle: syncBundleStorefrontNow as any,
       updateStepProductVariants: async ({ stepProductId, variants }: any) => {
         await db.stepProduct.update({

@@ -168,7 +168,7 @@ describe("ensureBundleParentProduct", () => {
         }),
         media: [
           {
-            originalSource: "https://app.example.test/bundle-product-placeholder.avif",
+            originalSource: "https://app.example.test/bundle-product-placeholder.png",
             alt: null,
             mediaContentType: "IMAGE",
           },
@@ -434,7 +434,7 @@ describe("ensureBundleParentProduct", () => {
         variables: {
           product: { id: "gid://shopify/Product/10" },
           media: [{
-            originalSource: "https://app.example.test/bundle-product-placeholder.avif",
+            originalSource: "https://app.example.test/bundle-product-placeholder.png",
             alt: null,
             mediaContentType: "IMAGE",
           }],
@@ -483,6 +483,114 @@ describe("ensureBundleParentProduct", () => {
       admin.graphql.mock.calls.some(([query]: [string]) =>
         query.includes("AddBundleParentPlaceholderMedia")),
     ).toBe(false);
+  });
+
+  it("adds the canonical placeholder when an existing PPB parent has no media", async () => {
+    const existingBundle = {
+      ...bundle,
+      bundleType: "product_page",
+      shopifyProductId: "gid://shopify/Product/10",
+      shopifyProductHandle: "build-your-box",
+    };
+    const admin = makeCreateAdmin();
+    const original = admin.graphql.getMockImplementation()!;
+    admin.graphql.mockImplementation(async (query: string, options?: unknown) => {
+      if (query.includes("GetBundleParentProduct")) {
+        return response({
+          data: {
+            product: {
+              id: "gid://shopify/Product/10",
+              handle: "build-your-box",
+              status: "UNLISTED",
+              media: { nodes: [] },
+              variants: { nodes: [{ id: "gid://shopify/ProductVariant/20" }] },
+            },
+          },
+        });
+      }
+      if (query.includes("AddBundleParentPlaceholderMedia")) {
+        return response({
+          data: {
+            productUpdate: {
+              product: { id: "gid://shopify/Product/10" },
+              userErrors: [],
+            },
+          },
+        });
+      }
+      return original(query, options);
+    });
+
+    await ensureBundleParentProduct({
+      admin,
+      shopDomain: "test-shop.myshopify.com",
+      appUrl: "https://app.example.test",
+      bundle: existingBundle,
+    });
+
+    expect(admin.graphql).toHaveBeenCalledWith(
+      expect.stringContaining("AddBundleParentPlaceholderMedia"),
+      {
+        variables: {
+          product: { id: "gid://shopify/Product/10" },
+          media: [{
+            originalSource: "https://app.example.test/bundle-product-placeholder.png",
+            alt: null,
+            mediaContentType: "IMAGE",
+          }],
+        },
+      },
+    );
+  });
+
+  it("retries the canonical placeholder when all existing PPB media failed processing", async () => {
+    const existingBundle = {
+      ...bundle,
+      bundleType: "product_page",
+      shopifyProductId: "gid://shopify/Product/10",
+      shopifyProductHandle: "build-your-box",
+    };
+    const admin = makeCreateAdmin();
+    const original = admin.graphql.getMockImplementation()!;
+    admin.graphql.mockImplementation(async (query: string, options?: unknown) => {
+      if (query.includes("GetBundleParentProduct")) {
+        return response({
+          data: {
+            product: {
+              id: "gid://shopify/Product/10",
+              handle: "build-your-box",
+              status: "UNLISTED",
+              media: {
+                nodes: [{ id: "gid://shopify/MediaImage/failed", status: "FAILED" }],
+              },
+              variants: { nodes: [{ id: "gid://shopify/ProductVariant/20" }] },
+            },
+          },
+        });
+      }
+      if (query.includes("AddBundleParentPlaceholderMedia")) {
+        return response({
+          data: {
+            productUpdate: {
+              product: { id: "gid://shopify/Product/10" },
+              userErrors: [],
+            },
+          },
+        });
+      }
+      return original(query, options);
+    });
+
+    await ensureBundleParentProduct({
+      admin,
+      shopDomain: "test-shop.myshopify.com",
+      appUrl: "https://app.example.test",
+      bundle: existingBundle,
+    });
+
+    expect(admin.graphql.mock.calls.some(([query]: [string]) =>
+      query.includes("AddBundleParentPlaceholderMedia")),
+    ).toBe(true);
   });
 
   it("fails existing-parent sync when Shopify rejects the Only Bundles parent tags", async () => {

@@ -3,7 +3,6 @@ import {
   cleanupInternalCartProperties,
   scheduleCartPropertiesCleanup,
   initCartPropertiesCleaner,
-  isCartContainerOrDescendant,
 } from '../../../app/storefront/cart-properties-cleanup';
 
 describe('cleanupInternalCartProperties', () => {
@@ -146,25 +145,7 @@ describe('cleanupInternalCartProperties', () => {
     expect(document.body.textContent).toContain('Gift Note: Happy Birthday!');
   });
 
-  describe('scoped container discovery and throttling', () => {
-    it('identifies cart container elements accurately', () => {
-      const form = document.createElement('form');
-      form.setAttribute('action', '/cart');
-      expect(isCartContainerOrDescendant(form)).toBe(true);
-
-      const drawer = document.createElement('div');
-      drawer.className = 'cart-drawer';
-      expect(isCartContainerOrDescendant(drawer)).toBe(true);
-
-      const divWithDrawer = document.createElement('div');
-      divWithDrawer.appendChild(drawer);
-      expect(isCartContainerOrDescendant(divWithDrawer)).toBe(true);
-
-      const carousel = document.createElement('div');
-      carousel.className = 'product-carousel';
-      expect(isCartContainerOrDescendant(carousel)).toBe(false);
-    });
-
+  describe('event-scoped cleanup and throttling', () => {
     it('coalesces multiple rapid schedule calls into one frame', () => {
       const rafMock = jest.fn();
       (global as any).window.requestAnimationFrame = rafMock;
@@ -177,7 +158,7 @@ describe('cleanupInternalCartProperties', () => {
       expect(rafMock).toHaveBeenCalledTimes(1);
     });
 
-    it('attaches scoped observer to cart container when present', () => {
+    it('does not attach a MutationObserver to the cart or document body', () => {
       document.body.innerHTML = `
         <div class="cart-drawer">
           <div class="content">_bundle_name: Test</div>
@@ -185,21 +166,12 @@ describe('cleanupInternalCartProperties', () => {
         <div class="other-section"></div>
       `;
 
-      const observeMock = jest.fn();
-      (global as any).MutationObserver = jest.fn().mockImplementation(() => ({
-        observe: observeMock,
-        disconnect: jest.fn(),
-      }));
+      const observerMock = jest.fn();
+      (global as any).MutationObserver = observerMock;
 
       initCartPropertiesCleaner();
 
-      const cartContainer = document.querySelector('.cart-drawer');
-      expect(observeMock).toHaveBeenCalledWith(cartContainer, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['open', 'class', 'aria-hidden'],
-      });
+      expect(observerMock).not.toHaveBeenCalled();
     });
   });
 });

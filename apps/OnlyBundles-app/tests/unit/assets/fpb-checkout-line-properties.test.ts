@@ -27,22 +27,27 @@ afterAll(() => {
     process.env.STOREFRONT_PROXY_ROOT = originalStorefrontProxyRoot;
   }
 });
-function createCartAddFetchMock() {
-  return jest.fn(async (_url: string, _options?: RequestInit) => ({ ok: true, json: async () => ({}) }));
+function createCartUpdateMock() {
+  return jest.fn(async () => ({ cart: {}, userErrors: [], warnings: [] }));
+}
+
+function cartItemsFromUpdateCart(updateCart: jest.Mock) {
+  return updateCart.mock.calls[0][0].lines.map((line: any) => ({
+    id: String(line.merchandiseId).split('/').pop(),
+    quantity: line.quantity,
+    properties: Object.fromEntries((line.attributes || []).map((attribute: any) => [attribute.key, attribute.value])),
+    ...(line.sellingPlanId ? { selling_plan: String(line.sellingPlanId).split('/').pop() } : {}),
+  }));
 }
 
 describe("FPB checkout cart-line properties", () => {
-  it("aborts add-to-cart when storefront preflight reports deleted variant", async () => {
-    const fetchMock = jest.fn(async (url: string) => {
-      if (url === "/variants/111.js") {
-        return {
-          ok: false,
-          status: 404,
-          json: async () => ({ available: false }),
-        };
-      }
-      throw new Error(`Unexpected fetch: ${url}`);
-    });
+  it("surfaces Shopify's native deleted-variant error without storefront preflight", async () => {
+    const updateCart = jest.fn(async () => ({
+      cart: null,
+      userErrors: [{ message: "Variant is unavailable" }],
+      warnings: [],
+    }));
+    const fetchMock = jest.fn();
     const originalFetch = (global as any).fetch;
     const originalWindow = (global as any).window;
     const originalDocument = (global as any).document;
@@ -52,6 +57,7 @@ describe("FPB checkout cart-line properties", () => {
     (global as any).window = {
       Shopify: {
         currency: { active: "USD", format: ["$", "{{amount}}"].join("") },
+        actions: { updateCart },
       },
     };
     (global as any).document = {
@@ -118,11 +124,9 @@ describe("FPB checkout cart-line properties", () => {
       (global as any).setTimeout = originalSetTimeout;
     }
 
-    expect(fetchMock).toHaveBeenCalledWith("/variants/111.js", expect.objectContaining({
-      method: "GET",
-    }));
-    expect(fetchMock).not.toHaveBeenCalledWith("/apps/product-bundles/api/cart-transform-runtime-token", expect.any(Object));
-    expect(fetchMock).not.toHaveBeenCalledWith("/cart/add.js", expect.any(Object));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(updateCart).toHaveBeenCalledTimes(1);
+    expect(ToastManager.show).toHaveBeenCalledWith("Variant is unavailable");
   });
 
     it("keeps paid add-on savings out of parent pricing metadata", () => {
@@ -185,26 +189,8 @@ describe("FPB checkout cart-line properties", () => {
   });
 
   it("uses resolved selected variant id even if product.variantId is not the selected variant", async () => {
-    const callOrder: string[] = [];
-    const fetchMock = jest.fn(async (url: string) => {
-      if (url === "/apps/product-bundles/api/cart-transform-runtime-token") {
-        return {
-          ok: true,
-          json: async () => ({ token: "runtime-token" }),
-        };
-      }
-      if (url === "/cart/add.js") {
-        callOrder.push("cart-add");
-        return {
-          ok: true,
-          json: async () => ({}),
-        };
-      }
-      return {
-        ok: true,
-        json: async () => ({}),
-      };
-    });
+    const updateCart = createCartUpdateMock();
+    const fetchMock = jest.fn();
     const originalFetch = (global as any).fetch;
     const originalWindow = (global as any).window;
     const originalDocument = (global as any).document;
@@ -215,6 +201,7 @@ describe("FPB checkout cart-line properties", () => {
       location: { pathname: "/" },
       Shopify: {
         currency: { active: "USD", format: ["$", "{{amount}}"].join("") },
+        actions: { updateCart },
       },
     };
     (global as any).document = {
@@ -292,19 +279,17 @@ describe("FPB checkout cart-line properties", () => {
       (global as any).setTimeout = originalSetTimeout;
     }
 
-    const addRequest: any = fetchMock.mock.calls.find(([url]: any) => url === "/cart/add.js")!;
-    expect(addRequest).toBeDefined();
-    const body = JSON.parse(String(addRequest[1]?.body));
+    const body = { items: cartItemsFromUpdateCart(updateCart) };
     expect(body.items).toEqual([expect.objectContaining({ id: "111" })]);
     expect(JSON.parse(body.items[0].properties._wpb_selection)).toMatchObject({bundleId: "bundle-1", revision: "published", groupId: "paid-step"});
-    expect(fetchMock.mock.calls.every(([url]: any) => !url.includes("runtime-token") && !url.includes("cart-bundle-details"))).toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(body.items[0].properties).toHaveProperty("_bundle_display_properties");
     expect(body.items[0].properties).not.toHaveProperty("_wolfpack_bundle_runtime");
-    expect(callOrder).toEqual(["cart-add"]);
+    expect(updateCart).toHaveBeenCalledTimes(1);
   });
 
   it("omits Box cart properties for BXY when bundle quantity options are hidden", async () => {
-    const fetchMock = createCartAddFetchMock();
+    const fetchMock = createCartUpdateMock();
     const originalFetch = (global as any).fetch;
     const originalWindow = (global as any).window;
     const originalDocument = (global as any).document;
@@ -315,6 +300,7 @@ describe("FPB checkout cart-line properties", () => {
       location: { pathname: "/" },
       Shopify: {
         currency: { active: "USD", format: ["$", "{{amount}}"].join("") },
+        actions: { updateCart: fetchMock },
       },
     };
     (global as any).document = {
@@ -412,9 +398,7 @@ describe("FPB checkout cart-line properties", () => {
       (global as any).setTimeout = originalSetTimeout;
     }
 
-    const addRequest = fetchMock.mock.calls.find(([url]: any) => url === "/cart/add.js")!;
-    expect(addRequest).toBeDefined();
-    const body = JSON.parse(String(addRequest[1]?.body));
+    const body = { items: cartItemsFromUpdateCart(fetchMock) };
 
     expect(body.items).toHaveLength(2);
     body.items.forEach((item: { properties: Record<string, string> }) => {
@@ -425,7 +409,7 @@ describe("FPB checkout cart-line properties", () => {
   });
 
   it("uses bundle box numbering and hidden bundle metadata for paid add-on lines", async () => {
-    const fetchMock = createCartAddFetchMock();
+    const fetchMock = createCartUpdateMock();
     const originalFetch = (global as any).fetch;
     const originalWindow = (global as any).window;
     const originalDocument = (global as any).document;
@@ -436,6 +420,7 @@ describe("FPB checkout cart-line properties", () => {
       location: { pathname: "/" },
       Shopify: {
         currency: { active: "USD", format: ["$", "{{amount}}"].join("") },
+        actions: { updateCart: fetchMock },
       },
     };
     (global as any).document = {
@@ -509,9 +494,7 @@ describe("FPB checkout cart-line properties", () => {
       (global as any).setTimeout = originalSetTimeout;
     }
 
-    const addRequest = fetchMock.mock.calls.find(([url]: any) => url === "/cart/add.js")!;
-    expect(addRequest).toBeDefined();
-    const body = JSON.parse(String(addRequest[1]?.body));
+    const body = { items: cartItemsFromUpdateCart(fetchMock) };
     const addonLine = body.items.find(
       (item: { properties: Record<string, string> }) =>
         item.properties._bundle_step_type === "addon:PERCENTAGE:10",
@@ -526,7 +509,7 @@ describe("FPB checkout cart-line properties", () => {
   });
 
   it("blocks out-of-stock selections before posting the full-page bundle to cart", async () => {
-    const fetchMock = createCartAddFetchMock();
+    const fetchMock = createCartUpdateMock();
     const originalFetch = (global as any).fetch;
     const originalWindow = (global as any).window;
     const originalDocument = (global as any).document;
@@ -537,6 +520,7 @@ describe("FPB checkout cart-line properties", () => {
     (global as any).window = {
       Shopify: {
         currency: { active: "USD", format: ["$", "{{amount}}"].join("") },
+        actions: { updateCart: fetchMock },
       },
     };
     (global as any).document = {
@@ -612,17 +596,14 @@ describe("FPB checkout cart-line properties", () => {
       (global as any).setTimeout = originalSetTimeout;
     }
 
-    expect(fetchMock).not.toHaveBeenCalledWith(
-      "/cart/add.js",
-      expect.anything(),
-    );
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(ToastManager.show).toHaveBeenCalledWith(
       expect.stringContaining("out of stock"),
     );
   });
 
   it("blocks selections that exceed available stock before posting the full-page bundle to cart", async () => {
-    const fetchMock = createCartAddFetchMock();
+    const fetchMock = createCartUpdateMock();
     const originalFetch = (global as any).fetch;
     const originalWindow = (global as any).window;
     const originalDocument = (global as any).document;
@@ -633,6 +614,7 @@ describe("FPB checkout cart-line properties", () => {
     (global as any).window = {
       Shopify: {
         currency: { active: "USD", format: ["$", "{{amount}}"].join("") },
+        actions: { updateCart: fetchMock },
       },
     };
     (global as any).document = {
@@ -708,39 +690,19 @@ describe("FPB checkout cart-line properties", () => {
       (global as any).setTimeout = originalSetTimeout;
     }
 
-    expect(fetchMock).not.toHaveBeenCalledWith(
-      "/cart/add.js",
-      expect.anything(),
-    );
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(ToastManager.show).toHaveBeenCalledWith(
       expect.stringContaining("only has 1 in stock"),
     );
   });
 
-  it("surfaces Shopify sold-out message when /cart/add.js returns 422", async () => {
-    const fetchMock = jest.fn(async (url: string) => {
-      if (url === "/apps/product-bundles/api/cart-transform-runtime-token") {
-        return {
-          ok: true,
-          json: async () => ({ token: "runtime-token" }),
-        };
-      }
-      if (url === "/cart/add.js") {
-        return {
-          ok: false,
-          status: 422,
-          text: async () => JSON.stringify({
-            status: 422,
-            message: "The product '14k Interlinked Earrings' is already sold out.",
-            description: "The product '14k Interlinked Earrings' is already sold out.",
-          }),
-        };
-      }
-      return {
-        ok: true,
-        json: async () => ({}),
-      };
-    });
+  it("surfaces Shopify's native sold-out user error", async () => {
+    const updateCart = jest.fn(async () => ({
+      cart: null,
+      userErrors: [{ message: "The product '14k Interlinked Earrings' is already sold out." }],
+      warnings: [],
+    }));
+    const fetchMock = jest.fn();
     const originalFetch = (global as any).fetch;
     const originalWindow = (global as any).window;
     const originalDocument = (global as any).document;
@@ -752,6 +714,7 @@ describe("FPB checkout cart-line properties", () => {
       location: { pathname: "/" },
       Shopify: {
         currency: { active: "USD", format: ["$", "{{amount}}"].join("") },
+        actions: { updateCart },
       },
     };
     (global as any).document = {
@@ -827,22 +790,15 @@ describe("FPB checkout cart-line properties", () => {
       (global as any).setTimeout = originalSetTimeout;
     }
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/cart/add.js",
-      expect.objectContaining({
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }),
-    );
+    expect(updateCart).toHaveBeenCalledTimes(1);
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(ToastManager.show).toHaveBeenCalledWith(
       expect.stringContaining("already sold out"),
     );
   });
 
   it("keeps active 100 percent add-on tier lines separate from free-gift merge semantics", async () => {
-    const fetchMock = createCartAddFetchMock();
+    const fetchMock = createCartUpdateMock();
     const originalFetch = (global as any).fetch;
     const originalWindow = (global as any).window;
     const originalDocument = (global as any).document;
@@ -853,6 +809,7 @@ describe("FPB checkout cart-line properties", () => {
       location: { pathname: "/" },
       Shopify: {
         currency: { active: "USD", format: ["$", "{{amount}}"].join("") },
+        actions: { updateCart: fetchMock },
       },
     };
     (global as any).document = {
@@ -949,9 +906,7 @@ describe("FPB checkout cart-line properties", () => {
       (global as any).setTimeout = originalSetTimeout;
     }
 
-    const addRequest = fetchMock.mock.calls.find(([url]: any) => url === "/cart/add.js")!;
-    expect(addRequest).toBeDefined();
-    const body = JSON.parse(String(addRequest[1]?.body));
+    const body = { items: cartItemsFromUpdateCart(fetchMock) };
     const addonLine = body.items.find(
       (item: { properties: Record<string, string> }) =>
         item.properties._bundle_step_type === "addon:PERCENTAGE:100",
@@ -970,7 +925,7 @@ describe("FPB checkout cart-line properties", () => {
   });
 
   it("keeps active flat 100 percent add-on tier lines eligible for checkout savings", async () => {
-    const fetchMock = createCartAddFetchMock();
+    const fetchMock = createCartUpdateMock();
     const originalFetch = (global as any).fetch;
     const originalWindow = (global as any).window;
     const originalDocument = (global as any).document;
@@ -981,6 +936,7 @@ describe("FPB checkout cart-line properties", () => {
       location: { pathname: "/" },
       Shopify: {
         currency: { active: "USD", format: ["$", "{{amount}}"].join("") },
+        actions: { updateCart: fetchMock },
       },
     };
     (global as any).document = {
@@ -1081,9 +1037,7 @@ describe("FPB checkout cart-line properties", () => {
       (global as any).setTimeout = originalSetTimeout;
     }
 
-    const addRequest = fetchMock.mock.calls.find(([url]: any) => url === "/cart/add.js")!;
-    expect(addRequest).toBeDefined();
-    const body = JSON.parse(String(addRequest[1]?.body));
+    const body = { items: cartItemsFromUpdateCart(fetchMock) };
     const addonLine = body.items.find(
       (item: { properties: Record<string, string> }) =>
         item.properties._bundle_step_type === "addon:PERCENTAGE:100",
@@ -1096,7 +1050,7 @@ describe("FPB checkout cart-line properties", () => {
   });
 
   it("keeps Classic fixed bundle price cart lines eligible for cart-transform pricing", async () => {
-    const fetchMock = createCartAddFetchMock();
+    const fetchMock = createCartUpdateMock();
     const originalFetch = (global as any).fetch;
     const originalWindow = (global as any).window;
     const originalDocument = (global as any).document;
@@ -1107,6 +1061,7 @@ describe("FPB checkout cart-line properties", () => {
       location: { pathname: "/" },
       Shopify: {
         currency: { active: "USD", format: ["$", "{{amount}}"].join("") },
+        actions: { updateCart: fetchMock },
       },
     };
     (global as any).document = {
@@ -1206,9 +1161,7 @@ describe("FPB checkout cart-line properties", () => {
       (global as any).setTimeout = originalSetTimeout;
     }
 
-    const addRequest = fetchMock.mock.calls.find(([url]: any) => url === "/cart/add.js")!;
-    expect(addRequest).toBeDefined();
-    const body = JSON.parse(String(addRequest[1]?.body));
+    const body = { items: cartItemsFromUpdateCart(fetchMock) };
     expect(body.items).toHaveLength(2);
     expect(body.items.every((item: { properties: Record<string, string> }) =>
       item.properties._bundle_step_type === "fixed_price_display_only"

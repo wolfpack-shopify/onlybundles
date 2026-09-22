@@ -5,7 +5,7 @@ title: Admin Performance
 type: operations
 status: authoritative
 summary: Embedded Admin Web Vitals instrumentation, route-level LCP findings, and critical-path constraints.
-last_audited: 2026-09-14
+last_audited: 2026-09-23
 owners:
   - engineering
 domains:
@@ -27,6 +27,8 @@ source_paths:
   - app/routes/app/app.dashboard/route.tsx
   - app/routes/app/app.dashboard/DashboardPage.tsx
   - app/routes/app/app.dashboard/DashboardDeferredProxyHealthBanner.tsx
+  - app/routes/app/app.dashboard/DashboardCommercialMetrics.tsx
+  - app/services/analytics/dashboard-commercial-metrics.server.ts
   - app/routes/app/app.dashboard/dashboard-app-embed-presentation.ts
   - app/routes/app/app.dashboard/AppEmbedEnableModal.tsx
   - app/routes/app/app.bundles.full-page-bundle.configure.$bundleId/ConfigureBundleFlow.tsx
@@ -88,7 +90,7 @@ Measured in the Shopify Admin chrome on `agent-5sfidg3m` / SIT using
 
 | Route | Iframe LCP candidate / source-audited candidate | Fix status |
 |---|---|---|
-| `/app/dashboard` | Measured: support card description text | Render useful Dashboard content as soon as route data is available. Resolve proxy-health and App Embed status asynchronously in their owned warning surfaces; neither lookup may gate the whole workspace. Keep row action-menu content lazy until merchant intent because closed overlays are not Dashboard page content. Mount the app-embed tutorial media only after the merchant opens its instructional modal so the initial Dashboard route does not request either video source. |
+| `/app/dashboard` | Measured: support card description text | Render useful Dashboard content as soon as route data is available. Resolve proxy health, published-theme status, and 30-day commercial metrics asynchronously in their owned native surfaces; none may gate the bundle workspace. Keep row action-menu content lazy until merchant intent because closed overlays are not Dashboard page content. Mount the app-embed tutorial media only after the merchant opens its instructional modal so the initial Dashboard route does not request either video source. |
 | `/app/bundles/create` | Measured: bundle type thumbnail rendered via `/ppb.avif` | Preloaded in route `links()` and HTTP `Link`; adjacent `/fpb.avif` also preloaded. The thumbnail is now a CSS background with stable dimensions, and local candidate paint was under target. |
 | `/app/integrations` | Measured: text content | Remove the artificial 800ms readiness interval; the static integration catalog paints immediately. |
 | `/app/billing` | Source audit: no first-viewport owned image | No image preload fix |
@@ -103,6 +105,23 @@ Pages without first-viewport owned media should be treated as text/bootstrap-bou
 unless a future debug run logs an owned image candidate. For text LCP pages, do
 not add image preloads speculatively; focus on loader critical path and reducing
 first-render JavaScript instead.
+
+### Dashboard deferred status and metrics
+
+The dashboard paints its bundle workspace and support cards without awaiting
+commercial analytics. The 30-day metrics promise starts beside the required
+bundle query but resolves inside its own `Suspense`/`Await` boundary after the
+support cards. Order IDs are queried through Admin GraphQL in batches of at most
+250. Shopify MoneyBag shop and presentment subtotals normalize attributed bundle
+amounts into the shop currency; missing or mismatched money rejects the whole
+metrics boundary so the UI never displays a partial mixed-currency total.
+
+Published-theme extension status remains client-side because App Bridge
+`shopify.app.extensions()` is the canonical source. One shared hook owns the
+initial request and all refresh paths; the dashboard must not issue a parallel
+status check during mount. A fresh SIT route-level LCP measurement remains a
+release gate for this major Admin UI change, and any temporary debug bridge must
+be removed before shipping.
 
 ### Billing progressive first paint
 

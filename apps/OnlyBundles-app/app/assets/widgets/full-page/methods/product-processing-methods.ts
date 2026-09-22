@@ -1,5 +1,4 @@
 import { BUNDLE_WIDGET } from '../../shared/constants.js';
-import { sanitizeRichHtmlFragment } from '../../shared/rich-html.js';
 import { fetchStorefrontProductsUnified } from '../../shared/storefront-products-fetcher.js';
 
 function extractFullPageId(idString: any) {
@@ -137,8 +136,9 @@ function normalizeProductDescription(product: any) {
     : '';
   if (!htmlDescription || typeof document === 'undefined') return '';
 
-  const fragment = sanitizeRichHtmlFragment(htmlDescription, 'product-description');
-  return (fragment.textContent || '').trim();
+  const template = document.createElement('template');
+  template.innerHTML = htmlDescription;
+  return (template.content.textContent || '').trim();
 }
 
 function normalizeProductDescriptionHtml(product: any) {

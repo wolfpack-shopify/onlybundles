@@ -102,6 +102,7 @@ export function applyProductPageVariantSelection({
   variantData = {},
   productCard = null,
   formatPrice = null,
+  showCompareAtPrice = true,
 }: any = {}) {
   const nextVariantId = variantData.id || product.variantId || product.id;
   const nextVariantTitle = variantData.title && variantData.title !== 'Default Title'
@@ -145,7 +146,7 @@ export function applyProductPageVariantSelection({
 
   const compareEl = productCard.querySelector?.('.product-price-strike');
   if (compareEl) {
-    if (Number.isFinite(product.compareAtPrice) && typeof formatPrice === 'function') {
+    if (showCompareAtPrice && Number.isFinite(product.compareAtPrice) && typeof formatPrice === 'function') {
       compareEl.textContent = formatPrice(product.compareAtPrice);
     } else if (typeof compareEl.remove === 'function') {
       compareEl.remove();
@@ -450,6 +451,7 @@ renderModalProducts(stepIndex: string|number, productsToRender: any = null) {
         className: `${freeGiftCardClass} ${currentQuantity > 0 ? 'bw-product-card--selected' : ''} ${outOfStock ? 'is-out-of-stock' : ''}`.trim(),
         variantSelectorElement: this.renderVariantSelector(product, stepIndex, currentStep),
         stockBadgeElement,
+        showCompareAtPrice: this._getProductPageControls?.()?.showCompareAtPrices !== false,
         addButtonText: resolveProductPageCardButtonText({
           currentQuantity,
           currentStep,
@@ -629,6 +631,7 @@ attachProductEventHandlers(productGrid: any, stepIndex: string|number) {
               getSubscriptionProductCardPrice(this, amount),
               CurrencyManager.getCurrencyInfo(),
             ),
+            showCompareAtPrice: this._getProductPageControls?.()?.showCompareAtPrices !== false,
           });
 
           const isInpageProductGrid = newProductGrid.classList.contains('bw-ppb-grid-product-grid')

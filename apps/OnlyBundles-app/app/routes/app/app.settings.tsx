@@ -16,6 +16,7 @@ import {
   SETTINGS_CONTROLS_SCHEMA_VERSION,
   buildSettingsControlsFormValues,
   buildSettingsControlsRuntime,
+  validateSettingsControlScripts,
   type SettingsControlsRuntime,
 } from "../../lib/settings-controls-runtime";
 import {
@@ -32,6 +33,8 @@ import {
 } from "../../lib/settings-language-runtime";
 import { CartTransformService } from "../../services/cart-transform-service.server";
 import { syncPpbStorefrontRuntime } from "../../services/ppb-storefront-runtime.server";
+import { syncFpbStorefrontRuntime } from "../../services/fpb-storefront-runtime.server";
+import { syncStorefrontControlsRuntime } from "../../services/storefront-controls-runtime.server";
 import { buildFpbStorefrontUrl } from "../../lib/fpb-storefront-url";
 import { navigateBackOrFallback } from "../../lib/navigation";
 import {
@@ -289,7 +292,10 @@ export async function action({ request }: ActionFunctionArgs) {
 
     await prisma.$transaction(writes);
     try {
-      await syncPpbStorefrontRuntime(admin, session.shop);
+      await Promise.all([
+        syncPpbStorefrontRuntime(admin, session.shop),
+        syncFpbStorefrontRuntime(admin, session.shop),
+      ]);
     } catch (error: any) {
       return json(
         {
@@ -298,7 +304,7 @@ export async function action({ request }: ActionFunctionArgs) {
           persisted: true,
           runtimeSynced: false,
           savedState,
-          message: `Settings saved, but PPB storefront runtime sync failed: ${
+          message: `Settings saved, but storefront runtime sync failed: ${
             error instanceof Error ? error.message : "Unknown error"
           }`,
         },
@@ -371,7 +377,10 @@ export async function action({ request }: ActionFunctionArgs) {
 
     await prisma.$transaction(writes);
     try {
-      await syncPpbStorefrontRuntime(admin, session.shop);
+      await Promise.all([
+        syncPpbStorefrontRuntime(admin, session.shop),
+        syncFpbStorefrontRuntime(admin, session.shop),
+      ]);
     } catch (error: any) {
       return json(
         {
@@ -380,7 +389,7 @@ export async function action({ request }: ActionFunctionArgs) {
           persisted: true,
           runtimeSynced: false,
           savedState: payload,
-          message: `Settings saved, but PPB storefront runtime sync failed: ${
+          message: `Settings saved, but storefront runtime sync failed: ${
             error instanceof Error ? error.message : "Unknown error"
           }`,
         },
@@ -397,6 +406,15 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   if (intent === "saveSettingsControls") {
+    const fieldErrors = validateSettingsControlScripts(payload);
+    if (Object.keys(fieldErrors).length > 0) {
+      return json({
+        success: false,
+        intent,
+        fieldErrors,
+        savedState: payload,
+      }, { status: 422 });
+    }
     const controlsRuntime = buildSettingsControlsRuntime(payload);
 
     await Promise.all(
@@ -475,7 +493,10 @@ export async function action({ request }: ActionFunctionArgs) {
       );
     }
     try {
-      await syncPpbStorefrontRuntime(admin, session.shop);
+      await Promise.all([
+        syncPpbStorefrontRuntime(admin, session.shop),
+        syncStorefrontControlsRuntime(admin, session.shop, controlsRuntime.settingsControls),
+      ]);
     } catch (error: any) {
       return json(
         {

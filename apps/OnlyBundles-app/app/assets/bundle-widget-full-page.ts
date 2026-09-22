@@ -33,7 +33,6 @@ import { fullPageRuntimeCartSettingsMethods } from './widgets/full-page/methods/
 import { fullPageTierFloatingRuntimeMethods } from './widgets/full-page/methods/tier-floating-runtime-methods.js';
 import { fullPageUpsellHandoffMethods } from './widgets/full-page/methods/upsell-handoff-methods.js';
 import { claimFullPageWidgetInitialization } from './widgets/full-page/initialization-guard.js';
-import { BundleProductModal } from './bundle-modal-component.js';
 import { renderBundlePurchaseOptions } from './widgets/shared/components/purchase-options.js';
 import { bundleSubscriptionStorefrontMethods } from './widgets/shared/subscription-storefront-methods.js';
 import { installDiscountTierPillFeedback } from './widgets/shared/discount-tier-feedback.js';
@@ -95,9 +94,7 @@ export class BundleWidgetFullPage {
     this.tierConfig = [];
     this.activeTierIndex = 0;
 
-    // Initialize product modal (if BundleProductModal is available)
     this.productModal = null;
-    this.productModal = new BundleProductModal(this);
 
     // Call async init but don't block constructor
     this.init().catch(error => {

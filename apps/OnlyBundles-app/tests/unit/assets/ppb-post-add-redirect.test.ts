@@ -12,7 +12,6 @@ function makeContext(productPageControls: Record<string, any> = {}) {
     },
     _getProductPageControls: ProductPageConfigLifecycleMethods._getProductPageControls,
     _runControlsScript: ProductPageConfigLifecycleMethods._runControlsScript,
-    _refreshConfiguredCartSection: jest.fn(async () => false),
   };
 }
 
@@ -29,6 +28,7 @@ describe('Product Page post-add redirect handling', () => {
     jest.useFakeTimers();
     (global as any).window = {
       location: { href: 'https://example.test/products/test-bundle' },
+      Shopify: { routes: { root: '/' }, actions: { openCart: jest.fn(async () => undefined) } },
     };
     (global as any).document = {
       querySelector: jest.fn(),
@@ -69,44 +69,30 @@ describe('Product Page post-add redirect handling', () => {
     expect(currentPathname()).toBe('/cart');
   });
 
-  it('clicks the configured side-cart trigger when the saved Product Page redirect mode is side_cart', async () => {
-    const clickSpy = jest.fn();
-    (global as any).document.querySelector.mockReturnValue({ click: clickSpy });
-
+  it('keeps the product page open when the saved Product Page redirect mode is stay', async () => {
     await ProductPageConfigLifecycleMethods._handlePostAddToCartAction.call(
       makeContext(),
       {
-        action: 'side_cart',
-        selectors: { sideCartOpenButton: '.open-cart' },
+        action: 'stay',
       },
     );
+    jest.advanceTimersByTime(1000);
 
-    jest.advanceTimersByTime(300);
-
-    expect(clickSpy).toHaveBeenCalledTimes(1);
-    expect((global as any).document.querySelector).toHaveBeenCalledWith('.open-cart');
+    expect((global as any).window.Shopify.actions.openCart).not.toHaveBeenCalled();
+    expect((global as any).document.querySelector).not.toHaveBeenCalled();
     expect(currentPathname()).toBe('/products/test-bundle');
   });
 
-  it('uses Shopify standard actions before selector-based side-cart handling', async () => {
-    const updateCart = jest.fn(async () => ({ cart: { id: 'cart-1' } }));
-    const openCart = jest.fn(async () => undefined);
-    (global as any).window.Shopify = {
-      actions: {
-        updateCart,
-        openCart,
-      },
-    };
-
+  it('defaults to staying on the product page without opening the cart', async () => {
     await ProductPageConfigLifecycleMethods._handlePostAddToCartAction.call(
       makeContext(),
-      { action: 'side_cart' },
+      {},
       'ppb-session-1',
     );
+    jest.advanceTimersByTime(1000);
 
-    expect(updateCart).toHaveBeenCalledTimes(1);
-    expect(openCart).toHaveBeenCalledTimes(1);
-    expect((global as any).document.querySelector).not.toHaveBeenCalled();
+    expect((global as any).window.Shopify.actions.openCart).not.toHaveBeenCalled();
+    expect(currentPathname()).toBe('/products/test-bundle');
   });
 
   it('runs only the redirect script during the post-add action', async () => {
@@ -141,17 +127,5 @@ describe('Product Page post-add redirect handling', () => {
     expect((global as any).window.__ppbCustomScript).toBe(1);
   });
 
-  it('refreshes configured side-cart markup before opening it', async () => {
-    const context = makeContext({ selectors: { sideCartOpenButton: '.open-cart' } });
-    context._refreshConfiguredCartSection.mockResolvedValue(true);
-    (global as any).document.querySelector.mockReturnValue({ click: jest.fn() });
-
-    await ProductPageConfigLifecycleMethods._handlePostAddToCartAction.call(
-      context,
-      { action: 'side_cart' },
-    );
-
-    expect(context._refreshConfiguredCartSection).toHaveBeenCalledWith('side_cart');
-  });
 });
 export {};

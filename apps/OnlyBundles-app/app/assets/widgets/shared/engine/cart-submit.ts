@@ -76,50 +76,6 @@ export function applySellingPlanToJsonCartItems(items: any[] = [], sellingPlanId
   });
 }
 
-export function buildProductPageCartFormData(cartItems: any[] = [], {
-  bundleName = '',
-  offerId = '',
-  sessionKey = '',
-  sellingPlanId = '',
-}: any = {}) {
-  const formData = new FormData();
-  const cartSellingPlanId = normalizeSellingPlanIdForCart(sellingPlanId);
-
-  cartItems.forEach((item, index) => {
-    const itemNumber = index + 1;
-    formData.append(`items[${index}][id]`, String(item.id));
-    formData.append(`items[${index}][quantity]`, String(item.quantity));
-    if (sellingPlanId) {
-      formData.append(`items[${index}][selling_plan]`, cartSellingPlanId);
-    }
-
-    Object.entries(item.properties || {}).forEach(([key, value]: any) => {
-      if (value === undefined || value === null) return;
-      formData.append(`items[${index}][properties][${key}]`, String(value));
-    });
-    formData.append(`items[${index}][properties][_bundleName]`, bundleName);
-    formData.append(`items[${index}][properties][_wolfpackProductBundle:OfferId]`, `${offerId}_${sessionKey}_${itemNumber}`);
-    formData.append(`items[${index}][properties][_wolfpackProductBundle:prodQty]`, String(item.quantity));
-    const rawDisplayProps = item?.properties?._bundle_display_properties;
-    if (rawDisplayProps) {
-      try {
-        const parsed = typeof rawDisplayProps === 'string' ? JSON.parse(rawDisplayProps) : rawDisplayProps;
-        if (parsed?.tierProgress) {
-          formData.append(`items[${index}][properties][_bundle_tier_progress]`, JSON.stringify(parsed.tierProgress));
-        }
-      } catch {
-        // Safe bypass
-      }
-    }
-  });
-
-  return {
-    formData,
-    sourceProperties: extractBundleDetailsSourceProperties(cartItems),
-  };
-}
-
-
 /** Buyer choices only. Shopify Functions resolve every rule from app-owned metafields. */
 export function buildBundleSelectionProperties(input: { bundleId: string; revision: string; instanceId: string; groupId: string }) {
   const { bundleId, revision, instanceId, groupId } = input;

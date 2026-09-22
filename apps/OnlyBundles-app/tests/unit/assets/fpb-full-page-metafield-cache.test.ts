@@ -26,7 +26,7 @@ describe('FPB full-page metafield cache', () => {
     jest.restoreAllMocks();
   });
 
-  it('uses a complete app-proxy document payload without fetching bundle JSON', async () => {
+  it('uses a complete Shopify Storefront snapshot without fetching bundle JSON', async () => {
     const proxyBundle = {
       id: 'bundle-1',
       bundleType: 'full_page',
@@ -36,16 +36,16 @@ describe('FPB full-page metafield cache', () => {
       pricing: { discountType: 'percentage', discountValue: 10 },
     };
     const fetchSpy = jest.spyOn(global, 'fetch' as any);
-    const widget = makeWidgetContext(proxyBundle, 'app_proxy');
+    const widget = makeWidgetContext(proxyBundle, 'shopify_storefront');
 
     await widget.loadBundleData();
 
     expect(widget.bundleData).toEqual({ 'bundle-1': proxyBundle });
-    expect(widget._bundleConfigCacheMode).toBe('app-proxy-inline');
+    expect(widget._bundleConfigCacheMode).toBe('shopify-storefront-inline');
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('uses the app proxy when an untrusted full payload is present', async () => {
+  it('fails closed without fetching when an untrusted full payload is present', async () => {
     const cachedBundle = {
       id: 'bundle-1',
       bundleType: 'full_page',
@@ -53,37 +53,16 @@ describe('FPB full-page metafield cache', () => {
       name: 'Daily Essentials',
       steps: [{ id: 'step-1', name: 'Choose Products', products: [] }],
     };
-    const currentBundle = {
-      id: 'bundle-1',
-      bundleType: 'full_page',
-      bundleDesignPresetId: 'CLASSIC',
-      name: 'Daily Essentials',
-      steps: [{ id: 'step-1', name: 'Full Size Earrings With A Very Long Classic Pill Label', products: [] }],
-    };
-    const fetchSpy = jest.spyOn(global, 'fetch' as any).mockResolvedValue({
-      ok: true,
-      json: async () => ({ success: true, bundle: currentBundle }),
-    });
+    const fetchSpy = jest.spyOn(global, 'fetch' as any);
     const widget = makeWidgetContext(cachedBundle);
 
-    await widget.loadBundleData();
+    await expect(widget.loadBundleData()).rejects.toThrow('authoritative Shopify snapshot');
 
-    expect(widget.bundleData).toEqual({ 'bundle-1': currentBundle });
-    expect(widget._bundleConfigCacheMode).toBe('proxy');
-    expect(fetchSpy).toHaveBeenCalledWith('/apps/product-bundles/api/bundle/bundle-1.json?country=CA');
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('hydrates through the app proxy when the cached payload is only a bootstrap pointer', async () => {
-    const hydratedBundle = {
-      id: 'bundle-1',
-      bundleType: 'full_page',
-      name: 'Daily Essentials',
-      steps: [],
-    };
-    const fetchSpy = jest.spyOn(global, 'fetch' as any).mockResolvedValue({
-      ok: true,
-      json: async () => ({ success: true, bundle: hydratedBundle }),
-    });
+  it('rejects a bootstrap pointer without an API fallback', async () => {
+    const fetchSpy = jest.spyOn(global, 'fetch' as any);
     const widget = makeWidgetContext({
       v: 2,
       type: 'full_page',
@@ -91,11 +70,9 @@ describe('FPB full-page metafield cache', () => {
       id: 'bundle-1',
     });
 
-    await widget.loadBundleData();
+    await expect(widget.loadBundleData()).rejects.toThrow('authoritative Shopify snapshot');
 
-    expect(widget.bundleData).toEqual({ 'bundle-1': hydratedBundle });
-    expect(widget._bundleConfigCacheMode).toBe('proxy');
-    expect(fetchSpy).toHaveBeenCalledWith('/apps/product-bundles/api/bundle/bundle-1.json?country=CA');
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
 });

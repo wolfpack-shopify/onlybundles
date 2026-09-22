@@ -103,6 +103,7 @@ describe("recovered admin surfaces contract", () => {
       "Hide Out Of Stock Products",
       "Track inventory on Add To Cart (in beta)",
       "Add bundle to cart after the last step is completed",
+      "Show Compare-at Prices",
       "Display empty state boxes based on bundle condition",
       "Hide Step Titles in completed state",
       "Add to cart when product card is clicked",
@@ -123,6 +124,7 @@ describe("recovered admin surfaces contract", () => {
       "Bundle Settings",
       "Bundle Settings",
       "Bundle Settings",
+      "Bundle Settings",
       "Cart Messaging",
       "Cart Messaging",
       "Cart Messaging",
@@ -135,20 +137,10 @@ describe("recovered admin surfaces contract", () => {
     expect(productPageCss?.fields.map((field) => field.label)).toEqual([
       "Custom CSS for Mix And Match Bundles",
       "Execute Custom Script",
-      "Side cart selector",
-      "Side cart section ID",
-      "Cart page items selector",
-      "Cart page items section ID",
-      "Side cart open button selector",
       "Product page price selector",
     ]);
     expect(productPageCss?.fields.map((field) => field.group)).toEqual([
       "CSS",
-      "JavaScript & Selectors",
-      "JavaScript & Selectors",
-      "JavaScript & Selectors",
-      "JavaScript & Selectors",
-      "JavaScript & Selectors",
       "JavaScript & Selectors",
       "JavaScript & Selectors",
     ]);
@@ -159,6 +151,7 @@ describe("recovered admin surfaces contract", () => {
     expect(landingConfiguration?.fields.map((field) => field.label)).toEqual([
       "Hide Irrelevant variant images",
       "Track inventory on Add To Cart (in beta)",
+      "Show Compare-at Prices",
       "Redirect Collection Page 'Quick Add' to Bundle",
       "Cart Messaging",
       "Bundle Items",
@@ -176,6 +169,7 @@ describe("recovered admin surfaces contract", () => {
       "Percentage only (Eg: \"You save 19%\")",
     ]);
     expect(landingConfiguration?.fields.map((field) => field.group)).toEqual([
+      "Bundle Settings",
       "Bundle Settings",
       "Bundle Settings",
       "Bundle Settings",

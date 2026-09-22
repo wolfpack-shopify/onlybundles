@@ -5,7 +5,7 @@ title: Polaris App Home Web Components Reference
 type: reference
 status: authoritative
 summary: Canonical source for Polaris web component usage and durable design decisions in the Wolfpack admin UI, with Shopify App Home web components as the source of truth.
-last_audited: 2026-09-12
+last_audited: 2026-09-23
 owners:
   - engineering
 domains:
@@ -22,6 +22,8 @@ source_paths:
   - app/routes/app/app.bundles.create/BundleTypeSelectionCard.tsx
   - app/routes/app/app.bundles.create/route.tsx
   - app/routes/app/app.dashboard/DashboardActionModals.tsx
+  - app/routes/app/app.dashboard/DashboardStatusGrid.tsx
+  - app/routes/app/app.dashboard/DashboardCommercialMetrics.tsx
   - app/routes/app/app.attribution/AttributionDateRangeControls.tsx
   - app/routes/app/shared/CountryTargetingSection.tsx
   - app/routes/app/_shared/bundle-configure/CommonConfigureShell.tsx
@@ -62,6 +64,8 @@ When implementing or auditing admin-facing UI in this repo, treat that documenta
   non-interactive. Do not nest an `s-button`, link, or second clickable inside
   it. Use an `s-button` instead when only the compact command should activate.
 - Use component props from the official App Home reference as canonical for rendering behavior.
+- Use Shopify's metrics-card composition for compact dashboard KPIs: one native `s-section`, a responsive `s-grid`, `s-clickable` metric cells, and `s-divider` separators. The entire metric cell owns navigation; do not nest another action inside it. For programmatic routes inside the embedded app, follow Shopify's Navigation API with `open(relativePath, "_self")` rather than emitting an iframe-relative clickable `href`, which can leave the embedded navigation context and reach Shopify authentication.
+- For a durable resource-status surface, keep all known resources visible, group them by Shopify extension kind, and use `s-badge` tones to preserve platform state semantics. A named `s-query-container` must own the responsive props. Use an equal-width responsive `s-grid` for the app-embed and app-block columns, with a denser two-column grid inside the app-block column; collapse both grids in narrow containers. Polaris responsive track values use simple explicit tracks (`1fr auto`, `1fr 1fr`): do not put comma-bearing `minmax()` or `repeat()` expressions inside the responsive prop because the parser can resolve them to the single-column branch. In compact resource tiles, use a native two-row grid with the status badge in an end-aligned trailing row so wrapped labels do not displace the status. Keep Theme Editor and refresh actions at the top-right with Polaris's `edit` and `refresh` icons. The Theme Editor action deep-links to the published theme's app-embed options, while instructional activation remains in the app-embed column that owns it. Loading and errors remain native `s-spinner` and `s-banner` states.
 - For status/feedback, treat `tone`, `color`, and `variant` values from the reference as authoritative and map them directly to components instead of inventing alternative visual tokens.
 - Use `commandFor` with `s-popover`, `s-menu`, and `s-modal` so Shopify owns
   opening, dismissal, focus, and keyboard behavior. Do not add document-level

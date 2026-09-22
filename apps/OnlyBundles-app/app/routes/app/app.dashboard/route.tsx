@@ -27,6 +27,7 @@ import { DashboardPage } from "./DashboardPage";
 import { getDashboardInitialImagePreloads } from "./dashboard-media-state";
 import { queueDashboardBackgroundTask } from "./dashboard-background-tasks.server";
 import { buildStorefrontApiPath } from "../../../config/storefront-proxy-routes";
+import { loadDashboardCommercialMetrics } from "../../../services/analytics/dashboard-commercial-metrics.server";
 
 /**
  * Preload first-viewport dashboard images via real
@@ -143,6 +144,10 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       orderBy: { createdAt: "desc" },
     })
   );
+  const commercialMetrics = loadDashboardCommercialMetrics({
+    admin,
+    shopId: session.shop,
+  });
 
   const apiKey = process.env.SHOPIFY_API_KEY || "";
   const bundles = await bundlesPromise;
@@ -302,6 +307,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
       apiKey,
       appUrl,
       banners,
+      commercialMetrics,
     },
     { headers: timing.toHeaders() }
   );
@@ -339,7 +345,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 };
 
 export default function Dashboard() {
-  const { banners } = useLoaderData<typeof loader>();
+  const { banners, commercialMetrics } = useLoaderData<typeof loader>();
 
-  return <DashboardPage banners={banners} />;
+  return (
+    <DashboardPage
+      banners={banners}
+      commercialMetrics={commercialMetrics}
+    />
+  );
 }

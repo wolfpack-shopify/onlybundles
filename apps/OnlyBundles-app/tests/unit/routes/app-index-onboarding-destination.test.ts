@@ -1,5 +1,6 @@
 import {
   default as AppIndex,
+  APP_SPLASH_SESSION_KEY,
   AppRouteLoadingWorkspace,
   getInitialAppDestination,
 } from "../../../app/routes/app/app._index";
@@ -11,14 +12,8 @@ import { createRoot, type Root } from "react-dom/client";
 import { JSDOM } from "jsdom";
 
 const navigate = jest.fn();
-const openSupportChat = jest.fn();
-
 jest.mock("@remix-run/react", () => ({
   useNavigate: () => navigate,
-}));
-
-jest.mock("../../../app/lib/support-chat.client", () => ({
-  openSupportChat: () => openSupportChat(),
 }));
 
 jest.mock("react-i18next", () => ({
@@ -50,7 +45,7 @@ describe("initial app destination", () => {
       IS_REACT_ACT_ENVIRONMENT: true,
     });
     navigate.mockReset();
-    openSupportChat.mockReset();
+    window.sessionStorage.clear();
     window.history.replaceState({}, "", "/app");
     container = document.createElement("div");
     document.body.appendChild(container);
@@ -62,11 +57,11 @@ describe("initial app destination", () => {
     container.remove();
   });
 
-  it("opens the dashboard for every authenticated app entry", () => {
+  it("opens the dashboard after the splash has been seen in this Admin tab", () => {
     expect(getInitialAppDestination(true)).toBe("/app/dashboard");
   });
 
-  it("keeps intentional app-home visits on the landing page", () => {
+  it("keeps the first app entry on the splash screen", () => {
     expect(getInitialAppDestination(false)).toBeNull();
   });
 
@@ -78,7 +73,7 @@ describe("initial app destination", () => {
     expect(markup).toContain("Loading your workspace");
   });
 
-  it("delegates app-home creation and support actions", async () => {
+  it("shows the branded splash on first entry and opens the dashboard", async () => {
     flushSync(() => {
       root.render(React.createElement(AppIndex));
     });
@@ -86,22 +81,38 @@ describe("initial app destination", () => {
       await Promise.resolve();
     });
 
-    const actions = Array.from(
+    expect(container.textContent).toContain("Only Bundles");
+    expect(container.textContent).toContain(
+      "Boost sales and average order value with customizable bundles.",
+    );
+    expect(container.textContent).toContain("Take me to my dashboard");
+    expect(window.sessionStorage.getItem(APP_SPLASH_SESSION_KEY)).toBe("seen");
+    expect(navigate).not.toHaveBeenCalled();
+
+    const dashboardButton = Array.from(
       container.querySelectorAll<HTMLElement>("button, s-button"),
-    );
-    const createBundle = actions.find((action) =>
-      action.textContent?.includes("Get Started"),
-    );
-    const contactSupport = actions.find((action) =>
-      action.textContent?.includes("Contact Support"),
+    ).find((action) =>
+      action.textContent?.includes("Take me to my dashboard"),
     );
 
     flushSync(() => {
-      createBundle?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-      contactSupport?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      dashboardButton?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     });
 
-    expect(navigate).toHaveBeenCalledWith("/app/bundles/create");
-    expect(openSupportChat).toHaveBeenCalledTimes(1);
+    expect(navigate).toHaveBeenCalledWith("/app/dashboard");
+  });
+
+  it("routes later app-name visits straight to the dashboard", async () => {
+    window.sessionStorage.setItem(APP_SPLASH_SESSION_KEY, "seen");
+
+    flushSync(() => {
+      root.render(React.createElement(AppIndex));
+    });
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(navigate).toHaveBeenCalledWith("/app/dashboard", { replace: true });
+    expect(container.textContent).not.toContain("Take me to my dashboard");
   });
 });

@@ -3,6 +3,7 @@ const findUnique = jest.fn();
 const upsert = jest.fn();
 const syncCartLineMessagingSettings = jest.fn();
 const syncPpbStorefrontRuntime = jest.fn();
+const syncStorefrontControlsRuntime = jest.fn();
 
 jest.mock("../../../app/shopify.server", () => ({ authenticate: { admin: requireAdminSession } }));
 jest.mock("../../../app/db.server", () => ({
@@ -15,6 +16,7 @@ jest.mock("../../../app/services/cart-transform-service.server", () => ({
   CartTransformService: { syncCartLineMessagingSettings },
 }));
 jest.mock("../../../app/services/ppb-storefront-runtime.server", () => ({ syncPpbStorefrontRuntime }));
+jest.mock("../../../app/services/storefront-controls-runtime.server", () => ({ syncStorefrontControlsRuntime }));
 
 // eslint-disable-next-line import/first
 import { action } from "../../../app/routes/app/app.settings";
@@ -38,6 +40,7 @@ describe("Settings Controls action", () => {
     upsert.mockResolvedValue({});
     syncCartLineMessagingSettings.mockResolvedValue({ success: true });
     syncPpbStorefrontRuntime.mockResolvedValue({});
+    syncStorefrontControlsRuntime.mockResolvedValue({});
   });
 
   it("writes the canonical contract to both bundle types and removes label-keyed state", async () => {
@@ -54,7 +57,7 @@ describe("Settings Controls action", () => {
     expect(upsert).toHaveBeenCalledTimes(2);
     for (const [write] of upsert.mock.calls) {
       expect(write.update.generalSettings.settingsControls).toMatchObject({
-        schemaVersion: 1,
+        schemaVersion: 2,
         shared: { cartMessaging: expect.any(Object) },
         landingPage: { checkout: { providerId: "upcart" } },
       });
@@ -66,6 +69,35 @@ describe("Settings Controls action", () => {
       expect.objectContaining({ isEnabled: true }),
     );
     expect(syncPpbStorefrontRuntime).toHaveBeenCalledWith({}, "shop.test");
+    expect(syncStorefrontControlsRuntime).toHaveBeenCalledWith(
+      {},
+      "shop.test",
+      expect.objectContaining({ schemaVersion: 2 }),
+    );
+  });
+
+  it("rejects invalid scripts before any persistence or storefront synchronization", async () => {
+    const response = await action({
+      request: requestFor({
+        "landingPage.scripts.bundlePage": "if (",
+      }),
+      params: {},
+      context: {},
+    } as never);
+    const body = await response.json();
+
+    expect(response.status).toBe(422);
+    expect(body).toMatchObject({
+      success: false,
+      intent: "saveSettingsControls",
+      fieldErrors: {
+        "landingPage.scripts.bundlePage": expect.any(String),
+      },
+    });
+    expect(upsert).not.toHaveBeenCalled();
+    expect(syncCartLineMessagingSettings).not.toHaveBeenCalled();
+    expect(syncPpbStorefrontRuntime).not.toHaveBeenCalled();
+    expect(syncStorefrontControlsRuntime).not.toHaveBeenCalled();
   });
 
   it("reports persisted Controls state when downstream cart synchronization fails", async () => {

@@ -137,6 +137,12 @@
       "saveError": "Unable to save Admin language"
     },
     "storefrontSetup": {
+      "sectionHeading": "Storefront status",
+      "publishedThemeDescription": "Published theme app embeds and blocks",
+      "appEmbedsHeading": "App embeds",
+      "appBlocksHeading": "Theme app blocks",
+      "refresh": "Refresh status",
+      "retry": "Try again",
       "loadingTitle": "Checking storefront setup",
       "loadingDescription": "Checking your published theme components and app embed.",
       "errorTitle": "Storefront status needs attention",
@@ -185,7 +191,27 @@
         "enabled": "Enabled",
         "ready": "Ready to enable",
         "unavailable": "Not available"
+      },
+      "resourceLabels": {
+        "bundleAppEmbed": "Bundle storefront features",
+        "bundleProductPage": "Product page bundle builder",
+        "bundleProductPageEmbed": "Product page bundle placement",
+        "bundlePageBuilderEmbed": "Page builder bundle placement",
+        "bundleUpsell": "Full page bundle upsell"
       }
+    },
+    "commercialMetrics": {
+      "heading": "Bundle performance",
+      "description": "Last {{days}} days in {{currency}}",
+      "bundleRevenue": "Bundle revenue",
+      "ordersWithBundles": "Orders with bundles",
+      "averageOrderValue": "Average order value",
+      "viewToOrderConversion": "View-to-order conversion",
+      "unavailable": "Not available",
+      "loading": "Loading bundle performance",
+      "errorHeading": "Bundle performance unavailable",
+      "errorDescription": "We couldn't load these metrics from Shopify.",
+      "retry": "Try again"
     }
   },
   "settingsDcp": {
@@ -1159,6 +1185,8 @@
       "theCompleteBundleSolutionForShopifyBuildCustomizeAndPromoteProdu": "The complete bundle solution for Shopify — build, customize, and promote product bundles that convert.",
       "getStarted": "✦ Get Started",
       "goToDashboard": "Go to Dashboard →",
+      "takeMeToMyDashboard": "Take me to my dashboard",
+      "valueStatement": "Boost sales and average order value with customizable bundles.",
       "everythingIncluded": "Everything included",
       "documentation": "Documentation"
     },
@@ -1490,6 +1518,7 @@
     }
   },
   "adminAttributes": {
+    "invalidJavaScriptSyntax": "Fix the JavaScript syntax before saving.",
     "searchCampaigns": "Search campaigns",
     "searchByCampaignName": "Search by campaign name",
     "sortTopCampaigns": "Sort top campaigns",
@@ -1759,7 +1788,6 @@
     "backgroundColorForUpsellButtons": "Background color for upsell buttons",
     "backgroundColorOfIndividualProductCards": "Background color of individual product cards",
     "backgroundColorOfTheFullPageBundleLoadingScreen": "Background color of the full-page bundle loading screen.",
-    "backgroundColorShownWhileEitherBundleTypeIsLoading": "Background color shown while either bundle type is loading.",
     "base": "Base",
     "basicBundleConfiguration": "Basic bundle configuration",
     "blockForHidingQtySelectorAndOverwritingRemoveButtonFor": "Block for Hiding Qty Selector and Overwriting Remove Button for Bundle Products in Cart: Prevents individual quantity increase for bundle items and enforces removal of all bundle products if one is removed",
@@ -1876,7 +1904,6 @@
     "executeDefaultSideCartUpdate": "Execute Default Side Cart Update",
     "executeScript": "Execute Script",
     "fpbLoadingGIF": "FPB Loading GIF",
-    "loadingGIF": "Loading GIF",
     "fill": "Fill",
     "fillColorForCompletedPartOfDiscountProgressBar": "Fill color for completed part of discount progress bar",
     "fillColorForEmptyPartOfDiscountProgressBar": "Fill color for empty part of discount progress bar",
@@ -1907,7 +1934,6 @@
     "hungarian": "Hungarian",
     "imageFit": "Image Fit",
     "imageFitSlotIconAndFullPageBundleLoadingScreen": "Image-fit, slot icon, and full-page bundle loading screen controls.",
-    "imageFitSlotIconAndBundleLoadingScreenControls": "Image-fit, slot icon, and bundle loading screen controls.",
     "imagesGIFs": "Images & GIFs",
     "imagesAndGIFsConfigureProductImageFitPlusLoadingMedia": "Images and GIFs configure product image fit plus loading media for bundle and checkout states.",
     "inactiveTabBackgroundColor": "Inactive Tab Background Color",
@@ -1956,7 +1982,6 @@
     "noteByDefaultYourStorefrontThemeFontWillBePicked": "Note: By default, your storefront theme font will be picked.",
     "noteThisSectionIsOnlyForDevelopers": "Note: This section is only for developers.",
     "optionalGIFDisplayedInsteadOfTheDefaultSpinnerOnThe": "Optional GIF displayed instead of the default spinner on the full-page bundle loading screen.",
-    "optionalGIFDisplayedInsteadOfTheDefaultSpinnerWhileEither": "Optional GIF displayed instead of the default spinner while either bundle type is loading.",
     "optionalImageDisplayedInEmptyFPBAndPPBProductSlots": "Optional image displayed in empty FPB and PPB product slots.",
     "originalBundlePrice": "Original Bundle Price",
     "pageBuilders": "Page Builders",

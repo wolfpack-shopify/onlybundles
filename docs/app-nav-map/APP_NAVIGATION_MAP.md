@@ -5,7 +5,7 @@ title: Wolfpack Product Bundles App Navigation and UI Map
 type: navigation-map
 status: authoritative
 summary: Routes, screens, actions, modals, and storefront-preview flows for the embedded app.
-last_audited: 2026-09-19
+last_audited: 2026-09-23
 owners:
   - engineering
 domains:
@@ -30,12 +30,12 @@ keywords:
 > Any time a new page, modal, tab, sidebar section, or user flow is added or removed,
 > this document **must** be updated. See CLAUDE.md for the enforcement rule.
 
-**Last Updated:** 2026-09-12
+**Last Updated:** 2026-09-23
 **Environment mapped:** SIT (`wolfpack-product-bundles-sit`)
 **Test store:** `wolfpack-store-test-1.myshopify.com`
 
 All merchant-facing Admin pages expose both the Shopify Admin breadcrumb and an
-app-owned back arrow. Dashboard, the `/app` welcome/auth entry point, billing
+app-owned back arrow. Dashboard, the `/app` splash/home entry point, billing
 callbacks, and resource/API routes are excluded. Both controls share the same
 page callback so configure and Settings dirty-state guards cannot be bypassed.
 The public root `/` preserves its query string and redirects to `/app`; the
@@ -48,26 +48,27 @@ authenticated app layout owns Admin authentication.
 The app runs inside the Shopify Admin embedded iframe. The outer Shopify Admin shell
 provides a persistent left-nav with the app's registered nav items.
 
-The authenticated `/app` entry renders a stable route-shaped loading shell while
-client-side auth parameters resolve. Authenticated shops continue to the dashboard
-without exposing a blank iframe. First-create guidance begins only after a successful
-bundle creation.
+Shopify's app name owns the `/app` home link. The first `/app` entry in an Admin
+tab renders a native Only Bundles splash; later app-name visits in that tab
+replace-route to the dashboard. The app registers only true sub-navigation items,
+so Dashboard is not duplicated beneath the app name. First-create guidance begins
+only after a successful bundle creation.
 
 Destination flow:
 
 ```
-/app with Shopify auth parameters
-└── /app/dashboard
+first /app entry in an Admin tab
+└── native Only Bundles splash
+    └── [Take me to my dashboard]  → /app/dashboard
 
-/app without auth parameters       → intentional app landing
-└── [Get Started]                   → /app/bundles/create
+later /app entry in the same tab   → /app/dashboard
 ```
 
 ### Shopify Admin Left Nav (app section)
 
 ```
 Wolfpack Bundles SIT
-├── [root]              → /app/dashboard          (Dashboard)
+├── [app name / home]   → /app                    (first-entry splash, then Dashboard)
 ├── Settings            → /app/settings
 ├── Integrations        → /app/integrations
 ├── Analytics           → /app/attribution
@@ -111,9 +112,6 @@ Dashboard
 ├── [Bell] "What’s new" → Canny changelog popup, immediately right of Create Bundle
 ├── Language selector → persists one shop-wide embedded Admin UI language for all staff accounts on change
 ├── Metrics: active bundle count
-├── Storefront setup card → action-first core readiness and active-bundle summary
-│   └── [Finish setup / View details] → Storefront setup modal
-│       └── current theme blocks/embeds with Theme Editor action when needed
 ├── Section: "Your Bundles"
 │   ├── Visible Status and Type filters → native selects in one inline row
 │   └── DataTable of bundles (empty state if none exist)
@@ -125,6 +123,14 @@ Dashboard
 │           └── [Button] "Delete" → opens Delete Confirmation Modal
 ├── Existing founder support card → direct support chat
 ├── Existing support issues card → feature/storefront/uninstall help and direct support chat
+├── Storefront status → persistent published-theme status for all five app resources
+│   ├── App embeds → Bundle storefront features + Theme Editor enable flow when inactive
+│   ├── Theme app blocks → Product page bundle builder, product page bundle placement,
+│   │   page builder bundle placement, and full page bundle upsell
+│   ├── [Theme Editor] → published theme editor with app-embed options visible
+│   └── [Refresh status] → rechecks shopify.app.extensions()
+├── Bundle performance → deferred 30-day shop-currency metrics
+│   └── Bundle revenue, orders with bundles, AOV, and view-to-order conversion → /app/attribution
 ├── Global Crisp launcher → visible on desktop and mobile; explicit support actions load and open chat immediately
 ├── Resources
 │   ├── Bundle Inspiration → selects the gallery preview panel
@@ -144,12 +150,13 @@ Dashboard
 Dashboard preview behavior:
 
 - Product-page bundle preview opens `/products/{shopifyProductHandle}`.
-- Every full-page bundle preview requests a new 15-minute signed `wpb_preview` URL on each click; active and unlisted bundles remain publicly accessible at the canonical URL without the token.
+- Every full-page bundle preview requests a new one-hour signed `wpb_preview` URL on each click; active and unlisted bundles remain publicly accessible at the canonical URL without the token.
 - First successful preview records the Admin `bundle_previewed` event with bundle id, type, status, and link.
 - The bundle table uses Polaris automatic table/list presentation: desktop keeps Name, Status, Type, and Actions columns, while phone containers expose the same record fields and row actions as a stacked list.
-- Core bundle work stays above support and education content: create actions, unresolved storefront setup, filters, and bundle actions render before the support cards.
-- The App Embed Status banner can be dismissed with its close control for the current dashboard mount.
-- The warning-state Enable action opens the App Embed Enable modal; it does not navigate or mark the embed active by itself.
+- Core bundle work stays above support and education content: create actions, filters, and bundle actions render before the support cards.
+- The persistent Storefront status section appears immediately after the support cards, reports Shopify's published-theme state for every known embed and block, and cannot be dismissed.
+- The inactive App Embed Enable action opens the App Embed Enable modal; it does not navigate or mark the embed active by itself.
+- The 30-day performance section streams after the status section. Money is normalized from Shopify MoneyBag presentment/shop amounts into the shop currency; incomplete conversion data fails the whole section rather than mixing currencies.
 
 App Embed Enable modal:
 
@@ -163,7 +170,7 @@ App Embed Enable
 
 The Theme Editor action uses the existing `activateAppId` deep link. Focus and
 visibility returns are deduplicated into one `shopify.app.extensions()` check;
-only a confirmed active `bundle-app-embed` changes the banner to success.
+only a confirmed active `bundle-app-embed` changes its resource row to enabled.
 
 #### "Create Bundle" Button
 
@@ -311,16 +318,20 @@ Dedicated Controls workspace:
 Additional Configurations
 ├── Landing Page Layout
 │   ├── Configuration
+│   │   └── Show Compare-at Prices (default on)
 │   ├── CSS & Scripts
 │   └── Integrations
 └── Product Page Layout
     ├── Configuration
+    │   └── Show Compare-at Prices (default on)
     └── CSS & Scripts
 ```
 
 - Reuses the Settings controls loader, action, persistence, save bar, and discard behavior.
 - Configuration includes shared cart messaging for bundle items, original price, and discount display. Landing Page additionally owns checkout providers; Product Page owns its post-add redirect.
 - CSS, scripts, selectors, and integrations save through stable field keys into the versioned storefront Controls contract. The deferred video-message player is not exposed as an Advanced tab.
+- Enabled custom scripts are syntax-validated before save; each invalid field owns its Polaris error and persistence is skipped.
+- Product Page cart-selector overrides are not exposed. Shopify storefront actions own cart updates and drawer opening; custom cart integration remains an explicit Landing Page integration.
 - Deep-links layout, tab, and nested group through `layout`, `tab`, and `group` query parameters.
 - Invalid query combinations resolve to the first valid visible tab and group.
 - Back navigation returns to `/app/settings` after App Bridge save-bar leave confirmation.
@@ -827,7 +838,9 @@ authorization, force-verifies the Partner API subscription, then redirects back.
       └── Shopify login(request) validates shop + owns OAuth navigation
           └── /auth/callback
               └── Shopify authenticate.admin(request) completes auth
-                  └── authenticated /app entry → /app/dashboard
+                  └── authenticated /app entry
+                      ├── first entry in Admin tab → native splash
+                      └── later entry in same tab  → /app/dashboard
 ```
 
 Admin actions and directly requested Admin resource loaders authenticate before
@@ -949,8 +962,7 @@ Checkout order summary → Bundle & Save
 | `/apps/product-bundles/api/storefront-products`                | Signed Storefront-context product hydration with ID validation and inventory normalization                                                                                                                       |
 | `/apps/product-bundles/api/storefront-collections`             | Signed Storefront-context collection hydration with product deduplication and membership mapping                                                                                                                 |
 | `/apps/product-bundles/api/checkout-integration-discount-code` | Signed storefront route that creates short-lived app discount codes for third-party FPB checkout integrations                                                                                                   |
-| `/apps/product-bundles/api/controls-settings`                  | Shopify app-proxy-authenticated Controls JSON; derives shop identity from the verified app-proxy session                                                                                                        |
-| `/apps/product-bundles/api/language-settings`                  | Shopify app-proxy-authenticated Language JSON; derives shop identity from the verified app-proxy session                                                                                                        |
+| `/apps/product-bundles/api/bundle-links`                      | Shopify app-proxy-authenticated active bundle navigation links used only by enabled collection quick-add redirects; derives shop identity from the verified app-proxy session                                  |
 | `/app/billing/return`                                          | Verify Shopify App Pricing state through the Partner API after a hosted-plan redirect                                                                                                                           |
 | `/api/activate-cart-transform`                                 | Deploy cart transform function                                                                                                                                                                                  |
 | `/api/activate-pixel`                                          | Activate UTM web pixel                                                                                                                                                                                          |

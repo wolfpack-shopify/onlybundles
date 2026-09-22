@@ -23,6 +23,7 @@ type ControlField = ControlTab["fields"][number];
 type SettingsControlsWorkspaceProps = {
   activeControlLayout: string;
   controlFieldValues: Record<string, string>;
+  controlFieldErrors: Record<string, string>;
   controlsNavigationRef: RefObject<HTMLDetailsElement>;
   hasNestedControlGroups: boolean;
   isControlsNavigationOpen: boolean;
@@ -53,6 +54,7 @@ type SettingsControlsWorkspaceProps = {
 export function SettingsControlsWorkspace({
   activeControlLayout,
   controlFieldValues,
+  controlFieldErrors,
   controlsNavigationRef,
   hasNestedControlGroups,
   isControlsNavigationOpen,
@@ -228,6 +230,7 @@ export function SettingsControlsWorkspace({
               }
               fields={selectedControlFields}
               values={controlFieldValues}
+              fieldErrors={controlFieldErrors}
               onFieldChange={onFieldChange}
               onFieldAction={onFieldAction}
             />

@@ -27,8 +27,8 @@ import { openSupportChat } from "../../../lib/support-chat.client";
 import { useEnablePreviewGate } from "../../../hooks/useEnablePreviewGate";
 import { useThemeExtensionStatus } from "../../../hooks/useThemeExtensionStatus";
 import { openThemeEditorInNewTab } from "../../../lib/theme-editor-navigation.client";
-import { getThemeExtensionStatusFromAppBridge } from "../../../lib/app-embed-status-check.client";
 import { buildThemeAppEmbedEditorUrl } from "../../../lib/theme-extension-status";
+import type { DashboardCommercialMetrics as DashboardCommercialMetricsData } from "../../../services/analytics/dashboard-commercial-metrics.server";
 import type { loader } from "./route";
 import { DashboardTopCards } from "./DashboardTopCards";
 import { DashboardStatusGrid } from "./DashboardStatusGrid";
@@ -54,6 +54,7 @@ import {
 import { DashboardBundlesPanel } from "./DashboardBundlesPanel";
 import { DashboardActionModals } from "./DashboardActionModals";
 import { DashboardHeader } from "./DashboardHeader";
+import { DashboardDeferredCommercialMetrics } from "./DashboardCommercialMetrics";
 import dashboardStyles from "./dashboard.module.css";
 const EnablePreviewModal = lazy(() =>
   import("../../../components/EnablePreviewModal").then((module) => ({
@@ -64,9 +65,13 @@ type DashboardPageProps = {
   banners: Promise<{
     proxyHealthy: boolean;
   }>;
+  commercialMetrics: Promise<DashboardCommercialMetricsData>;
 };
 
-export function DashboardPage({ banners }: DashboardPageProps) {
+export function DashboardPage({
+  banners,
+  commercialMetrics,
+}: DashboardPageProps) {
   const { bundles, shop, apiKey, appUrl } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const fetcher = useFetcher();
@@ -76,6 +81,7 @@ export function DashboardPage({ banners }: DashboardPageProps) {
 
   const dashboardState = useDashboardState();
   const themeExtensionStatus = useThemeExtensionStatus();
+  const refreshThemeExtensionStatus = themeExtensionStatus.refresh;
   const { bundleToDelete, openDeleteModal, closeDeleteModal } = dashboardState;
 
   const deleteModalRef = useRef<any>(null);
@@ -107,31 +113,17 @@ export function DashboardPage({ banners }: DashboardPageProps) {
   const [currentThemeEditorUrl, setCurrentThemeEditorUrl] = useState<
     string | null
   >(null);
-  const [currentAppEmbedEnabled, setCurrentAppEmbedEnabled] = useState<
-    boolean | null
-  >(null);
   const [appEmbedEnableFlow, dispatchAppEmbedEnableFlow] = useReducer(
     reduceAppEmbedEnableFlow,
     initialAppEmbedEnableFlow
   );
   const closingAppEmbedModalRef = useRef(false);
 
-  const refreshAppEmbedFromBridge = useCallback(async () => {
-    try {
-      const status = await getThemeExtensionStatusFromAppBridge(shopify);
-      setCurrentAppEmbedEnabled(status.appEmbedEnabled);
-    } catch {
-      setCurrentAppEmbedEnabled((current) => current ?? false);
-    }
-  }, [shopify]);
-
   useEffect(() => {
     setCurrentThemeEditorUrl(
       buildThemeAppEmbedEditorUrl(shop, apiKey, "bundle-app-embed")
     );
-    setCurrentAppEmbedEnabled(null);
-    void refreshAppEmbedFromBridge();
-  }, [apiKey, refreshAppEmbedFromBridge, shop]);
+  }, [apiKey, shop]);
 
   useEffect(() => {
     if (fetcher.state !== "idle" || !fetcher.data) return;
@@ -342,7 +334,7 @@ export function DashboardPage({ banners }: DashboardPageProps) {
     deleteModalRef.current?.showOverlay?.();
   }, [bundleToDelete]);
 
-  const appEmbedEnabled = currentAppEmbedEnabled ?? false;
+  const appEmbedEnabled = themeExtensionStatus.appEmbedEnabled;
 
   const enablePreviewGate = useEnablePreviewGate({
     appEmbedEnabled,
@@ -358,15 +350,16 @@ export function DashboardPage({ banners }: DashboardPageProps) {
 
   const checkAppEmbedForEnableFlow = useCallback(async () => {
     dispatchAppEmbedEnableFlow({ type: "check_started" });
-    const result = await checkAppEmbedActivation(() =>
-      getThemeExtensionStatusFromAppBridge(shopify)
-    );
-    setCurrentAppEmbedEnabled(result.appEmbedEnabled);
+    const result = await checkAppEmbedActivation(async () => {
+      const status = await refreshThemeExtensionStatus();
+      if (!status) throw new Error("Theme extension status unavailable");
+      return status;
+    });
     dispatchAppEmbedEnableFlow({
       type: result.phase === "success" ? "check_succeeded" : "check_failed",
     });
     return result;
-  }, [shopify]);
+  }, [refreshThemeExtensionStatus]);
 
   const appEmbedReturnCheck = useMemo(
     () => createAppEmbedReturnCheckCoordinator(checkAppEmbedForEnableFlow),
@@ -376,6 +369,11 @@ export function DashboardPage({ banners }: DashboardPageProps) {
   const handleOpenAppEmbedEnableModal = useCallback(() => {
     dispatchAppEmbedEnableFlow({ type: "open" });
   }, []);
+
+  const handleOpenPublishedThemeEditor = useCallback(() => {
+    if (!currentThemeEditorUrl) return;
+    openThemeEditorInNewTab(currentThemeEditorUrl);
+  }, [currentThemeEditorUrl]);
 
   const handleLaunchAppEmbedThemeEditor = useCallback(() => {
     if (!currentThemeEditorUrl) return;
@@ -555,15 +553,6 @@ export function DashboardPage({ banners }: DashboardPageProps) {
             alert={taskAlert}
             onDismiss={() => setTaskAlert(null)}
           />
-          <DashboardStatusGrid
-            resources={themeExtensionStatus.resources}
-            error={themeExtensionStatus.error}
-            themeEditorUrl={currentThemeEditorUrl}
-            appEmbedEnabled={appEmbedEnabled}
-            appEmbedStatusLoading={currentAppEmbedEnabled === null}
-            onOpenThemeEditor={handleOpenAppEmbedEnableModal}
-            enableActionRef={appEmbedEnableActionRef}
-          />
           <DashboardDeferredProxyHealthBanner
             appUrl={appUrl}
             banners={banners}
@@ -586,6 +575,19 @@ export function DashboardPage({ banners }: DashboardPageProps) {
           />
 
           <DashboardTopCards handleDirectChat={handleDirectChat} />
+
+          <DashboardStatusGrid
+            resources={themeExtensionStatus.resources}
+            error={themeExtensionStatus.error}
+            loading={themeExtensionStatus.loading}
+            themeEditorUrl={currentThemeEditorUrl}
+            onOpenEnableInstructions={handleOpenAppEmbedEnableModal}
+            onOpenThemeEditor={handleOpenPublishedThemeEditor}
+            onRefresh={refreshThemeExtensionStatus}
+            enableActionRef={appEmbedEnableActionRef}
+          />
+
+          <DashboardDeferredCommercialMetrics metrics={commercialMetrics} />
 
           <DashboardResourcesCard
             activeResource={activeResource}

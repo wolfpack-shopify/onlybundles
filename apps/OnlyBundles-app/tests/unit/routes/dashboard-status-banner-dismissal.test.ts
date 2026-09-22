@@ -1,160 +1,61 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { DashboardStatusGrid, DASHBOARD_STOREFRONT_SETUP_BANNER_KEY } from "../../../app/routes/app/app.dashboard/DashboardStatusGrid";
-import { dismissBannerInSession, isBannerDismissedInSession } from "../../../app/lib/banner-session-state";
+import { DashboardStatusGrid } from "../../../app/routes/app/app.dashboard/DashboardStatusGrid";
+import { THEME_EXTENSION_RESOURCES } from "../../../app/lib/theme-extension-status";
 
 jest.mock("react-i18next", () => ({
-  useTranslation: () => ({
-    t: (key: string) => key,
-  }),
+  useTranslation: () => ({ t: (key: string) => key }),
 }));
 
-class MockSessionStorage {
-  private store = new Map<string, string>();
-  getItem(key: string): string | null {
-    return this.store.get(key) ?? null;
-  }
-  setItem(key: string, value: string): void {
-    this.store.set(key, String(value));
-  }
-  removeItem(key: string): void {
-    this.store.delete(key);
-  }
-  clear(): void {
-    this.store.clear();
-  }
-}
-
-const APP_EMBED_RESOURCE = {
-  handle: "bundle-app-embed",
-  label: "Only Bundles",
-  kind: "embed" as const,
-  status: "active" as const,
-  enabled: true,
-  target: null,
-} as const;
-
-describe("dashboard status banner dismissal with session persistence", () => {
-  let mockStorage: MockSessionStorage;
-  const originalWindow = (globalThis as any).window;
-
-  beforeEach(() => {
-    mockStorage = new MockSessionStorage();
-    (globalThis as any).window = {
-      sessionStorage: mockStorage,
-    };
-  });
-
-  afterEach(() => {
-    (globalThis as any).window = originalWindow;
-  });
-
-  it("renders banner markup when not dismissed in session", () => {
-    const props = {
-      resources: [APP_EMBED_RESOURCE],
-      error: false,
-      appEmbedEnabled: true,
-      themeEditorUrl: "https://theme-editor.test",
-      onOpenThemeEditor: jest.fn(),
-    };
-
-    const view = renderToStaticMarkup(React.createElement(DashboardStatusGrid, props));
-    expect(view).toContain("s-banner");
-  });
-
-  it("renders native Polaris loading feedback while App Embed status is unresolved", () => {
-    const props = {
-      resources: [],
-      error: false,
-      appEmbedEnabled: false,
-      appEmbedStatusLoading: true,
-      themeEditorUrl: "https://theme-editor.test",
-      onOpenThemeEditor: jest.fn(),
-    };
-
-    const view = renderToStaticMarkup(React.createElement(DashboardStatusGrid, props));
-
-    expect(view).toContain("<s-banner");
-    expect(view).toContain('tone="info"');
-    expect(view).toContain('heading="dashboard.storefrontSetup.loadingTitle"');
-    expect(view).toContain("<s-spinner");
-    expect(view).toContain("dashboard.storefrontSetup.loadingDescription");
-    expect(view).not.toContain("dismissible");
-    expect(view).not.toContain("dashboard.storefrontSetup.activate");
-  });
-
-  it("renders loading as ordinary status content after a resolved banner was dismissed", () => {
-    dismissBannerInSession(DASHBOARD_STOREFRONT_SETUP_BANNER_KEY);
+describe("dashboard published-theme status", () => {
+  it("renders every resource persistently with refresh and activation actions", () => {
+    const resources = THEME_EXTENSION_RESOURCES.map((resource) => ({
+      ...resource,
+      status: "available" as const,
+      enabled: false,
+      target: null,
+    }));
 
     const view = renderToStaticMarkup(
       React.createElement(DashboardStatusGrid, {
-        resources: [],
+        resources,
         error: false,
-        appEmbedEnabled: false,
-        appEmbedStatusLoading: true,
+        loading: false,
         themeEditorUrl: "https://theme-editor.test",
+        onOpenEnableInstructions: jest.fn(),
         onOpenThemeEditor: jest.fn(),
+        onRefresh: jest.fn(),
       }),
     );
 
-    expect(view).toContain("<s-banner");
-    expect(view).toContain('tone="info"');
-    expect(view).toContain("<s-spinner");
-  });
-
-  it("resolves the shared banner shell to success without a CTA", () => {
-    const view = renderToStaticMarkup(
-      React.createElement(DashboardStatusGrid, {
-        resources: [APP_EMBED_RESOURCE],
-        error: false,
-        appEmbedEnabled: true,
-        appEmbedStatusLoading: false,
-        themeEditorUrl: "https://theme-editor.test",
-        onOpenThemeEditor: jest.fn(),
-      }),
-    );
-
-    expect(view).toContain('tone="success"');
-    expect(view).toContain("dashboard.storefrontSetup.completeDescription");
-    expect(view).not.toContain("dashboard.storefrontSetup.activate");
-  });
-
-  it("resolves the shared banner shell to warning with the activation CTA", () => {
-    const view = renderToStaticMarkup(
-      React.createElement(DashboardStatusGrid, {
-        resources: [],
-        error: false,
-        appEmbedEnabled: false,
-        appEmbedStatusLoading: false,
-        themeEditorUrl: "https://theme-editor.test",
-        onOpenThemeEditor: jest.fn(),
-      }),
-    );
-
-    expect(view).toContain('tone="warning"');
+    expect(view).toContain("dashboard.storefrontSetup.publishedThemeDescription");
+    expect(view).toContain("dashboard.storefrontSetup.appEmbedsHeading");
+    expect(view).toContain("dashboard.storefrontSetup.appBlocksHeading");
+    expect(view).toContain("dashboard.storefrontSetup.resourceLabels.bundleAppEmbed");
+    expect(view).toContain("dashboard.storefrontSetup.resourceLabels.bundleProductPage");
+    expect(view).toContain("dashboard.storefrontSetup.resourceLabels.bundleProductPageEmbed");
+    expect(view).toContain("dashboard.storefrontSetup.resourceLabels.bundlePageBuilderEmbed");
+    expect(view).toContain("dashboard.storefrontSetup.resourceLabels.bundleUpsell");
+    expect(view).toContain("dashboard.storefrontSetup.refresh");
+    expect(view).toContain("dashboard.storefrontSetup.openThemeEditor");
     expect(view).toContain("dashboard.storefrontSetup.activate");
+    expect(view).not.toContain("dismissible");
   });
 
-  it("persists dismissal in session storage when dismissed", () => {
-    expect(isBannerDismissedInSession(DASHBOARD_STOREFRONT_SETUP_BANNER_KEY)).toBe(false);
+  it("renders a native retry state after an App Bridge status error", () => {
+    const view = renderToStaticMarkup(
+      React.createElement(DashboardStatusGrid, {
+        resources: [],
+        error: true,
+        loading: false,
+        themeEditorUrl: null,
+        onOpenEnableInstructions: jest.fn(),
+        onOpenThemeEditor: jest.fn(),
+        onRefresh: jest.fn(),
+      }),
+    );
 
-    dismissBannerInSession(DASHBOARD_STOREFRONT_SETUP_BANNER_KEY);
-
-    expect(isBannerDismissedInSession(DASHBOARD_STOREFRONT_SETUP_BANNER_KEY)).toBe(true);
-  });
-
-  it("renders nothing when already dismissed in session (e.g. on page reload)", () => {
-    dismissBannerInSession(DASHBOARD_STOREFRONT_SETUP_BANNER_KEY);
-
-    const props = {
-      resources: [APP_EMBED_RESOURCE],
-      error: false,
-      appEmbedEnabled: true,
-      themeEditorUrl: "https://theme-editor.test",
-      onOpenThemeEditor: jest.fn(),
-    };
-
-    const view = renderToStaticMarkup(React.createElement(DashboardStatusGrid, props));
-    expect(view).toBe("");
+    expect(view).toContain("dashboard.storefrontSetup.errorDescription");
+    expect(view).toContain("dashboard.storefrontSetup.retry");
   });
 });

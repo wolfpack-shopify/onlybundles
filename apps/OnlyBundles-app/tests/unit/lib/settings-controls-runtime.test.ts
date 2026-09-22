@@ -4,11 +4,13 @@ import {
   buildSettingsControlsResponse,
   buildSettingsControlsFormValues,
   buildSettingsControlsRuntime,
+  validateSettingsControlScripts,
 } from "../../../app/lib/settings-controls-runtime";
 
 const values = {
   "landingPage.hideIrrelevantVariantImages": "Checked",
   "landingPage.trackInventoryOnAddToCart": "Checked",
+  "landingPage.showCompareAtPrices": "Checked",
   "landingPage.redirectCollectionQuickAddToBundle": "Checked",
   "shared.cartMessaging.isEnabled": "Checked",
   "shared.cartMessaging.showBundleContains": "",
@@ -46,11 +48,6 @@ const values = {
   "productPage.redirect.executeScript": "window.__ppbPostAddRuns = true;",
   "productPage.css.mixAndMatchBundles": ".mix { color: purple; }",
   "productPage.scripts.executeCustomScript": "window.__ppbCustom = true;",
-  "productPage.selectors.sideCart": ".side-cart",
-  "productPage.selectors.sideCartSectionId": "cart-drawer",
-  "productPage.selectors.cartPageItems": ".cart-items",
-  "productPage.selectors.cartPageItemsSectionId": "main-cart-items",
-  "productPage.selectors.sideCartOpenButton": ".open-cart",
   "productPage.selectors.productPagePrice": ".price",
 };
 
@@ -58,9 +55,9 @@ describe("Settings Controls runtime mapping", () => {
   it("maps stable Admin keys into the versioned canonical contract", () => {
     const result = buildSettingsControlsRuntime(values);
 
-    expect(SETTINGS_CONTROLS_SCHEMA_VERSION).toBe(1);
+    expect(SETTINGS_CONTROLS_SCHEMA_VERSION).toBe(2);
     expect(result.settingsControls).toMatchObject({
-      schemaVersion: 1,
+      schemaVersion: 2,
       shared: {
         cartMessaging: {
           isEnabled: true,
@@ -70,6 +67,7 @@ describe("Settings Controls runtime mapping", () => {
         },
       },
       landingPage: {
+        showCompareAtPrices: true,
         checkout: { action: "checkout", providerId: "monster_cart" },
         scripts: { bundlePage: "window.__bundlePage = true;" },
         selectors: {
@@ -78,6 +76,7 @@ describe("Settings Controls runtime mapping", () => {
         },
       },
       productPage: {
+        showCompareAtPrices: true,
         addBundleToCartAfterLastStepCompleted: true,
         addToCartWhenProductCardClicked: true,
         redirect: { action: "cart", executeScript: "window.__ppbPostAddRuns = true;" },
@@ -92,7 +91,7 @@ describe("Settings Controls runtime mapping", () => {
       "shared.cartMessaging.isEnabled": "",
     });
 
-    expect(result.settingsControls.landingPage).not.toHaveProperty("showCompareAtPrice");
+    expect(result.settingsControls.landingPage.showCompareAtPrices).toBe(true);
     expect(result.settingsControls.shared.cartMessaging.isEnabled).toBe(false);
   });
 
@@ -129,7 +128,7 @@ describe("Settings Controls runtime mapping", () => {
     const runtime = buildSettingsControlsRuntime(values).settingsControls;
     const response = buildSettingsControlsResponse(runtime, BundleType.PRODUCT_PAGE);
 
-    expect(response.schemaVersion).toBe(1);
+    expect(response.schemaVersion).toBe(2);
     expect(response.activeControls).toEqual(runtime.productPage);
     expect(response.settingsControls).toEqual(runtime);
   });
@@ -147,7 +146,7 @@ describe("Settings Controls runtime mapping", () => {
   it("uses safe defaults for an absent canonical contract", () => {
     const response = buildSettingsControlsResponse(null, BundleType.FULL_PAGE);
 
-    expect(response.settingsControls.schemaVersion).toBe(1);
+    expect(response.settingsControls.schemaVersion).toBe(2);
     expect(response.activeControls).toBe(response.settingsControls.landingPage);
     expect(response.settingsControls.shared.cartMessaging).toMatchObject({
       isEnabled: true,
@@ -155,8 +154,41 @@ describe("Settings Controls runtime mapping", () => {
       showOriginalPrice: true,
       discountDisplay: { isEnabled: true },
     });
-    expect(response.settingsControls.landingPage).not.toHaveProperty("showCompareAtPrice");
+    expect(response.settingsControls.landingPage.showCompareAtPrices).toBe(true);
+    expect(response.settingsControls.productPage.showCompareAtPrices).toBe(true);
+    expect(response.settingsControls.productPage.selectors).toEqual({
+      productPagePrice: "",
+    });
     expect(response.settingsControls.productPage.hideOutOfStockProducts).toBe(true);
     expect(response.settingsControls.productPage.validateConditionsBeforeAddToCart).toBe(true);
+    expect(response.settingsControls.productPage.redirect.action).toBe("stay");
+    expect(buildSettingsControlsFormValues(response.settingsControls)).toMatchObject({
+      "productPage.redirect.action": "Stay on product page",
+    });
+  });
+
+  it("validates every merchant script without executing it", () => {
+    const runtimeWindow = globalThis as typeof globalThis & { __scriptRan?: boolean };
+    delete runtimeWindow.__scriptRan;
+
+    expect(validateSettingsControlScripts({
+      "landingPage.checkout.executeScript": "globalThis.__scriptRan = true;",
+      "landingPage.scripts.bundlePage": "if (",
+      "landingPage.integrations.customThemeIntegrationScript": "const value = 1;",
+      "landingPage.integrations.customCartIntegrationScript": "class CartIntegration { init() {} }",
+      "productPage.scripts.executeCustomScript": "return true;",
+      "productPage.redirect.executeScript": "const ok = true;",
+    })).toEqual({
+      "landingPage.scripts.bundlePage": expect.any(String),
+    });
+    expect(runtimeWindow.__scriptRan).toBeUndefined();
+  });
+
+  it("reports cart integration expression syntax against its owning field", () => {
+    expect(validateSettingsControlScripts({
+      "landingPage.integrations.customCartIntegrationScript": "class {",
+    })).toEqual({
+      "landingPage.integrations.customCartIntegrationScript": expect.any(String),
+    });
   });
 });

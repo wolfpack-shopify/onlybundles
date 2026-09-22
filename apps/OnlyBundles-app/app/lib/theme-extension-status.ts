@@ -15,11 +15,11 @@ export type ShopifyThemeExtensionInfo = {
 };
 
 export const THEME_EXTENSION_RESOURCES = [
-  { handle: "bundle-app-embed", label: "Only Bundles", kind: "embed" },
-  { handle: "bundle-product-page", label: "Bundle Builder", kind: "block" },
-  { handle: "bundle-product-page-embed", label: "Bundle Builder placement", kind: "block" },
-  { handle: "bundle-page-builder-embed", label: "Page Builder bundle", kind: "block" },
-  { handle: "bundle-upsell", label: "Bundle Upsell", kind: "block" },
+  { handle: "bundle-app-embed", label: "Bundle storefront features", kind: "embed" },
+  { handle: "bundle-product-page", label: "Product page bundle builder", kind: "block" },
+  { handle: "bundle-product-page-embed", label: "Product page bundle placement", kind: "block" },
+  { handle: "bundle-page-builder-embed", label: "Page builder bundle placement", kind: "block" },
+  { handle: "bundle-upsell", label: "Full page bundle upsell", kind: "block" },
 ] as const;
 
 export type NormalizedThemeExtensionResource = (typeof THEME_EXTENSION_RESOURCES)[number] & {

@@ -1,41 +1,24 @@
 import { json } from "@remix-run/node";
 import { useNavigate } from "@remix-run/react";
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import styles from "../../styles/routes/app-index.module.css";
-import { navigateBackOrFallback } from "../../lib/navigation";
-import { openSupportChat } from "../../lib/support-chat.client";
 import { AdminSectionLoadingState } from "../../components/AdminSectionLoadingState";
 import { APP_BRAND } from "../../lib/app-brand";
-import { TUTORIAL_LIBRARY_URL } from "../../lib/tutorial-links";
+import styles from "../../styles/routes/app-index.module.css";
 import { translateAdmin } from "~/i18n/config";
 
-// This route handles /app → shows the Welcome landing screen for intentional visits,
-// and silently redirects to the dashboard when Shopify's auth flow lands here.
-//
-// Auth strategy:
-// - The layout (app.tsx) calls authenticate.admin() and handles token exchange
-//   plus the exit-iframe bounce. By the time this component renders, auth is
-//   complete and App Bridge is initialized.
-// - This route must NOT call authenticate.admin() — Remix runs layout and child
-//   loaders in parallel, and a second authenticate.admin() would race for the
-//   same one-time id_token, causing token exchange failures.
-// - Server-side redirects must not be used here — they lose auth context.
-//
-// Landing page flash fix:
-// - showLanding starts false on both server and client (no SSR flash).
-// - On mount, we check for Shopify auth params (shop/host/id_token).
-//   • Auth params present  → Shopify's auth flow landed here → redirect to dashboard.
-//   • No auth params       → intentional navigation → show the landing page.
+export const APP_SPLASH_SESSION_KEY = "only-bundles:app-splash-seen";
+
+// The authenticated layout owns Shopify authentication. This child loader must
+// not repeat authenticate.admin() because parent and child loaders run together.
 export const loader = async () => {
   return json(null);
 };
 
 export function getInitialAppDestination(
-  isAuthFlow: boolean
+  hasSeenSplash: boolean
 ): "/app/dashboard" | null {
-  if (!isAuthFlow) return null;
-  return "/app/dashboard";
+  return hasSeenSplash ? "/app/dashboard" : null;
 }
 
 export function AppRouteLoadingWorkspace() {
@@ -48,145 +31,60 @@ export function AppRouteLoadingWorkspace() {
   );
 }
 
-const FEATURES = [
-  {
-    icon: "🛒",
-    iconClass: styles.iconPurple,
-    title: "Product Page Bundles",
-    desc: "Slide-out drawer on any product page. Customers build their bundle without leaving the page.",
-  },
-  {
-    icon: "📄",
-    iconClass: styles.iconTeal,
-    title: "Full-Page Bundles",
-    desc: "Dedicated bundle pages with step-by-step tabs, timeline navigation, and sidebar layouts.",
-  },
-  {
-    icon: "🎨",
-    iconClass: styles.iconOrange,
-    title: "Settings -> Design",
-    desc: "Bundle design customization — colors, typography, promo banners, GIF loaders, and custom CSS.",
-  },
-  {
-    icon: "📊",
-    iconClass: styles.iconBlue,
-    title: "UTM Attribution Analytics",
-    desc: "Track bundle revenue by ad platform, campaign, and bundle. First-party web pixel included.",
-  },
-  {
-    icon: "🏷️",
-    iconClass: styles.iconGreen,
-    title: "Smart Discount Rules",
-    desc: "Percentage off, fixed amount, or fixed bundle price. Quantity-based tiered discounts.",
-  },
-  {
-    icon: "🔀",
-    iconClass: styles.iconPink,
-    title: "Mix & Match Steps",
-    desc: "Multi-step bundles with per-step conditions, collection filters, and inventory sync.",
-  },
-];
-
 export default function AppIndex() {
   const navigate = useNavigate();
-  // Start false so the server renders nothing (no SSR flash during auth bounces).
-  // The useEffect below flips this to true only for intentional /app visits.
-  const [showLanding, setShowLanding] = useState(false);
+  const [showSplash, setShowSplash] = useState(false);
+  const hasResolvedEntry = useRef(false);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    // Shopify's auth flow redirects to /app with one or more of these params.
-    // When they're present we're mid-auth — silently move on to the dashboard.
-    const isAuthFlow =
-      params.has("id_token") || params.has("host") || params.has("shop");
+    if (hasResolvedEntry.current) return;
+    hasResolvedEntry.current = true;
 
-    const destination = getInitialAppDestination(isAuthFlow);
+    const hasSeenSplash =
+      window.sessionStorage.getItem(APP_SPLASH_SESSION_KEY) === "seen";
+    const destination = getInitialAppDestination(hasSeenSplash);
+
     if (destination) {
       navigate(destination, { replace: true });
-    } else {
-      setShowLanding(true);
+      return;
     }
+
+    window.sessionStorage.setItem(APP_SPLASH_SESSION_KEY, "seen");
+    setShowSplash(true);
   }, [navigate]);
 
-  if (!showLanding) return <AppRouteLoadingWorkspace />;
+  if (!showSplash) return <AppRouteLoadingWorkspace />;
 
   return (
-    <div className={styles.page}>
-      {/* ── Hero ── */}
-      <div className={styles.hero}>
-        <div className={styles.heroInner}>
-          <div className={styles.brandRow}>
-            <div className={styles.wolfIcon}>
-              <s-image
-                src={APP_BRAND.markPath}
-                alt=""
-                accessibilityRole="presentation"
-                objectFit="contain"
-              />
-            </div>
-            <span className={styles.brandName}>{APP_BRAND.publisher}</span>
-          </div>
-
-          <h1 className={styles.heroTitle}>
-            {translateAdmin("adminExtracted.appIndex.welcomeTo")}{" "}
-            <span>{APP_BRAND.name}</span>
-          </h1>
-
-          <p className={styles.heroSubtitle}>
-            {translateAdmin(
-              "adminExtracted.appIndex.theCompleteBundleSolutionForShopifyBuildCustomizeAndPromoteProdu"
-            )}
-          </p>
-
-          <div className={styles.ctaRow}>
-            <s-button
-              variant="primary"
-              onClick={() => navigate("/app/bundles/create")}
-            >
-              {translateAdmin("adminExtracted.appIndex.getStarted")}
-            </s-button>
-            <s-button
-              variant="secondary"
-              onClick={() =>
-                navigateBackOrFallback(navigate, "/app/dashboard", {
-                  replaceFallback: true,
-                })
-              }
-            >
-              {translateAdmin("adminExtracted.appIndex.goToDashboard")}
-            </s-button>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Features ── */}
-      <div className={styles.featuresSection}>
-        <p className={styles.sectionLabel}>
-          {translateAdmin("adminExtracted.appIndex.everythingIncluded")}
-        </p>
-        <div className={styles.featuresGrid}>
-          {FEATURES.map((f) => (
-            <div key={f.title} className={styles.featureCard}>
-              <div className={`${styles.featureIconWrap} ${f.iconClass}`}>
-                {f.icon}
-              </div>
-              <div className={styles.featureTitle}>{f.title}</div>
-              <div className={styles.featureDesc}>{f.desc}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Footer strip ── */}
-      <div className={styles.footerStrip}>
-        <s-button variant="tertiary" onClick={() => openSupportChat()}>
-          {translateAdmin("billing.actions.contactSupport")}
-        </s-button>
-        <span className={styles.footerDot} />
-        <s-link href={TUTORIAL_LIBRARY_URL} target="_blank">
-          {translateAdmin("adminExtracted.appIndex.documentation")}
-        </s-link>
-      </div>
-    </div>
+    <main className={styles.splashViewport}>
+      <s-page inlineSize="small">
+        <s-section>
+          <s-box paddingBlock="large-500">
+            <s-stack direction="block" gap="large-300" alignItems="center">
+              <s-box inlineSize="96px">
+                <s-image
+                  src={APP_BRAND.markPath}
+                  alt={APP_BRAND.name}
+                  aspectRatio="1/1"
+                  objectFit="contain"
+                />
+              </s-box>
+              <s-stack direction="block" gap="small-200" alignItems="center">
+                <s-heading>{APP_BRAND.name}</s-heading>
+                <s-paragraph color="subdued">
+                  {translateAdmin("adminExtracted.appIndex.valueStatement")}
+                </s-paragraph>
+              </s-stack>
+              <s-button
+                variant="primary"
+                onClick={() => navigate("/app/dashboard")}
+              >
+                {translateAdmin("adminExtracted.appIndex.takeMeToMyDashboard")}
+              </s-button>
+            </s-stack>
+          </s-box>
+        </s-section>
+      </s-page>
+    </main>
   );
 }

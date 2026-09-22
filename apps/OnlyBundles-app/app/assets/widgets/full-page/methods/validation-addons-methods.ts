@@ -1,6 +1,6 @@
 import { CurrencyManager, type CurrencyInfo } from '../../shared/currency-manager.js';
 import { PricingCalculator } from '../../shared/pricing-calculator.js';
-import { calculateBundleTotalForPurchaseOption } from '../../shared/subscription-storefront-methods.js';
+import { calculatePaidBundleTotalForPurchaseOption } from '../../shared/subscription-storefront-methods.js';
 import { ConditionValidator } from '../../shared/condition-validator.js';
 
 function getAddonTiersForStep(step: any) {
@@ -279,11 +279,7 @@ getAddonTiers(step: any) {
 },
 
 getAddonTierEvaluation(step: any) {
-  const { totalPrice, totalQuantity } = calculateBundleTotalForPurchaseOption(this,
-    this.selectedProducts,
-    this.stepProductData,
-    this.selectedBundle?.steps
-  );
+  const { totalPrice, totalQuantity } = calculatePaidBundleTotalForPurchaseOption(this);
   const withState = getAddonTierCandidatesWithState(step, totalPrice, totalQuantity);
   if (withState.length === 0) {
     return { tier: null, totalPrice, totalQuantity, currentValue: totalQuantity };
@@ -308,11 +304,7 @@ getAddonTierEvaluation(step: any) {
 },
 
 getAddonMessageTierEvaluation(step: any) {
-  const { totalPrice, totalQuantity } = calculateBundleTotalForPurchaseOption(this,
-    this.selectedProducts,
-    this.stepProductData,
-    this.selectedBundle?.steps
-  );
+  const { totalPrice, totalQuantity } = calculatePaidBundleTotalForPurchaseOption(this);
   const withState = getAddonTierCandidatesWithState(step, totalPrice, totalQuantity);
   if (withState.length === 0) {
     return { tier: null, totalPrice, totalQuantity, currentValue: totalQuantity };
@@ -337,11 +329,7 @@ getAddonMessageTierEvaluation(step: any) {
 },
 
 getAddonSummaryEligibilityStates(step: any) {
-  const { totalPrice, totalQuantity } = calculateBundleTotalForPurchaseOption(this,
-    this.selectedProducts,
-    this.stepProductData,
-    this.selectedBundle?.steps
-  );
+  const { totalPrice, totalQuantity } = calculatePaidBundleTotalForPurchaseOption(this);
   const withState = getAddonTierCandidatesWithState(step, totalPrice, totalQuantity);
   const getEligibilityState = typeof this.getAddonEligibilityState === 'function'
     ? this.getAddonEligibilityState

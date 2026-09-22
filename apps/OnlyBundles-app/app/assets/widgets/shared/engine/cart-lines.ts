@@ -11,7 +11,7 @@
 const DEFAULT_CART_LINE_LABELS: any = {
   items: 'Items',
   retailPrice: 'Retail Price',
-  youSave: 'You Save',
+  youSave: 'Bundle Savings',
 };
 
 function formatCartLineItemTitle(product: any = {}) {
@@ -31,6 +31,7 @@ export function buildCartLineSourceProperties({
   box = '1',
   includeBox = true,
   labels = null,
+  tierProgress = null,
 }: any = {}) {
   const displayProperties: any = {
     items: selectedLines
@@ -52,6 +53,10 @@ export function buildCartLineSourceProperties({
     };
   }
 
+  if (tierProgress) {
+    displayProperties.tierProgress = tierProgress;
+  }
+
   if (labels) {
     displayProperties.labels = {
       ...DEFAULT_CART_LINE_LABELS,
@@ -70,7 +75,6 @@ export function buildCartLineDisplayProperties(displayProperties: any = {}, labe
     ...labels,
   };
   const properties: any = {
-    Box: displayProperties.box || '1',
     [cartLineLabels.items]: displayProperties.items,
     [cartLineLabels.retailPrice]: displayProperties.retailPrice,
     _bundle_display_properties: JSON.stringify(displayProperties),
@@ -81,4 +85,37 @@ export function buildCartLineDisplayProperties(displayProperties: any = {}, labe
   }
 
   return properties;
+}
+
+export function extractTierProgressForBundle(bundle: any = {}) {
+  if (!bundle?.pricing?.enabled) return null;
+  const rules = Array.isArray(bundle?.pricing?.rules) ? bundle.pricing.rules : [];
+  if (rules.length === 0) return null;
+
+  const progressBar = bundle?.pricing?.displayOptions?.progressBar
+    || bundle?.messaging?.displayOptions?.progressBar
+    || null;
+
+  const normalizedRules = rules.map((r: any) => {
+    const conditionType = r.conditionType || (r.minSubtotal !== undefined ? 'amount' : 'quantity');
+    const isAmount = conditionType === 'amount';
+    return {
+      conditionType,
+      minQuantity: isAmount ? undefined : Number(r.conditionValue ?? r.minQuantity ?? 0),
+      minSubtotal: isAmount ? Number(r.conditionValue ?? r.minSubtotal ?? 0) : undefined,
+      discountType: r.discountType || (bundle.pricing?.method === 'fixed_amount_off' ? 'fixed_amount' : 'percentage'),
+      discountValue: Number(r.discountValue ?? 0),
+      tierText: r.tierText || null,
+    };
+  });
+
+  return {
+    rules: normalizedRules,
+    progressBar: progressBar ? {
+      enabled: progressBar.enabled === true,
+      type: progressBar.type || 'simple',
+      progressText: progressBar.progressText,
+      successText: progressBar.successText,
+    } : { enabled: false, type: 'simple' },
+  };
 }

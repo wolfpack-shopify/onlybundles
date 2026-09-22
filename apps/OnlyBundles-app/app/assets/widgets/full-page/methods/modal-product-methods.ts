@@ -4,7 +4,7 @@ import { ToastManager } from '../../shared/toast-manager.js';
 import { createSharedProductCardElement, getProductImageUrls } from '../../shared/components/product-card.js';
 import { VariantSelectorComponent } from '../../shared/variant-selector.js';
 import { shouldRenderInlineVariantSelector } from '../../shared/variant-selector-policy.js';
-import { BundleProductModal } from '../../../bundle-modal-component.js';
+import { ensureFpbProductModal } from '../product-modal-runtime.js';
 import { TemplateDesignSystem } from '../../shared/template-design-system.js';
 import { getSubscriptionProductCardPrice } from '../../shared/subscription-storefront-methods.js';
 import { resolveLowStockAlert } from '../../../../lib/low-stock-alert.js';
@@ -165,13 +165,11 @@ renderModalProducts(stepIndex: number, productsToRender: any = null) {
       }])
       : null;
 
-    // Low-stock / out-of-stock badge — shown on the image, not in the CTA.
-    const stockBadgeElement = outOfStock || lowStockAlert ? document.createElement('div') : null;
+    // Low-stock badge — shown on the image, while out of stock is shown in the CTA.
+    const stockBadgeElement = lowStockAlert ? document.createElement('div') : null;
     if (stockBadgeElement) {
-      stockBadgeElement.className = `product-stock-badge ${outOfStock ? 'product-stock-badge--out' : 'product-stock-badge--low'}`;
-      stockBadgeElement.textContent = outOfStock
-        ? outOfStockLabel
-        : lowStockAlert?.message ?? '';
+      stockBadgeElement.className = 'product-stock-badge product-stock-badge--low';
+      stockBadgeElement.textContent = lowStockAlert?.message ?? '';
     }
 
     return createSharedProductCardElement(
@@ -186,7 +184,7 @@ renderModalProducts(stepIndex: number, productsToRender: any = null) {
         displayPrice: getSubscriptionProductCardPrice(this, product.price),
         variantSelectorElement,
         stockBadgeElement,
-        showCompareAtPrice: this._getLandingPageControls?.()?.showCompareAtPrice === true,
+        showCompareAtPrice: this._getLandingPageControls?.()?.showCompareAtPrices !== false,
         openImageLabel: resolveText('productImageLabel', 'Open product details'),
         openTitleLabel: resolveText('productTitleLabel', 'Open product details'),
         imageNavPreviousLabel: resolveText('productImagePreviousLabel', 'Previous image'),
@@ -251,18 +249,16 @@ attachProductEventHandlers(productGrid: any, stepIndex: string|number) {
     });
   };
 
-  const openProductModalForCard = (productCard: any) => {
-    if (!this.productModal) {
-      this.productModal = new BundleProductModal(this);
-    }
-    if (!productCard || !this.productModal) return;
+  const openProductModalForCard = async (productCard: any) => {
+    if (!productCard) return;
+    const productModal = await ensureFpbProductModal(this);
     const productId = productCard.dataset.productId;
     const product = findProduct(productId);
 
     if (product && step) {
       const initialImageIndex = Number(productCard.dataset.bwCardImageIndex || 0);
       const isClassicQuickView = isClassicFpbPreset(this.getFullPageDesignPreset?.());
-      this.productModal.open(product, step, {
+      productModal.open(product, step, {
         initialImageIndex,
         readOnly: isClassicQuickView,
       });
@@ -331,7 +327,9 @@ attachProductEventHandlers(productGrid: any, stepIndex: string|number) {
     }
 
     if (e.target.closest('.product-image, .product-title')) {
-      openProductModalForCard(e.target.closest('.product-card'));
+      void openProductModalForCard(e.target.closest('.product-card')).catch((error) => {
+        console.error('[WPB] Unable to load FPB product modal', error);
+      });
     }
   });
 
@@ -348,14 +346,18 @@ attachProductEventHandlers(productGrid: any, stepIndex: string|number) {
     if (!target.closest('.product-image, .product-title') && !target.closest('.product-card')) return;
     e.preventDefault();
     e.stopPropagation();
-    openProductModalForCard(target.closest('.product-card'));
+    void openProductModalForCard(target.closest('.product-card')).catch((error) => {
+      console.error('[WPB] Unable to load FPB product modal', error);
+    });
   });
 
   newProductGrid.querySelectorAll('.product-image, .product-title').forEach((element: any) => {
     element.addEventListener('click', (event: any) => {
       if (event.target.closest('.bw-product-card__image-nav')) return;
       event.stopPropagation();
-      openProductModalForCard(event.target.closest('.product-card'));
+      void openProductModalForCard(event.target.closest('.product-card')).catch((error) => {
+        console.error('[WPB] Unable to load FPB product modal', error);
+      });
     });
   });
 

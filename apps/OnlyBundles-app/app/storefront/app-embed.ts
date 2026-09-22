@@ -3,24 +3,14 @@ import {
   type FpbDesignPreset,
 } from './fpb-template-assets.js';
 import { transferBootstrapLoadingScreen } from '../assets/widgets/full-page/bootstrap-skeleton.js';
-import {
-  initializeFpbProductPageUpsells,
-  reconcileFpbUpsellPlacement,
-} from './fpb-product-page-upsell.js';
-import {
-  exposeStorefrontContext,
-  initializePpbBundleEmbed,
-  reconcilePpbBundleEmbedPlacement,
-} from './ppb-bundle-embed.js';
-import {
-  findPageBuilderEmbedMarker,
-  initializePageBuilderEmbed,
-  suppressesAutomaticPpbEmbed,
-} from './page-builder-embed.js';
-import { loadAndApplyGlobalSettingsControls } from './settings-controls.js';
+import { exposeStorefrontContext } from './ppb-bundle-embed.js';
 import { FPB_PROXY_PATH_PATTERN, setStorefrontProxyRoot } from '../config/storefront-proxy-routes.js';
 import { resolveAppEmbedOwnership } from './app-embed-marker.js';
-import { initCartPropertiesCleaner } from './cart-properties-cleanup.js';
+import {
+  shouldLoadCartFeatures,
+  shouldLoadControlsFeatures,
+  shouldLoadProductFeatures,
+} from './app-embed-feature-gates.js';
 
 const ownership = resolveAppEmbedOwnership();
 const embed = ownership.status === 'owned' ? ownership.marker : null;
@@ -94,6 +84,8 @@ function hydrateMarker(): void {
     fpbTabStyle: preset === 'CLASSIC' || preset === 'COMPACT' ? 'pill' : 'underline',
     bundleConfig: marker.dataset.bundleConfig || 'null',
     bundleConfigSource: marker.dataset.bundleConfigSource || '',
+    fpbRuntime: marker.dataset.fpbRuntime || 'null',
+    fpbModalScriptUrl: embed.dataset.fullPageModalScriptUrl || '',
     bundleSettings: marker.dataset.bundleSettings || 'null',
     shop: marker.dataset.shop || '',
     fpbLoadingGif: marker.dataset.fpbLoadingGif || '',
@@ -110,50 +102,50 @@ function hydrateMarker(): void {
   loadFullPageRuntime(embed.dataset.fullPageScriptUrl);
 }
 
-function hydrateProductPageUpsells(): void {
-  if (!embed) return;
-  reconcileFpbUpsellPlacement();
-  void initializeFpbProductPageUpsells(embed);
+export function loadFeatureScript(src: string | undefined): boolean {
+  if (!src || document.querySelector(`script[src="${src}"]`)) return false;
+  const script = document.createElement('script');
+  script.src = src;
+  script.defer = true;
+  document.body.append(script);
+  return true;
 }
 
-function hydratePpbBundleEmbed(): void {
-  if (!embed) return;
-  if (suppressesAutomaticPpbEmbed(findPageBuilderEmbedMarker())) return;
-  reconcilePpbBundleEmbedPlacement();
-  void initializePpbBundleEmbed(embed);
-}
-
-function hydratePageBuilderEmbed(): void {
-  if (!embed) return;
-  void initializePageBuilderEmbed(embed);
-}
-
-function hydrateGlobalSettingsControls(): void {
-  if (!embed || embed.dataset.wpbControlsHydrated === 'true') return;
-  embed.dataset.wpbControlsHydrated = 'true';
-  void loadAndApplyGlobalSettingsControls(embed.dataset.controlsSettingsEndpoint || '');
+function loadAppFeatures(): void {
+  if (!embed || embed.dataset.redirectPath) return;
+  const runtime = (window as Window & Record<string, any>).__WOLFPACK_SETTINGS_CONTROLS_RUNTIME__;
+  if (shouldLoadProductFeatures({
+    productId: embed.dataset.productId,
+    hasPageBuilderMarker: Boolean(document.querySelector('[data-wpb-page-builder-embed]')),
+  })) {
+    loadFeatureScript(embed.dataset.productFeaturesScriptUrl);
+  }
+  if (shouldLoadControlsFeatures(runtime)) {
+    loadFeatureScript(embed.dataset.controlsScriptUrl);
+  }
+  if (shouldLoadCartFeatures({
+    pageType: embed.dataset.pageType,
+    hasPrivateProperties: embed.dataset.cartHasWpbPrivateProperties === 'true',
+  })) {
+    loadFeatureScript(embed.dataset.cartScriptUrl);
+  } else {
+    const loadCart = () => loadFeatureScript(embed.dataset.cartScriptUrl);
+    document.addEventListener('shopify:cart:view', loadCart, { once: true });
+    document.addEventListener('shopify:cart:lines-update', loadCart, { once: true });
+  }
 }
 
 if (embed) {
   (window as Window & { __WOLFPACK_BUNDLE_EMBED_ACTIVE__?: boolean }).__WOLFPACK_BUNDLE_EMBED_ACTIVE__ = true;
-  initCartPropertiesCleaner();
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
       hydrateMarker();
-      hydratePageBuilderEmbed();
-      hydrateProductPageUpsells();
-      hydratePpbBundleEmbed();
-      hydrateGlobalSettingsControls();
+      loadAppFeatures();
     }, { once: true });
   } else {
     hydrateMarker();
-    hydratePageBuilderEmbed();
-    hydrateProductPageUpsells();
-    hydratePpbBundleEmbed();
-    hydrateGlobalSettingsControls();
+    loadAppFeatures();
   }
   document.addEventListener('shopify:section:load', hydrateMarker);
-  document.addEventListener('shopify:section:load', hydratePageBuilderEmbed);
-  document.addEventListener('shopify:section:load', hydrateProductPageUpsells);
-  document.addEventListener('shopify:section:load', hydratePpbBundleEmbed);
+  document.addEventListener('shopify:section:load', loadAppFeatures);
 }

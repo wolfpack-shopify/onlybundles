@@ -22,6 +22,7 @@ function run(command, args, options = {}) {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
+
 const rustc = spawnSync("rustup", ["which", "--toolchain", "stable", "rustc"], {
   encoding: "utf8",
 });
@@ -42,4 +43,6 @@ run(
   },
 );
 
+// Shopify CLI applies its ABI trampoline and optimizer after this compiler command.
+// Validate the final artifact through `shopify app function build` and a replay.
 console.log(`Compiled Cart Transform WASM: ${statSync(wasmPath).size} bytes`);

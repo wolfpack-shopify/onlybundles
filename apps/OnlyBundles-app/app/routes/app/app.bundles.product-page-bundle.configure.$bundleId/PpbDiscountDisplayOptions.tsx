@@ -136,6 +136,9 @@ export function PpbBundleQuantityOptions({
           </div>
           <QuestionHelpTooltip tooltipKey="bundleQuantityOptions" />
           <s-switch
+            accessibilityLabel={translateAdmin(
+              "tooltips.bundleQuantityOptions.title"
+            )}
             checked={qtyOptionsEnabled || undefined}
             disabled={!bundleQuantityOptionsEligible || undefined}
             onChange={(e) => {
@@ -305,6 +308,9 @@ function PpbProgressBarOptions({
           </div>
           <QuestionHelpTooltip tooltipKey="discountProgressBar" />
           <s-switch
+            accessibilityLabel={translateAdmin(
+              "tooltips.discountProgressBar.title"
+            )}
             checked={progressBarEnabled || undefined}
             onChange={(e) => {
               setProgressBarEnabled((e.target as HTMLInputElement).checked);

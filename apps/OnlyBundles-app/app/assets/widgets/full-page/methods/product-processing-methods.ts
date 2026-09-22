@@ -1,5 +1,5 @@
 import { BUNDLE_WIDGET } from '../../shared/constants.js';
-import { sanitizeRichHtmlFragment } from '../../shared/rich-html.js';
+import { fetchStorefrontProductsUnified } from '../../shared/storefront-products-fetcher.js';
 
 function extractFullPageId(idString: any) {
   if (!idString) return null;
@@ -136,8 +136,9 @@ function normalizeProductDescription(product: any) {
     : '';
   if (!htmlDescription || typeof document === 'undefined') return '';
 
-  const fragment = sanitizeRichHtmlFragment(htmlDescription, 'product-description');
-  return (fragment.textContent || '').trim();
+  const template = document.createElement('template');
+  template.innerHTML = htmlDescription;
+  return (template.content.textContent || '').trim();
 }
 
 function normalizeProductDescriptionHtml(product: any) {
@@ -504,24 +505,22 @@ async loadStepProducts(stepIndex: string|number) {
           || null;
 
         try {
-          const countryParam = country ? `&country=${encodeURIComponent(country)}` : '';
-          const response = await fetch(`${apiBaseUrl}/api/storefront-products?ids=${encodeURIComponent(missingProductIds.join(','))}${countryParam}`);
+          const products = await fetchStorefrontProductsUnified({
+            productIds: missingProductIds,
+            country,
+            apiBaseUrl,
+          });
 
-          if (response.ok) {
-            const data = await response.json();
-            if (data.products && data.products.length > 0) {
-              if (typeof this.rememberRuntimeProductInventory === 'function') {
-                this.rememberRuntimeProductInventory(data.products);
-              }
-              data.products.forEach((product: any)  => {
-                const key = storefrontApiProductLookupKey(product);
-                if (key) fetchedProductsByKey.set(key, product);
-              });
+          if (products && products.length > 0) {
+            if (typeof this.rememberRuntimeProductInventory === 'function') {
+              this.rememberRuntimeProductInventory(products);
             }
-          } else {
-            await response.text();
+            products.forEach((product: any) => {
+              const key = storefrontApiProductLookupKey(product);
+              if (key) fetchedProductsByKey.set(key, product);
+            });
           }
-        } catch (error: any) {
+        } catch (_error: any) {
         }
       }
     }
@@ -538,32 +537,25 @@ async loadStepProducts(stepIndex: string|number) {
     });
   } else if (!step?.isFreeGift) {
     if (productIds.length > 0) {
-
-      // Get app URL from widget data attribute or window global
       const apiBaseUrl = this.resolveStorefrontApiBase();
-
-      // Derive customer's country for @inContext pricing (market-correct prices via Shopify Markets)
       const country = window.Shopify?.country
         || (window.Shopify?.locale?.includes('-') ? window.Shopify.locale.split('-')[1] : null)
         || null;
 
       try {
-        const countryParam = country ? `&country=${encodeURIComponent(country)}` : '';
-        const response = await fetch(`${apiBaseUrl}/api/storefront-products?ids=${encodeURIComponent(productIds.join(','))}${countryParam}`);
+        const products = await fetchStorefrontProductsUnified({
+          productIds,
+          country,
+          apiBaseUrl,
+        });
 
-        if (!response.ok) {
-          await response.text();
-        } else {
-          const data = await response.json();
-
-          if (data.products && data.products.length > 0) {
-            allProducts = allProducts.concat(data.products);
-            if (typeof this.rememberRuntimeProductInventory === 'function') {
-              this.rememberRuntimeProductInventory(data.products);
-            }
+        if (products && products.length > 0) {
+          allProducts = allProducts.concat(products);
+          if (typeof this.rememberRuntimeProductInventory === 'function') {
+            this.rememberRuntimeProductInventory(products);
           }
         }
-      } catch (error: any) {
+      } catch (_error: any) {
       }
     }
   }
@@ -666,7 +658,7 @@ async _reconcileDirectDefaultProductsFromStorefront(stepIndex: number) {
     return;
   }
 
-  const productIds = Array.from(new Set(this.directDefaultProducts
+  const productIds = Array.from(new Set<string>(this.directDefaultProducts
     .map((product: any)  => extractFullPageId(product?.id))
     .filter(Boolean)
     .map((productId: any)  => `gid://shopify/Product/${productId}`)));
@@ -678,21 +670,16 @@ async _reconcileDirectDefaultProductsFromStorefront(stepIndex: number) {
     || null;
 
   try {
-    const countryParam = country ? `&country=${encodeURIComponent(country)}` : '';
-    const response = await fetch(
-      `${apiBaseUrl}/api/storefront-products?ids=${encodeURIComponent(productIds.join(','))}${countryParam}`,
-      { cache: 'no-store' },
-    );
-    if (!response.ok) {
-      await response.text();
-      return;
-    }
+    const products = await fetchStorefrontProductsUnified({
+      productIds,
+      country,
+      apiBaseUrl,
+    });
 
-    const data = await response.json();
     const previousDefaults = this.directDefaultProducts;
     this.directDefaultProducts = reconcileFullPageDirectDefaultProducts(
       previousDefaults,
-      Array.isArray(data.products) ? data.products : [],
+      Array.isArray(products) ? products : [],
     );
     const retainedSelectionIds = new Set(this.directDefaultProducts
       .map((product: any)  => extractFullPageId(product?.selectionId || product?.variantId))
@@ -717,7 +704,7 @@ async _reconcileDirectDefaultProductsFromStorefront(stepIndex: number) {
     });
 
     if (typeof this.rememberRuntimeProductInventory === 'function') {
-      this.rememberRuntimeProductInventory(data.products);
+      this.rememberRuntimeProductInventory(products);
     }
   } catch (error: any) {
   }
@@ -910,7 +897,7 @@ processProductsForStep(products: any, step: any) {
 
       const processedOptions = deriveProductOptionNames(product);
 
-    return product.variants
+      return product.variants
         .filter((variant: any)  => this.isVariantSelectableForInventory(variant))
         .map((variant: any)  => {
           const variantId = variantLookupKey(variant);
@@ -960,19 +947,21 @@ processProductsForStep(products: any, step: any) {
         })
         .filter(Boolean);
     } else {
-      // Grouped cards require at least one sellable variant. This also removes
-      // tracked zero-stock products when the global inventory control is active.
       const defaultVariant = this.getFirstAvailableVariant(product);
-      if (Array.isArray(product?.variants) && product.variants.length > 0 && !defaultVariant) {
+      const trackInventoryOnAddToCart = typeof this.isInventoryTrackingOnAddToCartEnabled === 'function'
+        ? this.isInventoryTrackingOnAddToCartEnabled()
+        : fullPageProductProcessingMethods.isInventoryTrackingOnAddToCartEnabled.call(this);
+      if (trackInventoryOnAddToCart && Array.isArray(product?.variants) && product.variants.length > 0 && !defaultVariant) {
         return [];
       }
-      const defaultRuntimeInventory = defaultVariant
+      const activeVariant = defaultVariant || (Array.isArray(product?.variants) && product.variants.length > 0 ? product.variants[0] : null);
+      const defaultRuntimeInventory = activeVariant
         && typeof this.getRuntimeVariantInventory === 'function'
-        ? this.getRuntimeVariantInventory(defaultVariant)
+        ? this.getRuntimeVariantInventory(activeVariant)
         : null;
       const defaultVariantSource = defaultRuntimeInventory
-        ? { ...defaultVariant, ...defaultRuntimeInventory }
-        : defaultVariant;
+        ? { ...activeVariant, ...defaultRuntimeInventory }
+        : activeVariant;
 
       // Storefront API: prioritize variant image, fallback to product featured image.
       // product.imageUrl — set by API path; product.featuredImage/images — metafield cache format.
@@ -1118,7 +1107,7 @@ async enrichMissingProductDescriptions(products: any[]) {
   const missingProductIds = Array.from(new Set(products
     .filter(product => !normalizeProductDescriptionHtml(product))
     .map(productGraphqlId)
-    .filter(Boolean)));
+    .filter((id): id is string => typeof id === 'string' && id.length > 0)));
 
   if (missingProductIds.length === 0) return products;
 
@@ -1128,16 +1117,19 @@ async enrichMissingProductDescriptions(products: any[]) {
     || null;
 
   try {
-    const countryParam = country ? `&country=${encodeURIComponent(country)}` : '';
-    const response = await fetch(`${apiBaseUrl}/api/storefront-products?ids=${encodeURIComponent(missingProductIds.join(','))}${countryParam}`);
-    if (!response.ok) return products;
+    const productsList = await fetchStorefrontProductsUnified({
+      productIds: missingProductIds,
+      country,
+      apiBaseUrl,
+    });
 
-    const data = await response.json();
+    if (productsList.length === 0) return products;
+
     if (typeof this.rememberRuntimeProductInventory === 'function') {
-      this.rememberRuntimeProductInventory(data.products);
+      this.rememberRuntimeProductInventory(productsList);
     }
     const descriptionsByProductId = new Map();
-    (Array.isArray(data.products) ? data.products : []).forEach((product: any)  => {
+    productsList.forEach((product: any) => {
       const description = normalizeProductDescription(product);
       const descriptionHtml = normalizeProductDescriptionHtml(product);
       const key = storefrontApiProductLookupKey(product);

@@ -51,6 +51,10 @@ describe("AddOnDiscountFunctionService", () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockShopifyAdmin.graphql.mockImplementation(async (query: string, options: any) => {
+      if (query.includes('SyncBundleDiscountConfiguration')) return createMockGraphQLResponse({ metafieldsSet: { userErrors: [], metafields: options.variables.metafields } });
+      throw new Error('Unexpected query');
+    });
   });
 
   it("creates the automatic app discount by stable function handle when none exists", async () => {
@@ -101,7 +105,7 @@ describe("AddOnDiscountFunctionService", () => {
     expect(createCall[1].variables.automaticAppDiscount.startsAt).toEqual(expect.any(String));
   });
 
-  it("returns already active without mutating a matching active discount", async () => {
+  it("refreshes configuration on a matching active discount", async () => {
     mockShopifyAdmin.graphql
       .mockResolvedValueOnce(addOnFunctionsMock())
       .mockResolvedValueOnce(createMockGraphQLResponse({
@@ -118,7 +122,7 @@ describe("AddOnDiscountFunctionService", () => {
     expect(result.success).toBe(true);
     expect(result.discountId).toBe(MOCK_DISCOUNT_ID);
     expect(result.outcome).toBe("already_active");
-    expect(mockShopifyAdmin.graphql).toHaveBeenCalledTimes(2);
+    expect(mockShopifyAdmin.graphql).toHaveBeenCalledTimes(3);
   });
 
   it("creates a role-tagged first-order subscription discount with one recurring cycle", async () => {
@@ -142,9 +146,9 @@ describe("AddOnDiscountFunctionService", () => {
       recurringCycleLimit: 1,
       metafields: [{
         namespace: "$app",
-        key: "discount_role",
-        type: "single_line_text_field",
-        value: "subscription_initial",
+        key: "discount_configuration",
+        type: "json",
+        value: JSON.stringify({ version: 1, role: 'subscription_initial', windowStart: '00:00:00', windowEnd: '23:59:59' }),
       }],
     });
   });
@@ -168,7 +172,7 @@ describe("AddOnDiscountFunctionService", () => {
     expect(mockShopifyAdmin.graphql.mock.calls[2][1].variables.automaticAppDiscount).toMatchObject({
       title: "Bundle Subscription - Recurring Orders",
       recurringCycleLimit: 0,
-      metafields: [expect.objectContaining({ value: "subscription_recurring" })],
+      metafields: [expect.objectContaining({ value: JSON.stringify({ version: 1, role: 'subscription_recurring', windowStart: '00:00:00', windowEnd: '23:59:59' }) })],
     });
   });
 
@@ -322,4 +326,16 @@ describe("AddOnDiscountFunctionService", () => {
     expect(result.error).toContain("Discount lookup failed");
     expect(mockShopifyAdmin.graphql).toHaveBeenCalledTimes(2);
   });
+});
+
+test('refreshes the non-secret Function configuration on an existing active owner', async () => {
+  mockShopifyAdmin.graphql.mockReset();
+  const value = JSON.stringify({ version: 1, role: 'addons', windowStart: '00:00:00', windowEnd: '23:59:59' });
+  mockShopifyAdmin.graphql.mockResolvedValueOnce(addOnFunctionsMock())
+    .mockResolvedValueOnce(createMockGraphQLResponse({ discountNodes: { nodes: [automaticDiscountMock()] } }))
+    .mockResolvedValueOnce(createMockGraphQLResponse({ metafieldsSet: { userErrors: [], metafields: [{ key: 'discount_configuration', value }] } }));
+  expect(await AddOnDiscountFunctionService.completeSetup(mockShopifyAdmin, 'test-shop.myshopify.com')).toMatchObject({ success: true });
+  expect(mockShopifyAdmin.graphql.mock.calls[2][1].variables.metafields).toEqual([{
+    ownerId: MOCK_DISCOUNT_ID, namespace: '$app', key: 'discount_configuration', type: 'json', value,
+  }]);
 });

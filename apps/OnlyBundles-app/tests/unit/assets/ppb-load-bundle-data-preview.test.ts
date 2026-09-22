@@ -122,7 +122,7 @@ describe("PPB loadBundleData and draft preview", () => {
     expect(widget.bundleData).toBeNull();
   });
 
-  it("does not call fetch and fails closed on public URL when schema-v3 snapshot is missing", async () => {
+  it("does not call fetch and fails closed on public URL when schema-v4 snapshot is missing", async () => {
     const mockFetch = jest.fn();
     global.fetch = mockFetch;
 
@@ -147,13 +147,13 @@ describe("PPB loadBundleData and draft preview", () => {
     global.fetch = mockFetch;
 
     const validSnapshot = {
-      schemaVersion: 3,
+      schemaVersion: 4,
       bundleType: "product_page",
       id: "snapshot-bundle-1",
       name: "Snapshot Bundle",
       status: "active",
       steps: [{ id: "step-1", name: "Step 1" }],
-      runtimeAuthorization: { version: 2 },
+      runtimePolicyRevision: "published",
     };
 
     const widget = createLifecycleWidget({

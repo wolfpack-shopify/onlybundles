@@ -36,7 +36,7 @@ export const ProductPageProductDataMethods: Record<string, any> & ThisType<any> 
   },
 
 resolveStorefrontApiBase() {
-  return this.config?.storefrontRuntime || null;
+  return this.config?.storefrontRuntime || (typeof window !== 'undefined' ? (window as any).__WOLFPACK_PPB_STOREFRONT_RUNTIME__ : null) || null;
 },
 
 collectStepProductIds(step: any, stepIndex?: string|number) {

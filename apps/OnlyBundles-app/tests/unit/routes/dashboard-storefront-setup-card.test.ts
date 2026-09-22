@@ -1,98 +1,36 @@
 import {
-  getStorefrontSetupSummary,
-  getStorefrontStatusRows,
+  getStorefrontStatusGroups,
+  getStorefrontStatusPresentation,
 } from "../../../app/routes/app/app.dashboard/DashboardStatusGrid";
+import { THEME_EXTENSION_RESOURCES } from "../../../app/lib/theme-extension-status";
 
-const APP_EMBED_RESOURCE = {
-  handle: "bundle-app-embed",
-  label: "Only Bundles",
-  kind: "embed",
-  status: "unavailable" as const,
-  enabled: false,
+const resources = THEME_EXTENSION_RESOURCES.map((resource, index) => ({
+  ...resource,
+  status: (["active", "available", "unavailable"] as const)[index % 3],
+  enabled: index % 3 === 0,
   target: null,
-} as const;
+}));
 
-const AVAILABLE_RESOURCE = {
-  handle: "bundle-product-page",
-  label: "Bundle Builder",
-  kind: "block",
-  status: "available" as const,
-  enabled: true,
-  target: null,
-} as const;
+describe("dashboard storefront status", () => {
+  it("groups every known resource without hiding optional app blocks", () => {
+    const groups = getStorefrontStatusGroups(resources);
 
-describe("dashboard storefront setup card", () => {
-  it("keeps loading and failed checks distinct from a completed setup", () => {
-    expect(getStorefrontSetupSummary({
-      enabledCoreCount: 0,
-      totalCoreCount: 2,
-      loading: true,
-      error: false,
-    })).toMatchObject({
-      state: "loading",
-      titleKey: "dashboard.storefrontSetup.loadingTitle",
-    });
-
-    expect(getStorefrontSetupSummary({
-      enabledCoreCount: 0,
-      totalCoreCount: 2,
-      loading: false,
-      error: true,
-    })).toMatchObject({
-      state: "error",
-      titleKey: "dashboard.storefrontSetup.errorTitle",
-    });
+    expect(groups.appEmbeds.map((resource) => resource.handle)).toEqual([
+      "bundle-app-embed",
+    ]);
+    expect(groups.appBlocks.map((resource) => resource.handle)).toEqual([
+      "bundle-product-page",
+      "bundle-product-page-embed",
+      "bundle-page-builder-embed",
+      "bundle-upsell",
+    ]);
   });
 
-  it("reports the exact remaining core setup work", () => {
-    expect(getStorefrontSetupSummary({
-      enabledCoreCount: 1,
-      totalCoreCount: 2,
-      loading: false,
-      error: false,
-    })).toEqual({
-      state: "incomplete",
-      titleKey: "dashboard.storefrontSetup.incompleteTitle",
-      descriptionKey: "dashboard.storefrontSetup.incompleteDescription",
-      remainingCoreCount: 1,
-    });
-  });
-
-  it("reports readiness only when every core component is enabled", () => {
-    expect(getStorefrontSetupSummary({
-      enabledCoreCount: 2,
-      totalCoreCount: 2,
-      loading: false,
-      error: false,
-    })).toEqual({
-      state: "complete",
-      titleKey: "dashboard.storefrontSetup.completeTitle",
-      descriptionKey: "dashboard.storefrontSetup.completeDescription",
-      remainingCoreCount: 0,
-    });
-  });
-
-  it("keeps summary output coupled only to core completion state", () => {
-    expect(getStorefrontSetupSummary({
-      enabledCoreCount: 2,
-      totalCoreCount: 2,
-      loading: false,
-      error: false,
-    })).toEqual({
-      state: "complete",
-      titleKey: "dashboard.storefrontSetup.completeTitle",
-      descriptionKey: "dashboard.storefrontSetup.completeDescription",
-      remainingCoreCount: 0,
-    });
-
-    const { core } = getStorefrontStatusRows([APP_EMBED_RESOURCE]);
-    expect(core).toHaveLength(1);
-  });
-
-  it("returns only core storefront rows from configured status resources", () => {
-    expect(getStorefrontStatusRows([APP_EMBED_RESOURCE, AVAILABLE_RESOURCE]))
-      .toEqual({
-        core: [APP_EMBED_RESOURCE, AVAILABLE_RESOURCE],
-      });
+  it.each([
+    ["active", "success", "dashboard.storefrontSetup.status.enabled"],
+    ["available", "info", "dashboard.storefrontSetup.status.ready"],
+    ["unavailable", "neutral", "dashboard.storefrontSetup.status.unavailable"],
+  ] as const)("maps %s to its canonical presentation", (status, tone, labelKey) => {
+    expect(getStorefrontStatusPresentation(status)).toEqual({ tone, labelKey });
   });
 });

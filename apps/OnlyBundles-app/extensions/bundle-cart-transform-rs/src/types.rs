@@ -12,9 +12,9 @@
 // METAFIELD JSON TYPES — deserialized from metafield string values
 // ============================================================================
 
-/// Runtime-token parent data used by MERGE.
-/// EXPAND reads component references separately and quantities from price_adjustment.
-#[derive(serde::Deserialize, Debug)]
+/// Parent identity and pricing resolved from the published policy.
+#[derive(serde::Deserialize)]
+#[cfg_attr(test, derive(Debug))]
 pub struct ComponentParent {
     /// Parent variant GID, e.g. "gid://shopify/ProductVariant/123"
     pub id: String,
@@ -22,80 +22,14 @@ pub struct ComponentParent {
     pub price_adjustment: Option<PriceAdjustmentConfig>,
 }
 
-/// Required parent eligibility, parsed separately from optional discount rules.
-#[derive(serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ParentOfferPolicy {
-    pub component_quantities: Vec<i64>,
-    pub shop: String,
-    pub bundle_id: String,
-    pub revision: String,
-    pub country_rule: String,
-}
-
 /// Deserialized from `$app:price_adjustment` metafield.
 /// Also embedded inside `ComponentParent.price_adjustment`.
-#[derive(serde::Deserialize, Debug, Clone, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct PriceAdjustmentConfig {
-    #[serde(default)]
-    pub method: PricingMethod,
-    #[serde(default)]
-    pub value: f64,
-    #[serde(default)]
-    pub conditions: Option<Condition>,
-    #[serde(default)]
-    pub customer_buys: Option<i64>,
-    #[serde(default)]
-    pub customer_gets: Option<i64>,
-    #[serde(default)]
-    pub discount_type: Option<String>,
-    #[serde(default)]
-    pub apply_discount_to: Option<String>,
-    #[serde(default)]
-    pub rules: Option<Vec<PriceAdjustmentConfig>>,
-}
+pub use bundle_runtime_policy::pricing::{PriceAdjustmentConfig, PricingMethod, ConditionType};
 
-#[derive(serde::Deserialize, Debug, Clone, PartialEq, Default)]
-#[serde(rename_all = "snake_case")]
-pub enum PricingMethod {
-    #[default]
-    PercentageOff,
-    FixedAmountOff,
-    FixedBundlePrice,
-    BuyXGetY,
-}
-
-/// Optional discount threshold condition.
-#[derive(serde::Deserialize, Debug, Clone)]
-pub struct Condition {
-    #[serde(rename = "type")]
-    pub condition_type: ConditionType,
-    pub operator: String,
-    pub value: f64,
-}
-
-#[derive(serde::Deserialize, Debug, Clone, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum ConditionType {
-    Quantity,
-    Amount,
-}
-
-/// Normalized condition operator.
-#[derive(Debug, Clone, PartialEq)]
-pub enum Operator {
-    Gte,
-    Gt,
-    Lte,
-    Lt,
-    Eq,
-}
-
-#[derive(Debug, Clone)]
+#[derive(Clone)]
+#[cfg_attr(test, derive(Debug))]
 pub struct CartLineMessagingSettings {
     pub is_enabled: bool,
-    pub show_bundle_contains: bool,
     pub show_original_price: bool,
     pub discount_display: CartLineDiscountDisplaySettings,
 }
@@ -104,22 +38,21 @@ impl Default for CartLineMessagingSettings {
     fn default() -> Self {
         Self {
             is_enabled: true,
-            show_bundle_contains: true,
             show_original_price: true,
             discount_display: CartLineDiscountDisplaySettings::default(),
         }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
+#[cfg_attr(test, derive(Debug))]
 pub struct CartLineDiscountDisplaySettings {
     pub is_enabled: bool,
-    pub format: String,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Clone, Default)]
+#[cfg_attr(test, derive(Debug))]
 pub struct CartTransformRuntimeConfiguration {
-    pub runtime_token_secret: String,
     pub bundle_cart_line_messaging: CartLineMessagingSettings,
 }
 
@@ -131,17 +64,9 @@ impl CartTransformRuntimeConfiguration {
         let messaging = value.get_obj_prop("bundleCartLineMessaging");
         let discount = messaging.get_obj_prop("discountDisplay");
         Self {
-            runtime_token_secret: value
-                .get_obj_prop("runtimeTokenSecret")
-                .as_string()
-                .unwrap_or_default(),
             bundle_cart_line_messaging: CartLineMessagingSettings {
                 is_enabled: messaging
                     .get_obj_prop("isEnabled")
-                    .as_bool()
-                    .unwrap_or(true),
-                show_bundle_contains: messaging
-                    .get_obj_prop("showBundleContains")
                     .as_bool()
                     .unwrap_or(true),
                 show_original_price: messaging
@@ -150,10 +75,6 @@ impl CartTransformRuntimeConfiguration {
                     .unwrap_or(true),
                 discount_display: CartLineDiscountDisplaySettings {
                     is_enabled: discount.get_obj_prop("isEnabled").as_bool().unwrap_or(true),
-                    format: discount
-                        .get_obj_prop("format")
-                        .as_string()
-                        .unwrap_or_else(default_amount_percentage),
                 },
             },
         }
@@ -164,45 +85,22 @@ impl Default for CartLineDiscountDisplaySettings {
     fn default() -> Self {
         Self {
             is_enabled: true,
-            format: default_amount_percentage(),
         }
     }
 }
 
-fn default_amount_percentage() -> String {
-    "amount_percentage".to_string()
-}
-
-#[derive(serde::Deserialize, Debug, Clone, Default)]
+#[derive(serde::Deserialize, Clone, Default)]
+#[cfg_attr(test, derive(Debug))]
 #[serde(rename_all = "camelCase")]
 pub struct CartLineDisplayProperties {
     #[serde(default)]
-    pub bundle_name: Option<String>,
-    #[serde(default, rename = "box")]
-    pub box_label: Option<String>,
-    #[serde(default)]
-    pub items: Option<String>,
-    #[serde(default)]
-    pub retail_price: Option<String>,
-    #[serde(default)]
-    pub you_save: CartLineDisplaySavings,
-    #[serde(default)]
-    pub labels: CartLineDisplayLabels,
-    #[serde(default)]
     pub offer_analytics: Option<CartLineOfferAnalytics>,
+    #[serde(default, alias = "tier_progress")]
+    pub tier_progress: Option<Box<serde_json::value::RawValue>>,
 }
 
-#[derive(serde::Deserialize, Debug, Clone, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct CartBundleDetailsEntry {
-    pub key: String,
-    #[serde(default)]
-    pub display_properties: CartLineDisplayProperties,
-    #[serde(default)]
-    pub runtime_token: Option<String>,
-}
-
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone, Default)]
+#[derive(serde::Deserialize, serde::Serialize, Clone, Default)]
+#[cfg_attr(test, derive(Debug))]
 #[serde(rename_all = "camelCase")]
 pub struct CartLineOfferAnalytics {
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -215,100 +113,4 @@ pub struct CartLineOfferAnalytics {
     pub offer_tier_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub offer_eligibility_source: Option<String>,
-}
-
-#[derive(serde::Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct CartLineDisplayLabels {
-    #[serde(default = "default_items_label")]
-    pub items: String,
-    #[serde(default = "default_retail_price_label")]
-    pub retail_price: String,
-    #[serde(default = "default_you_save_label")]
-    pub you_save: String,
-}
-
-impl Default for CartLineDisplayLabels {
-    fn default() -> Self {
-        Self {
-            items: default_items_label(),
-            retail_price: default_retail_price_label(),
-            you_save: default_you_save_label(),
-        }
-    }
-}
-
-fn default_items_label() -> String {
-    "Items".to_string()
-}
-fn default_retail_price_label() -> String {
-    "Retail Price".to_string()
-}
-fn default_you_save_label() -> String {
-    "You Save".to_string()
-}
-
-#[derive(serde::Deserialize, Debug, Clone, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct CartLineDisplaySavings {
-    #[serde(default)]
-    pub amount: Option<String>,
-    #[serde(default)]
-    pub percentage: Option<String>,
-    #[serde(default)]
-    pub amount_percentage: Option<String>,
-}
-
-#[derive(serde::Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-#[allow(dead_code)]
-pub struct RuntimeTokenPayload {
-    pub version: i64,
-    #[serde(default)]
-    pub kind: String,
-    pub shop: String,
-    #[serde(default)]
-    pub bundle_id: String,
-    #[serde(default)]
-    pub offer_group_id: String,
-    #[serde(default)]
-    pub parent_variant_id: String,
-    #[serde(default)]
-    pub revision: String,
-    #[serde(default)]
-    pub group_id: String,
-    #[serde(default)]
-    pub variant_id: String,
-    #[serde(default)]
-    pub product_id: Option<String>,
-    #[serde(default)]
-    pub role: String,
-    #[serde(default)]
-    pub max_quantity: i64,
-    #[serde(default)]
-    pub groups: Vec<PpbSelectionGroupV2>,
-    #[serde(default)]
-    pub components: Vec<RuntimeTokenLine>,
-    #[serde(default)]
-    pub price_adjustment: PriceAdjustmentConfig,
-    #[serde(default)]
-    pub country_rule: String,
-}
-
-#[derive(serde::Deserialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct PpbSelectionGroupV2 {
-    pub id: String,
-    pub role: String,
-    pub min_quantity: i64,
-    pub max_quantity: i64,
-}
-
-pub type PpbLineTokenV2 = RuntimeTokenPayload;
-
-#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct RuntimeTokenLine {
-    pub variant_id: String,
-    pub quantity: i64,
 }

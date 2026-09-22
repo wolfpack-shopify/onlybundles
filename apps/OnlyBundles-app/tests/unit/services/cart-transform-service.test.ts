@@ -358,7 +358,6 @@ describe('CartTransformService', () => {
         mockShopifyAdmin.graphql.mock.calls[4][1].variables.metafields[0].value
       );
       expect(runtimeConfiguration).toEqual({
-        runtimeTokenSecret: expect.any(String),
         bundleCartLineMessaging: { isEnabled: false }
       });
     });
@@ -461,10 +460,9 @@ describe('CartTransformService', () => {
       ]);
       const runtimeConfiguration = JSON.parse(metafieldsCall[1].variables.metafields[0].value);
       expect(runtimeConfiguration).toEqual({
-        runtimeTokenSecret: expect.any(String),
         bundleCartLineMessaging: settings
       });
-      expect(runtimeConfiguration.runtimeTokenSecret).toHaveLength(64);
+      expect(runtimeConfiguration).not.toHaveProperty('runtimeTokenSecret');
     });
 
     it('returns a failed result when metafield sync reports user errors', async () => {

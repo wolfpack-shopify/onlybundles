@@ -148,6 +148,17 @@ export function exposeStorefrontContext(embed: Pick<HTMLElement, "dataset">) {
       // Missing or malformed Shopify-hosted state is intentionally left absent.
     }
   }
+  const rawControlsRuntime = embed.dataset.storefrontControlsRuntime;
+  if (rawControlsRuntime) {
+    try {
+      const parsed = JSON.parse(rawControlsRuntime);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && parsed.schemaVersion === 2) {
+        runtime.__WOLFPACK_SETTINGS_CONTROLS_RUNTIME__ = parsed;
+      }
+    } catch {
+      // Missing or malformed Shopify-hosted Controls state is intentionally left absent.
+    }
+  }
 
   const shopBaseCurrency = normalizeCurrencyCode(embed.dataset.shopBaseCurrency);
   const customerCurrency = normalizeCurrencyCode(embed.dataset.customerCurrency);

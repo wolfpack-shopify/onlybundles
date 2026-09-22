@@ -6,19 +6,17 @@ describe("FPB runtime Controls application", () => {
     const runtimeWindow = {
       Shopify: { shop: "test.myshopify.com" },
       __bundleScriptRuns: 0,
+      __WOLFPACK_SETTINGS_CONTROLS_RUNTIME__: {
+        landingPage: {
+          font: { customFont: "Inter" },
+          scripts: { bundlePage: "window.__bundleScriptRuns += 1" },
+          selectors: { addToCartButtons: ".add", buyNowButton: ".buy" },
+        },
+      },
     };
     const originalWindow = globalThis.window;
-    const originalFetch = globalThis.fetch;
     Object.defineProperty(globalThis, "window", { configurable: true, value: runtimeWindow });
-    const fetchMock = jest.fn(async () => new Response(JSON.stringify({
-      activeControls: {
-        font: { customFont: "Inter" },
-        scripts: { bundlePage: "window.__bundleScriptRuns += 1" },
-        selectors: { addToCartButtons: ".add", buyNowButton: ".buy" },
-      },
-    }), { status: 200 }));
-    globalThis.fetch = fetchMock as typeof fetch;
-    const context = {
+    const context: any = {
       config: {},
       container: { dataset: {}, style: { setProperty, removeProperty: jest.fn() } },
       _runControlsScript: fullPageAnalyticsConfigMethods._runControlsScript,
@@ -29,7 +27,6 @@ describe("FPB runtime Controls application", () => {
       await fullPageAnalyticsConfigMethods.loadControlsSettings.call(context);
       await fullPageAnalyticsConfigMethods.loadControlsSettings.call(context);
     } finally {
-      globalThis.fetch = originalFetch;
       Object.defineProperty(globalThis, "window", { configurable: true, value: originalWindow });
     }
 
@@ -39,26 +36,27 @@ describe("FPB runtime Controls application", () => {
       addToCartButtons: ".add",
       buyNowButton: ".buy",
     });
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/apps/product-bundles/api/controls-settings?bundleType=full_page",
-      { credentials: "same-origin" },
-    );
   });
 
-  it("requests language settings without a caller-controlled shop path", async () => {
+  it("selects the exact or base locale from the inline FPB runtime without fetching", async () => {
     const originalWindow = globalThis.window;
     const originalFetch = globalThis.fetch;
-    const fetchMock = jest.fn(async () => new Response(JSON.stringify({
-      activeLanguageData: { addBundle: "Ajouter" },
-      sharedCartLabels: {},
-      textOverrides: {},
-    }), { status: 200 }));
+    const fetchMock = jest.fn();
     Object.defineProperty(globalThis, "window", {
       configurable: true,
       value: { Shopify: { shop: "caller-controlled.myshopify.com", locale: "fr-CA" } },
     });
     globalThis.fetch = fetchMock as typeof fetch;
-    const context = { config: {} };
+    const context: any = {
+      config: {},
+      container: { dataset: { fpbRuntime: JSON.stringify({
+        schemaVersion: 1,
+        languages: {
+          en: { activeLocale: "en", sharedCartLabels: {}, textOverrides: { nextButton: "Next" } },
+          fr: { activeLocale: "fr", sharedCartLabels: {}, textOverrides: { nextButton: "Suivant" } },
+        },
+      }) } },
+    };
 
     try {
       await fullPageAnalyticsConfigMethods.loadLanguageSettings.call(context);
@@ -67,10 +65,8 @@ describe("FPB runtime Controls application", () => {
       Object.defineProperty(globalThis, "window", { configurable: true, value: originalWindow });
     }
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/apps/product-bundles/api/language-settings?bundleType=full_page&locale=fr-CA",
-      { credentials: "same-origin" },
-    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(context.config.textOverrides).toEqual({ nextButton: "Suivant" });
   });
 
   it("mounts bundle-builder CSS on the FPB surface", async () => {
@@ -82,18 +78,19 @@ describe("FPB runtime Controls application", () => {
     };
     const originalWindow = globalThis.window;
     const originalDocument = globalThis.document;
-    const originalFetch = globalThis.fetch;
     Object.defineProperty(globalThis, "window", {
       configurable: true,
-      value: { Shopify: { shop: "test.myshopify.com" } },
+      value: {
+        Shopify: { shop: "test.myshopify.com" },
+        __WOLFPACK_SETTINGS_CONTROLS_RUNTIME__: {
+          landingPage: {
+            css: { bundleBuilderPages: ".builder-marker { color: red; }" },
+            font: {}, scripts: {}, selectors: {},
+          },
+        },
+      },
     });
     Object.defineProperty(globalThis, "document", { configurable: true, value: runtimeDocument });
-    globalThis.fetch = jest.fn(async () => new Response(JSON.stringify({
-      activeControls: {
-        css: { bundleBuilderPages: ".builder-marker { color: red; }" },
-        font: {}, scripts: {}, selectors: {},
-      },
-    }), { status: 200 })) as typeof fetch;
     const context = {
       config: {},
       container: { dataset: {}, style: { setProperty: jest.fn(), removeProperty: jest.fn() } },
@@ -104,7 +101,6 @@ describe("FPB runtime Controls application", () => {
     try {
       await fullPageAnalyticsConfigMethods.loadControlsSettings.call(context);
     } finally {
-      globalThis.fetch = originalFetch;
       Object.defineProperty(globalThis, "window", { configurable: true, value: originalWindow });
       Object.defineProperty(globalThis, "document", { configurable: true, value: originalDocument });
     }

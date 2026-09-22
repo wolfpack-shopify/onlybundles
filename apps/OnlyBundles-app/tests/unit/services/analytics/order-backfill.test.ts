@@ -1,5 +1,4 @@
 import { backfillOrderAttribution } from "../../../../app/services/analytics/order-backfill.server";
-import { createHmac } from "node:crypto";
 
 const mockOrderAttributionFindMany = jest.fn();
 const mockOrderAttributionCreateMany = jest.fn();
@@ -33,30 +32,7 @@ jest.mock("../../../../app/lib/logger", () => ({
 const SHOP = "test-bundle-store123.myshopify.com";
 const SINCE = "2026-06-01T00:00:00.000Z";
 const UNTIL = "2026-07-01T00:00:00.000Z";
-const API_SECRET = "analytics-test-secret";
-
-function makeRuntimeToken(bundleId: string, shop = SHOP) {
-  const payloadPart = Buffer.from(JSON.stringify({
-    version: 1,
-    shop,
-    bundleId,
-    bundleType: "full_page",
-    offerGroupId: `${bundleId}_test`,
-    parentVariantId: "gid://shopify/ProductVariant/200",
-    bundleName: "Historical Bundle",
-    components: [],
-    addons: [],
-    countryRule: "",
-    priceAdjustment: null,
-  })).toString("base64url");
-  const runtimeSecret = createHmac("sha256", API_SECRET)
-    .update(`wpb-runtime-token:${shop}`)
-    .digest("hex");
-  const signature = createHmac("sha256", runtimeSecret)
-    .update(payloadPart)
-    .digest("base64url");
-  return `${payloadPart}.${signature}`;
-}
+function selectionForBundle(bundleId: string) { return JSON.stringify({ bundleId }); }
 
 function makeOrderNode(overrides: Partial<any> = {}) {
   return {
@@ -100,7 +76,6 @@ const admin = { graphql: (...args: unknown[]) => mockAdminGraphql(...args) } as 
 
 describe("backfillOrderAttribution", () => {
   beforeEach(() => {
-    process.env.SHOPIFY_API_SECRET = API_SECRET;
     mockOrderAttributionFindMany.mockReset();
     mockOrderAttributionCreateMany.mockReset();
     mockOrderAttributionUpdateMany.mockReset();
@@ -271,14 +246,14 @@ describe("backfillOrderAttribution", () => {
   });
 
   it("uses Shopify line-item custom attributes to retain a deleted bundle identity", async () => {
-    const runtimeToken = makeRuntimeToken("deleted-bundle-1");
+    const selection = selectionForBundle("deleted-bundle-1");
     mockAdminGraphql.mockResolvedValue(makeGraphqlResponse([makeOrderNode({
       lineItems: {
         nodes: [{
           product: { id: "gid://shopify/Product/100" },
           quantity: 1,
           discountedTotalSet: { shopMoney: { amount: "45.00" } },
-          customAttributes: [{ key: "_wolfpack_bundle_runtime", value: runtimeToken }],
+          customAttributes: [{ key: "_wpb_selection", value: selection }],
         }],
       },
     })]));
@@ -299,7 +274,7 @@ describe("backfillOrderAttribution", () => {
   });
 
   it("refreshes canonical Shopify order and bundle values for an existing bundle row", async () => {
-    const runtimeToken = makeRuntimeToken("bundle-1");
+    const selection = selectionForBundle("bundle-1");
     mockAdminGraphql.mockResolvedValue(makeGraphqlResponse([makeOrderNode({
       currentTotalPriceSet: { shopMoney: { amount: "90.00", currencyCode: "USD" } },
       lineItems: {
@@ -307,7 +282,7 @@ describe("backfillOrderAttribution", () => {
           product: { id: "gid://shopify/Product/100" },
           quantity: 1,
           discountedTotalSet: { shopMoney: { amount: "40.00" } },
-          customAttributes: [{ key: "_wolfpack_bundle_runtime", value: runtimeToken }],
+          customAttributes: [{ key: "_wpb_selection", value: selection }],
         }],
       },
     })]));
@@ -334,14 +309,14 @@ describe("backfillOrderAttribution", () => {
     expect(result).toMatchObject({ created: 0, repaired: 1, skipped: 0 });
   });
 
-  it("ignores a tampered runtime token and falls back to current product matching", async () => {
-    const runtimeToken = `${makeRuntimeToken("forged-bundle")}-tampered`;
+  it("ignores malformed selection metadata and falls back to current product matching", async () => {
+    const selection = `${selectionForBundle("forged-bundle")}-tampered`;
     mockAdminGraphql.mockResolvedValue(makeGraphqlResponse([makeOrderNode({
       lineItems: {
         nodes: [{
           product: { id: "gid://shopify/Product/100" },
           quantity: 1,
-          customAttributes: [{ key: "_wolfpack_bundle_runtime", value: runtimeToken }],
+          customAttributes: [{ key: "_wpb_selection", value: selection }],
         }],
       },
     })]));
@@ -378,13 +353,13 @@ describe("backfillOrderAttribution", () => {
   });
 
   it("repairs an existing null attribution when Shopify retains a valid runtime token", async () => {
-    const runtimeToken = makeRuntimeToken("deleted-bundle-1");
+    const selection = selectionForBundle("deleted-bundle-1");
     mockAdminGraphql.mockResolvedValue(makeGraphqlResponse([makeOrderNode({
       lineItems: {
         nodes: [{
           product: { id: "gid://shopify/Product/100" },
           quantity: 1,
-          customAttributes: [{ key: "_wolfpack_bundle_runtime", value: runtimeToken }],
+          customAttributes: [{ key: "_wpb_selection", value: selection }],
         }],
       },
     })]));

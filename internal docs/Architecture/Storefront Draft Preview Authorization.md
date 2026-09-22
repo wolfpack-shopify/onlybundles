@@ -5,7 +5,7 @@ title: Storefront Draft Preview Authorization
 type: architecture-decision
 status: accepted
 summary: Draft FPB and PPB storefront previews use one 1-hour stateless token bound to the shop and bundle.
-last_audited: 2026-09-15
+last_audited: 2026-09-22
 owners:
   - engineering
 domains:
@@ -39,7 +39,7 @@ keywords:
 
 ## Decision
 
-Draft FPB and PPB previews use the same 1-hour (60-minute) stateless `wpb_preview` token (`BUNDLE_PREVIEW_TOKEN_TTL_MS = 60 * 60 * 1000`). The token is HMAC-signed from `SHOPIFY_API_SECRET` and binds version, shop domain, bundle ID, and expiry. It is minted only after an authenticated Admin preview preparation successfully performs the normal storefront sync.
+Draft FPB and PPB previews use the same 1-hour (60-minute) stateless `wpb_preview` token (`BUNDLE_PREVIEW_TOKEN_TTL_MS = 60 * 60 * 1000`). The token is HMAC-signed from `SHOPIFY_API_SECRET` and binds version, shop domain, bundle ID, and expiry. Authenticated Admin preview preparation is read-only: it validates the saved bundle identity, requires FPB `publicNumber`, and mints the token without publishing or synchronizing storefront state.
 
 Active and unlisted bundles remain public. Draft bundles require a valid token. Archived, missing, cross-shop, expired, tampered, and cross-bundle requests return `404` so callers cannot distinguish private state from absence.
 
@@ -52,3 +52,5 @@ PPB places the token on the Shopify product preview URL. The product-page widget
 ## Caching and persistence
 
 Preview tokens are not stored in Prisma, metafields, local storage, or app events. Authorized draft API responses use `Cache-Control: private, no-store` and do not participate in conditional public caching. Public active and unlisted responses retain their existing short cache policy.
+
+The prepare client posts only the dedicated resource route. A route or network failure closes the synchronously reserved preview tab and surfaces the operation error; it never retries against the configure document or opens an unsigned fallback URL. Preview analytics remain a separate fire-and-forget action after successful navigation.

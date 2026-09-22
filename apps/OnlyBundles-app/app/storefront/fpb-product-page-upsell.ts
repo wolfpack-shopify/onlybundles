@@ -1,4 +1,5 @@
 import { createFpbUpsellHandoff } from "./fpb-upsell-handoff.js";
+import { storefrontPath } from "../assets/widgets/shared/storefront-path.js";
 
 type Offer = {
   bundleId: string;
@@ -75,7 +76,7 @@ export function resolveCurrentVariantId(context: ProductContext, root: ParentNod
 }
 
 function destinationUrl(offer: Offer) {
-  const url = new URL(offer.targetPath, window.location.origin);
+  const url = new URL(storefrontPath(offer.targetPath, window), window.location.origin);
   url.searchParams.set("source", offer.mode === "button" ? "upsell-button" : "upsell-block");
   return url.toString();
 }

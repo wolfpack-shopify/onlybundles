@@ -137,6 +137,12 @@
       "saveError": "无法保存管理员语言"
     },
     "storefrontSetup": {
+      "sectionHeading": "店面状态",
+      "publishedThemeDescription": "已发布模板中的应用嵌入和应用块",
+      "appEmbedsHeading": "应用嵌入",
+      "appBlocksHeading": "模板应用块",
+      "refresh": "刷新状态",
+      "retry": "重试",
       "loadingTitle": "正在检查存储前台设置",
       "loadingDescription": "检查您已发布的主题组件和应用程序嵌入。",
       "errorTitle": "需要注意店面状态",
@@ -185,7 +191,27 @@
         "enabled": "已启用",
         "ready": "准备启用",
         "unavailable": "不可用"
+      },
+      "resourceLabels": {
+        "bundleAppEmbed": "套装店面功能",
+        "bundleProductPage": "商品页面套装构建器",
+        "bundleProductPageEmbed": "商品页面套装位置",
+        "bundlePageBuilderEmbed": "页面构建器套装位置",
+        "bundleUpsell": "整页套装追加销售"
       }
+    },
+    "commercialMetrics": {
+      "heading": "套装表现",
+      "description": "过去 {{days}} 天，以 {{currency}} 计",
+      "bundleRevenue": "套装收入",
+      "ordersWithBundles": "含套装的订单",
+      "averageOrderValue": "平均订单金额",
+      "viewToOrderConversion": "浏览到下单转化率",
+      "unavailable": "不可用",
+      "loading": "正在加载套装表现",
+      "errorHeading": "无法获取套装表现",
+      "errorDescription": "无法从 Shopify 加载这些指标。",
+      "retry": "重试"
     }
   },
   "settingsDcp": {
@@ -490,6 +516,8 @@
     "title": "提供时间安排和优先级",
     "description": "当这个捆包可以出现在Only Bundles 商店前台并且首先显示匹配的报价时进行控制。",
     "shopifyOwnership": "购物控制结算折扣日期和组合。这些设置只控制Only Bundles商店面可见性并提供选择。",
+    "scheduleUnavailableHeading": "此折扣无法使用排期",
+    "scheduleUnavailableBody": "此捆绑包使用组件级资格或定价规则，而 Shopify 无法在基础商品合并后重新计算这些规则。请移除这些规则以启用排期。如果已选择排期，请在保存前选择始终有效。",
     "priorityLabel": "店面优先级",
     "priorityDetails": "当多个Only Bundles 提供匹配相同位置时，数字会被视为较低。",
     "stopLowerLabel": "停止较低优先级的商店报价",
@@ -1157,6 +1185,8 @@
       "theCompleteBundleSolutionForShopifyBuildCustomizeAndPromoteProdu": "购物完整的捆绑解决方案——构建、定制和推广转换的产品捆绑。",
       "getStarted": "变换开始",
       "goToDashboard": "转到仪表板 →",
+      "takeMeToMyDashboard": "带我前往控制面板",
+      "valueStatement": "通过可自定义的捆绑销售提升销量和平均订单价值。",
       "everythingIncluded": "包含所有内容",
       "documentation": "文件"
     },
@@ -1488,6 +1518,7 @@
     }
   },
   "adminAttributes": {
+    "invalidJavaScriptSyntax": "请先修正 JavaScript 语法，然后再保存。",
     "searchCampaigns": "搜索活动",
     "searchByCampaignName": "按活动名称搜索",
     "sortTopCampaigns": "排序顶级活动",

@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const extensionHandle = process.argv[2] ?? "bundle-discount-function";
-if (!["bundle-discount-function", "scheduled-bundle-discount"].includes(extensionHandle)) {
+if (extensionHandle !== "bundle-discount-function") {
   throw new Error(`Unknown Discount Function extension: ${extensionHandle}`);
 }
 const extensionRoot = resolve(appRoot, "extensions", extensionHandle);

@@ -1,8 +1,8 @@
-import { withBundleCartLock } from "../../../../lib/bundle-cart-lock.js";
 import { buildCartLineSourceProperties } from '../../shared/engine/cart-lines.js';
+import { extractTierProgressForBundle } from '../../shared/engine/cart-lines.js';
 import {
+  buildBundleSelectionProperties,
   buildOfferAnalyticsCartProperties,
-  buildProductPageCartFormData,
 } from '../../shared/engine/cart-submit.js';
 import { ToastManager } from '../../shared/toast-manager.js';
 import { CurrencyManager } from '../../shared/currency-manager.js';
@@ -12,9 +12,7 @@ import {
   calculateBundleTotalForPurchaseOption,
 } from '../../shared/subscription-storefront-methods.js';
 import { areRequiredProductPageStepsValid } from './step-validation.js';
-import { preflightVariantOnStorefront, resolveRuntimeVariantNumericId } from '../../shared/variant-preflight.js';
-import { setPpbBundleDetailsCartMetafield } from '../storefront-client.js';
-import { buildStorefrontApiPath } from '../../../../config/storefront-proxy-routes.js';
+import { updateShopifyCart } from '../../shared/shopify-cart-actions.js';
 import { captureDiscountTierState } from '../../shared/discount-tier-feedback.js';
 import { hasProductPageHydrationFailure } from './product-data-methods.js';
 
@@ -33,17 +31,6 @@ function getProductPageActiveBoxSelectionRule(boxSelection: any) {
   return boxSelection?.activeRule
     || rules.find((rule: any)  => rule?.isDefaultSelected === true)
     || rules[0]
-    || null;
-}
-
-function resolveRuntimeTokenProductId(product: any = {}) {
-  return product.parentProductId
-    || product.productId
-    || product.productGraphqlId
-    || product.graphqlId
-    || product.admin_graphql_api_id
-    || product.gid
-    || product.id
     || null;
 }
 
@@ -68,7 +55,9 @@ export const ProductPageCartMethods: Record<string, any> & ThisType<any> = {
         ? areRequiredProductPageStepsValid(this.selectedBundle.steps, this.validateStep.bind(this))
         : true;
 
-      if (!allStepsValid) {
+      const addonStepsValid = this.selectedBundle.steps.every((step: any, index: number) =>
+        !step.isFreeGift || this.validateStep(index));
+      if (!allStepsValid || !addonStepsValid) {
         ToastManager.show('Please complete all bundle steps before adding to cart.');
         return;
       }
@@ -90,74 +79,35 @@ export const ProductPageCartMethods: Record<string, any> & ThisType<any> = {
       const bundleName = this.selectedBundle?.name || '';
       const sellingPlanId = this.selectedSellingPlanId || '';
       const cartItems = this.buildCartItems(offerId, sessionKey);
-      const variantPreflightCache = new Map();
-      for (let itemIndex = 0; itemIndex < cartItems.length; itemIndex += 1) {
-        const cartItem = cartItems[itemIndex];
-        const numericId = resolveRuntimeVariantNumericId(cartItem.id);
-        if (!numericId) {
-          throw new Error(`runtime-preflight blocked: invalid variant id for cart item ${itemIndex + 1}.`);
-        }
-
-        const preflightResult = variantPreflightCache.get(numericId)
-          || await preflightVariantOnStorefront(numericId, fetch);
-        variantPreflightCache.set(numericId, preflightResult);
-        if (!preflightResult?.ok) {
-          throw new Error(
-            `runtime-preflight blocked: variant ${numericId} in cart item ${itemIndex + 1} (status ${preflightResult?.status || 0}).`,
-          );
-        }
-
-        cartItem.id = numericId;
-      }
-
       this.elements.addToCartButton.disabled = true;
       this.elements.addToCartButton.textContent = this._resolveText('addingToCart', 'Adding to Cart...');
       this.showLoadingOverlay(this.config?.loadingScreen?.gifUrl || null);
 
-      const runtimeToken = this.config?.isEmbedSource && this.selectedBundle?.runtimeAuthorization?.version !== 2
-        ? await this.requestEmbedCartTransformRuntimeToken(cartItems, {
-          offerGroupId: `${offerId}_${sessionKey}`,
-          sellingPlanId,
-        })
-        : this.applyPpbStaticAuthorization(cartItems, { sellingPlanId });
-      const cartContext = this.buildProductPageCartFormData(cartItems, {
-        bundleName,
-        offerId,
-        sessionKey,
-        runtimeToken,
-        sellingPlanId,
-      });
-      const response = await withBundleCartLock(async () => {
-      await this.syncBundleDetailsCartMetafield(
-        cartContext.bundleDetailsKey,
-        cartContext.sourceProperties,
-        runtimeToken,
-        cartItems.length,
-      );
-
-      return fetch('/cart/add', {
-        method: 'POST',
-        body: cartContext.formData
-      });
-      });
-      const responseText = await response.text();
-
-      if (!response.ok) {
-        let errorMessage = `Cart add failed (${response.status})`;
-        try {
-          const errorData = JSON.parse(responseText);
-          errorMessage = errorData.message || errorData.description || errorMessage;
-        } catch {
-          // Response was not JSON, so the status-code message is clearer.
+      const nativeLines = cartItems.map((item: any, index: number) => {
+        const properties = {
+          ...item.properties,
+          _bundleName: bundleName,
+          '_wolfpackProductBundle:OfferId': `${offerId}_${sessionKey}_${index + 1}`,
+          '_wolfpackProductBundle:prodQty': String(item.quantity),
+        };
+        const rawDisplayProperties = properties._bundle_display_properties;
+        if (rawDisplayProperties) {
+          try {
+            const parsed = typeof rawDisplayProperties === 'string'
+              ? JSON.parse(rawDisplayProperties)
+              : rawDisplayProperties;
+            if (parsed?.tierProgress) properties._bundle_tier_progress = JSON.stringify(parsed.tierProgress);
+          } catch {
+            // Invalid optional display metadata must not block the cart action.
+          }
         }
-        throw new Error(errorMessage);
-      }
-
-      try {
-        JSON.parse(responseText);
-      } catch {
-        // Shopify can return an HTML cart page after a successful multipart add.
-      }
+        return { ...item, properties, sellingPlanId };
+      });
+      const cartResult = await updateShopifyCart(nativeLines);
+      const warning = Array.isArray(cartResult?.warnings)
+        ? cartResult.warnings.find((entry: any) => entry?.message)?.message
+        : null;
+      if (warning) ToastManager.show(warning);
 
       const successMessage = this._resolveText?.('addBundleSuccess', '');
       if (successMessage) ToastManager.show(successMessage);
@@ -220,6 +170,7 @@ export const ProductPageCartMethods: Record<string, any> & ThisType<any> = {
         : '',
       discountPercentage,
       labels: this.getCartLineLabels?.(),
+      tierProgress: extractTierProgressForBundle(this.selectedBundle),
     });
   },
 
@@ -278,11 +229,10 @@ export const ProductPageCartMethods: Record<string, any> & ThisType<any> = {
           id: parseInt(this.extractId(variantId)),
           quantity,
           properties,
-          _wpbProductId: resolveRuntimeTokenProductId(product),
-          _wpbAuthorizationGroup: this._isDirectDefaultVariant(variantId)
-            ? 'default-products'
-            : String(step?.id ?? stepIndex),
         };
+        Object.assign(properties, buildBundleSelectionProperties({ bundleId: this.selectedBundle.id,
+          revision: this.selectedBundle.runtimePolicyRevision, instanceId: baseOfferId,
+          groupId: this._isDirectDefaultVariant(variantId) ? 'default-products' : String(step.id) }));
         cartItems.push(cartItem);
         selectedLines.push({ product, quantity });
       });
@@ -308,205 +258,6 @@ export const ProductPageCartMethods: Record<string, any> & ThisType<any> = {
     });
 
     return cartItems;
-  },
-
-  buildProductPageCartFormData(cartItems: any, {
-    bundleName = '',
-    offerId = '',
-    sessionKey = '',
-    runtimeToken = '',
-    sellingPlanId = '',
-  }: any = {}) {
-    return buildProductPageCartFormData(cartItems, {
-      bundleName,
-      offerId,
-      sessionKey,
-      runtimeToken,
-      sellingPlanId,
-    });
-  },
-
-  parseRuntimeAddonDiscount(stepType: string) {
-    if (typeof stepType !== 'string') return null;
-    const parts = stepType.split(':');
-    if (parts.length !== 3 || parts[0] !== 'addon' || String(parts[1]).toUpperCase() !== 'PERCENTAGE') {
-      return null;
-    }
-    const value = Number(parts[2]);
-    if (!Number.isFinite(value) || value <= 0) return null;
-    return { type: 'PERCENTAGE', value: Math.min(100, value) };
-  },
-
-  applyPpbStaticAuthorization(cartItems: any[], { sellingPlanId = '' }: any = {}) {
-    const authorization = this.selectedBundle?.runtimeAuthorization;
-    if (authorization?.version !== 2 || !authorization.bundleToken || !Array.isArray(authorization.lines)) {
-      throw new Error('Bundle authorization is unavailable. Sync this bundle before adding it to cart.');
-    }
-    if (sellingPlanId) {
-      const selectedPlanIds = this.selectedBundle?.subscription?.selectedPlanIds || [];
-      if (!selectedPlanIds.includes(sellingPlanId)) {
-        throw new Error('The selected subscription option is not authorized for this bundle.');
-      }
-    }
-    for (const item of cartItems) {
-      const rawStepType = String(item?.properties?._bundle_step_type || '');
-      const role = rawStepType.startsWith('addon:') || rawStepType === 'addon'
-        ? 'addon'
-        : rawStepType === 'free_gift'
-          ? 'free_gift'
-          : rawStepType === 'default'
-            ? 'default'
-            : 'component';
-      const variantId = `gid://shopify/ProductVariant/${resolveRuntimeVariantNumericId(item.id)}`;
-      const productId = String(item._wpbProductId || '');
-      const groupId = String(item._wpbAuthorizationGroup || '');
-      const line = authorization.lines.find((candidate: any) => (
-        candidate.role === role
-        && candidate.groupId === groupId
-        && (candidate.variantId === variantId || (candidate.productId && candidate.productId === productId))
-      ));
-      if (!line || Number(item.quantity) > Number(line.maxQuantity)) {
-        throw new Error(`Selected ${role} line is not authorized for this bundle.`);
-      }
-      const addonDiscount = this.parseRuntimeAddonDiscount(rawStepType);
-      if (addonDiscount && addonDiscount.value > Number(line.maxDiscountPercentage || 0)) {
-        throw new Error('Selected add-on discount exceeds the synchronized bundle policy.');
-      }
-      item.properties._wolfpack_line_auth = line.token;
-    }
-    const groupTotals = new Map<string, number>();
-    for (const item of cartItems) {
-      const groupId = String(item._wpbAuthorizationGroup || '');
-      groupTotals.set(groupId, (groupTotals.get(groupId) || 0) + Number(item.quantity || 0));
-    }
-    for (const group of authorization.groups || []) {
-      const quantity = groupTotals.get(String(group.id)) || 0;
-      if (quantity < Number(group.minQuantity) || quantity > Number(group.maxQuantity)) {
-        throw new Error(`Selected quantity is outside the synchronized bounds for ${group.id}.`);
-      }
-    }
-    return authorization.bundleToken;
-  },
-
-  async requestEmbedCartTransformRuntimeToken(cartItems: any[], { offerGroupId, sellingPlanId = '' }: any) {
-    const components: any[] = [];
-    const addons: any[] = [];
-    for (const item of cartItems) {
-      const stepType = item?.properties?._bundle_step_type;
-      const line = {
-        variantId: item.id,
-        productId: item._wpbProductId,
-        quantity: item.quantity,
-      };
-      if (stepType === 'addon' || String(stepType || '').startsWith('addon:')) {
-        addons.push({ ...line, discount: this.parseRuntimeAddonDiscount(stepType) });
-      } else {
-        components.push(line);
-      }
-    }
-    const response = await fetch(buildStorefrontApiPath('cart-transform-runtime-token'), {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        bundleId: this.selectedBundle?.id,
-        bundleType: 'product_page',
-        offerGroupId,
-        components,
-        addons,
-        ...(sellingPlanId ? { subscription: {
-          sellingPlanGroupId: this.selectedBundle?.subscription?.selectedGroup?.id,
-          sellingPlanId,
-          recurringBundleDiscount: this.selectedBundle?.subscription?.recurringBundleDiscount === true,
-        } } : {}),
-      }),
-    });
-    const data = await response.json().catch(() => null);
-    if (!response.ok || !data?.token) throw new Error(data?.error || 'Unable to validate bundle selection');
-    return data.token;
-  },
-
-  async syncBundleDetailsCartMetafield(bundleDetailsKey: any, sourceProperties: any, runtimeToken: any, pendingLineCount: number) {
-      const displayProperties = this.buildBundleDetailsDisplayProperties(sourceProperties);
-      if (!bundleDetailsKey || !runtimeToken || Object.keys(displayProperties).length === 0) {
-        throw new Error('Missing bundle cart authorization');
-      }
-
-      const cartToken = await this.getBundleDetailsCartToken();
-      if (!cartToken) throw new Error('Unable to identify the Shopify cart');
-
-      const runtime = this.config?.storefrontRuntime;
-      if (!runtime?.storefrontAccessToken) throw new Error('Storefront authorization is unavailable');
-      await setPpbBundleDetailsCartMetafield({
-        shop: window.Shopify?.shop || this.container?.dataset?.shop,
-        apiVersion: runtime.storefrontApiVersion,
-        accessToken: runtime.storefrontAccessToken,
-        cartToken,
-        bundleDetailsKey,
-        displayProperties,
-        runtimeToken,
-        pendingLineCount,
-        fetchImpl: fetch,
-      });
-  },
-
-  buildBundleDetailsDisplayProperties(sourceProperties: any) {
-    const displayProperties: any = {};
-    const raw = sourceProperties?._bundle_display_properties;
-    const cartLineLabels = this.getCartLineLabels();
-
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw);
-        if (parsed?.box) displayProperties.Box = String(parsed.box);
-        if (parsed?.items) displayProperties[cartLineLabels.items] = String(parsed.items);
-        if (parsed?.retailPrice) displayProperties[cartLineLabels.retailPrice] = String(parsed.retailPrice);
-        if (parsed?.youSave?.amountPercentage) {
-          displayProperties[cartLineLabels.youSave] = String(parsed.youSave.amountPercentage);
-        }
-      } catch {
-        // Cart add must remain non-blocking if display metadata is malformed.
-      }
-    }
-
-    ['Box', cartLineLabels.items, cartLineLabels.retailPrice, cartLineLabels.youSave, 'Items', 'Retail Price', 'You Save'].forEach((key) => {
-      if (sourceProperties?.[key] && !displayProperties[key]) {
-        displayProperties[key] = String(sourceProperties[key]);
-      }
-    });
-
-    return displayProperties;
-  },
-
-  getCartLineLabels() {
-    const labels = this.config?.sharedCartLabels || {};
-    return {
-      items: labels.bundleContainsLabel || 'Items',
-      retailPrice: labels.bundleOriginalPriceLabel || 'Retail Price',
-      youSave: labels.bundleDiscountDisplayLabel || 'You Save',
-    };
-  },
-
-  async getBundleDetailsCartToken() {
-    const response = await fetch('/cart.js?app=wolfpackProductBundles', {
-      credentials: 'same-origin'
-    });
-    if (!response.ok) return null;
-    const cart = await response.json().catch(() => null);
-    let token = cart?.token || null;
-    if (token && !token.includes('?key=')) {
-      const updateRes = await fetch('/cart/update.js', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ note: cart?.note ?? '' })
-      }).catch(() => null);
-      if (updateRes && updateRes.ok) {
-        const updatedCart = await updateRes.json().catch(() => null);
-        if (updatedCart?.token) token = updatedCart.token;
-      }
-    }
-    return token;
   },
 
   resolveProductPageOfferId() {

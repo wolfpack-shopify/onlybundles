@@ -17,7 +17,6 @@ import {
   buildFpbUpsellThemeEditorUrl,
   openThemeEditorInNewTab,
 } from "../../../lib/theme-editor-navigation.client";
-import { buildFpbStorefrontUrl } from "../../../lib/fpb-storefront-url";
 import { useSharedBundleHandlers } from "../../../hooks/useSharedBundleHandlers";
 import { i18n } from "../../../i18n/config";
 import {
@@ -206,20 +205,23 @@ export function useConfigureActionController(
     if (!appEmbedEnabled) {
       flow.triggerAppEmbedBannerFeedback();
     }
-    let preparedPreview: any = null;
+    let preparedPreview: any;
     try {
       preparedPreview = await prepareStorefrontPreviewForOpen();
     } catch (error: any) {
-      AppLogger.warn(
-        "Storefront preview preparation warning in FPB:",
-        {},
-        error
-      );
+      closePendingDashboardPreview(pendingPreviewWindow);
+      AppLogger.error("Storefront preview preparation failed in FPB", {}, error);
+      flow.setOperationAlert({
+        id: "bundle-preview",
+        heading: "Preview unavailable",
+        message: error instanceof Error
+          ? error.message
+          : "Check the bundle configuration and try again.",
+      });
+      finishPreviewBundleLoading();
+      return false;
     }
-    const publicNumber = flow.bundle.publicNumber ?? 1;
-    const shareablePreviewUrl =
-      preparedPreview?.shareablePreviewUrl ||
-      buildFpbStorefrontUrl(flow.shop, publicNumber, flow.storefrontProxyRoot);
+    const shareablePreviewUrl = preparedPreview.shareablePreviewUrl;
 
     const executePreviewBundle = (): string | false => {
       if (flow.bundle.bundleType === "full_page") {
@@ -236,6 +238,7 @@ export function useConfigureActionController(
           storage: window.localStorage,
           setHasPreview: flow.setHasPreview,
         });
+        recordBundlePreview(shareablePreviewUrl, "fpb_configure");
         flow.clearOperationAlert();
         flow.shopify.toast.show(i18n.t("common.success.previewOpened"), {
           isError: false,

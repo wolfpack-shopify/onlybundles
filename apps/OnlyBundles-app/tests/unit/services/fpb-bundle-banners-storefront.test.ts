@@ -4,6 +4,8 @@ import {
   batchGetFirstVariantsWithPrices,
   getFirstVariantId,
 } from "../../../app/utils/variant-lookup.server";
+jest.mock('../../../app/services/bundle-runtime-policy-publisher.server', () => ({publishBundleRuntimePolicy: jest.fn().mockResolvedValue({ok: true})}));
+jest.mock('../../../app/db.server', () => ({__esModule: true, default: {bundle: {update: jest.fn().mockResolvedValue({})}}}));
 
 jest.mock("../../../app/services/scheduled-bundle-discount.server", () => ({ syncScheduledBundleDiscounts: jest.fn().mockResolvedValue({}) }));
 

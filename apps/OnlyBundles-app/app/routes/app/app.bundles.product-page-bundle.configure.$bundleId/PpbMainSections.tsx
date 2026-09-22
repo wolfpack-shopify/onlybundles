@@ -6,6 +6,7 @@ import { PpbStepSetupSection } from "./PpbStepSetupSection";
 import { getDeferredConfigureSection } from "../_shared/bundle-configure/deferred-configure-sections";
 import { getPpbStandaloneOperationAlert } from "./ppb-warning-presentation";
 import type { PpbConfigureFlow } from "./usePpbConfigureFlow";
+import { getScheduledBundleIncompatibilities } from "../../../lib/scheduled-bundle-compatibility";
 
 const PpbDiscountPricingSection = lazy(() =>
   import("./PpbDiscountPricingSection").then((module) => ({
@@ -46,6 +47,10 @@ const PpbFreeGiftAddonsSection = lazy(() =>
 export function PpbMainSections({ flow }: { flow: PpbConfigureFlow }) {
   const { t } = useTranslation();
   const deferredSection = getDeferredConfigureSection(flow.activeSection);
+  const scheduleIncompatibilities = getScheduledBundleIncompatibilities({
+    discountData: flow.pricingState,
+    steps: flow.stepsState?.steps ?? [],
+  });
 
   return (
     <>
@@ -223,6 +228,7 @@ export function PpbMainSections({ flow }: { flow: PpbConfigureFlow }) {
             specificLinkOfferBusy={flow.specificLinkOfferBusy}
             themeEditorUrl={flow.themeEditorUrl}
             validationErrors={flow.validationErrors}
+            scheduleIncompatibilities={scheduleIncompatibilities}
           />
         ) : null}
         {deferredSection === "bundle_widget" ? (

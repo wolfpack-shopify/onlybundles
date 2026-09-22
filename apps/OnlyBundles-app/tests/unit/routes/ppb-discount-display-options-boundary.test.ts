@@ -71,5 +71,10 @@ describe("PPB discount display-options boundary", () => {
 
     expect(view).toContain("<s-switch");
     expect(view).toContain("Progress bar");
+    const switches = view.match(/<s-switch\b[^>]*>/g) ?? [];
+    expect(switches).toHaveLength(2);
+    for (const switchMarkup of switches) {
+      expect(switchMarkup).toMatch(/accessibilityLabel="[^"]+"/);
+    }
   });
 });

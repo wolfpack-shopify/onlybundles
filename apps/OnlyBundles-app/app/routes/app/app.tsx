@@ -92,12 +92,6 @@ function AdminNavigation() {
 
   return (
     <s-app-nav>
-      <s-link
-        href="/app/dashboard"
-        onClick={handleNavigation("/app/dashboard")}
-      >
-        {t("nav.dashboard")}
-      </s-link>
       <s-link href="/app/settings" onClick={handleNavigation("/app/settings")}>
         {t("nav.settings")}
       </s-link>

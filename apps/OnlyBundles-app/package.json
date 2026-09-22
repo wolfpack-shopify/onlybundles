@@ -12,7 +12,7 @@
     "build:widgets:full-page": "node scripts/build-storefront.mjs full-page",
     "build:widgets:product-page": "node scripts/build-storefront.mjs product-page",
     "build:sdk": "node scripts/build-storefront.mjs sdk",
-    "build:cart-transform": "node scripts/build-cart-transform-function.mjs",
+    "build:cart-transform": "shopify app function build --path extensions/bundle-cart-transform-rs",
     "minify:assets": "node scripts/minify-assets.js",
     "dev": "SHOPIFY_FLAG_PATH=. shopify app dev",
     "dev:sit": "SHOPIFY_FLAG_PATH=. shopify app dev --config shopify.app.wolfpack-product-bundles-sit.toml",

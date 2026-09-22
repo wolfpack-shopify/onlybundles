@@ -1,8 +1,8 @@
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const {
+  buildBundleSelectionProperties,
   applySellingPlanToJsonCartItems,
   buildOfferAnalyticsCartProperties,
-  buildProductPageCartFormData,
   extractBundleDetailsSourceProperties,
 } = require('../../../app/assets/widgets/shared/engine/cart-submit.js');
 
@@ -53,40 +53,6 @@ describe('shared cart-submit helpers', () => {
     });
   });
 
-  it('keeps large runtime and display metadata off ordinary component lines', () => {
-    const context = buildProductPageCartFormData([
-      {
-        id: 123,
-        quantity: 2,
-        properties: {
-          _bundle_display_properties: '{"box":"1"}',
-          _custom: 'value',
-          _skip: null,
-        },
-      },
-    ], {
-      bundleName: 'Gift Box',
-      offerId: 'offer-1',
-      sessionKey: 'session-1',
-      runtimeToken: 'signed-runtime-token',
-    });
-
-    expect(context.bundleDetailsKey).toBe('offer-1_session-1');
-    expect(context.sourceProperties).toMatchObject({
-      _bundle_display_properties: '{"box":"1"}',
-      _custom: 'value',
-    });
-    expect(Array.from(context.formData.entries())).toEqual([
-      ['items[0][id]', '123'],
-      ['items[0][quantity]', '2'],
-      ['items[0][properties][_custom]', 'value'],
-      ['items[0][properties][Box]', '1'],
-      ['items[0][properties][_bundleName]', 'Gift Box'],
-      ['items[0][properties][_wolfpackProductBundle:OfferId]', 'offer-1_session-1_1'],
-      ['items[0][properties][_wolfpackProductBundle:prodQty]', '2'],
-    ]);
-  });
-
   it('extracts bundle-details source properties from the first cart item with display metadata', () => {
     expect(extractBundleDetailsSourceProperties([
       { properties: { ignored: 'true' } },
@@ -95,39 +61,6 @@ describe('shared cart-submit helpers', () => {
       _bundle_display_properties: '{"box":"1"}',
       keep: 'yes',
     });
-  });
-
-  it('adds one selling plan to every subscription component and omits public Box metadata', () => {
-    const { formData } = buildProductPageCartFormData([
-      { id: 101, quantity: 1, properties: {} },
-      { id: 202, quantity: 2, properties: {} },
-    ], {
-      bundleName: 'Subscription bundle',
-      offerId: 'offer',
-      sessionKey: 'session',
-      runtimeToken: 'signed-token',
-      sellingPlanId: 'gid://shopify/SellingPlan/55',
-    });
-
-    expect(formData.get('items[0][selling_plan]')).toBe('55');
-    expect(formData.get('items[1][selling_plan]')).toBe('55');
-    expect(formData.has('items[0][properties][Box]')).toBe(false);
-    expect(formData.get('items[0][properties][_wolfpack_bundle_runtime]')).toBe('signed-token');
-  });
-
-  it('retains runtime authorization only on add-on lines that the Discount Function evaluates directly', () => {
-    const { formData } = buildProductPageCartFormData([
-      { id: 101, quantity: 1, properties: {} },
-      { id: 202, quantity: 1, properties: { _bundle_step_type: 'addon:PERCENTAGE:25' } },
-    ], {
-      bundleName: 'Bundle',
-      offerId: 'offer',
-      sessionKey: 'session',
-      runtimeToken: 'signed-token',
-    });
-
-    expect(formData.has('items[0][properties][_wolfpack_bundle_runtime]')).toBe(false);
-    expect(formData.get('items[1][properties][_wolfpack_bundle_runtime]')).toBe('signed-token');
   });
 
   it('adds one selling plan to every full-page JSON component and omits public Box metadata', () => {
@@ -145,4 +78,12 @@ describe('shared cart-submit helpers', () => {
     ]);
     expect(original[0].properties.Box).toBe('1');
   });
+});
+
+
+test('selection properties contain identifiers only and require a published revision', () => {
+  expect(buildBundleSelectionProperties({ bundleId: 'bundle', revision: 'r', instanceId: 'i', groupId: 'g' })).toEqual({
+    _wpb_selection: JSON.stringify({ bundleId: 'bundle', revision: 'r', instanceId: 'i', groupId: 'g' }),
+  });
+  expect(() => buildBundleSelectionProperties({ bundleId: 'bundle', instanceId: 'i', groupId: 'g' })).toThrow();
 });

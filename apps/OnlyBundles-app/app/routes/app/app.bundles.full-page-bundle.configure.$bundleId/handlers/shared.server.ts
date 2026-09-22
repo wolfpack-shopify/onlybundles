@@ -1,7 +1,6 @@
 import { safeJsonParse } from "../../../../services/bundles/bundle-configure-handlers.server";
 import { BundleType } from "../../../../constants/bundle";
 import {
-  formatProductReferencesForRuntime,
   formatStepCategoriesForRuntime,
 } from "../../../../lib/bundle-config/category-runtime";
 import { buildOfferDecisionMarker } from "../../../../lib/offer-policy-decision";
@@ -42,25 +41,13 @@ function buildFullPageBundlePricing(pricing: any) {
   };
 }
 
-function buildRuntimeProductReferences(products: any[] = []) {
-  return formatProductReferencesForRuntime(products, products);
-}
-
 function buildFullPageBundleMetafieldSteps(steps: any[] = []) {
   return steps.map((step: any, index: number) => {
     const rawStepProducts = Array.isArray(step.StepProduct)
       ? step.StepProduct
       : [];
 
-    const stepProducts = buildRuntimeProductReferences(rawStepProducts)
-      .map((product: any) => ({
-        ...product,
-        productId: product.productId || product.id || product.graphqlId || null,
-        title: product.title || product.name || "Product",
-      }))
-      .filter((product: { productId: string | null }) =>
-        Boolean(product.productId)
-      );
+    const stepProducts = rawStepProducts;
 
     const categoriesForMetafield = formatStepCategoriesForRuntime(
       step,
@@ -90,9 +77,10 @@ function buildFullPageBundleMetafieldSteps(steps: any[] = []) {
       conditionOperator2: step.conditionOperator2 ?? null,
       conditionValue2: step.conditionValue2 ?? null,
       StepProduct: stepProducts,
+      StepCategory: Array.isArray(step.StepCategory) ? step.StepCategory : [],
       products: stepProducts.map((product: any) => ({
         ...product,
-        id: product.id || product.productId,
+        id: product.productId,
       })),
       collections: stepCollections.map((c: any) => ({
         id: c.id,
@@ -117,11 +105,15 @@ export function buildFullPageBundleMetafieldConfig(bundle: any) {
     offerPolicy: bundle.offerPolicy ?? null,
     bundleSubscriptionConfig: bundle.bundleSubscriptionConfig ?? null,
     personalizationData: bundle.personalizationData ?? null,
+    defaultProductsData: bundle.defaultProductsData ?? {},
+    validateQuantityPerProduct: bundle.validateQuantityPerProduct ?? null,
     name: bundle.name,
     description: bundle.description || "",
     status: bundle.status,
     bundleType: BundleType.FULL_PAGE,
     publicNumber: bundle.publicNumber,
+    bundleDesignTemplate: bundle.bundleDesignTemplate ?? null,
+    bundleDesignPresetId: bundle.bundleDesignPresetId ?? null,
     templateName: bundle.templateName || null,
     shopifyProductId: bundle.shopifyProductId || null,
     promoBannerBgImage: bundle.promoBannerBgImage ?? null,

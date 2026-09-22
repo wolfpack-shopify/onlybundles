@@ -1,7 +1,6 @@
 // Cart Transform Automatic Activation Service
 import type { authenticate } from "~/shopify.server";
 import { AppLogger } from "../lib/logger";
-import { generateCartTransformRuntimeTokenSecret } from "./cart-transform-runtime-token.server";
 
 type AdminApiContext = Awaited<ReturnType<typeof authenticate.admin>>['admin'];
 
@@ -354,12 +353,12 @@ export class CartTransformService {
     const result = await this.activateForNewInstallation(admin, shopDomain);
 
     if (result.success && result.cartTransformId) {
-      const secretSync = await this.syncRuntimeTokenSecret(admin, shopDomain, result.cartTransformId);
-      if (!secretSync.success) {
+      const configurationSync = await this.syncRuntimeConfiguration(admin, shopDomain, result.cartTransformId);
+      if (!configurationSync.success) {
         return {
           success: false,
           cartTransformId: result.cartTransformId,
-          error: secretSync.error ?? 'Runtime token secret sync failed',
+          error: configurationSync.error ?? 'Runtime configuration sync failed',
         };
       }
     }
@@ -379,13 +378,12 @@ export class CartTransformService {
     return result;
   }
 
-  private static async syncRuntimeTokenSecret(
+  private static async syncRuntimeConfiguration(
     admin: AdminApiContext,
     shopDomain: string,
     cartTransformId: string,
   ): Promise<CartTransformMetafieldSyncResult> {
     try {
-      const secret = generateCartTransformRuntimeTokenSecret(shopDomain);
       const CURRENT_CONFIGURATION_QUERY = `
         query CartTransformRuntimeConfiguration($id: ID!) {
           node(id: $id) {
@@ -420,7 +418,7 @@ export class CartTransformService {
         }
       }
       const MUTATION = `
-        mutation SyncRuntimeTokenSecret($metafields: [MetafieldsSetInput!]!) {
+        mutation SyncRuntimeConfiguration($metafields: [MetafieldsSetInput!]!) {
           metafieldsSet(metafields: $metafields) {
             metafields {
               key
@@ -443,8 +441,7 @@ export class CartTransformService {
             key: 'runtime_configuration',
             type: 'json',
             value: JSON.stringify({
-              ...currentConfiguration,
-              runtimeTokenSecret: secret,
+              bundleCartLineMessaging: currentConfiguration.bundleCartLineMessaging ?? null,
             }),
           }],
         },
@@ -455,18 +452,18 @@ export class CartTransformService {
         const message = data.errors
           ? data.errors.map((error: any) => error.message).join(', ')
           : errors.map((error: any) => error.message).join(', ');
-        AppLogger.error('Failed to sync runtime token secret metafield', {
+        AppLogger.error('Failed to sync runtime configuration metafield', {
           component: 'cart-transform',
-          operation: 'sync-runtime-token-secret'
+          operation: 'sync-runtime-configuration'
         }, { shopDomain, errors: data.errors ?? errors });
         return { success: false, cartTransformId, error: message };
       }
       return { success: true, cartTransformId };
     } catch (error: any) {
-      const message = error instanceof Error ? error.message : 'Unknown runtime token secret sync error';
-      AppLogger.error('Error syncing runtime token secret metafield', {
+      const message = error instanceof Error ? error.message : 'Unknown runtime configuration sync error';
+      AppLogger.error('Error syncing runtime configuration metafield', {
         component: 'cart-transform',
-        operation: 'sync-runtime-token-secret'
+        operation: 'sync-runtime-configuration'
       }, { shopDomain, error: message });
       return { success: false, cartTransformId, error: message };
     }
@@ -514,7 +511,6 @@ export class CartTransformService {
         }
       `;
 
-      const runtimeTokenSecret = generateCartTransformRuntimeTokenSecret(shopDomain);
       const response = await admin.graphql(MUTATION, {
         variables: {
           metafields: [{
@@ -523,7 +519,6 @@ export class CartTransformService {
             key: 'runtime_configuration',
             type: 'json',
             value: JSON.stringify({
-              runtimeTokenSecret,
               bundleCartLineMessaging: settings ?? null,
             }),
           }],

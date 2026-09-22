@@ -5,7 +5,7 @@ title: Only Bundles Internal Docs
 type: index
 status: authoritative
 summary: Index of durable Only Bundles architecture, integration, feature, and operations documentation.
-last_audited: 2026-09-12
+last_audited: 2026-09-19
 owners:
   - engineering
 domains:
@@ -56,7 +56,8 @@ Full evidence record: `docs/competitor-analysis/16-eb-full-data-flow-investigati
 - [[Architecture/Public Website]] — static public routes, interactive-demo boundary, canonical SDK guide, product-claim ownership, analytics, and legal release gate
 - [[Architecture/Only Bundles Brand and Compatibility Boundary]] — visible brand identity, preserved runtime identifiers, legacy URL boundary, and parent-tag transition
 - [[Architecture/Database Schema]] — Authoritative Prisma schema summary
-- [[Architecture/Cart Transform Function]] — Rust Cart Transform and Discount Function runtime, build, and checkout pricing contracts
+- [[Architecture/Cart Transform Function]] — Rust Function runtime, authoritative policy migration gates, scheduled component lines, and native parent protection
+- [[Architecture/Shopify Native Audit]] — Review of discount functions, cart transform, SDK, and storefront architecture for over-engineering and Shopify canonical patterns
 - [[Architecture/Widget Architecture]] — FPB + PPB widgets, limited-release hydrated SDK, app-embed-owned product-page upsells, load strategy, versioning
 - [[Architecture/Product Card Layout Contract]] — Hard rule for row-level card size behavior across all templates and interaction states
 - [[Architecture/Admin Configure Page]] — shared FPB/PPB Admin configure-page adapter boundary, section rhythm, route-owned save semantics

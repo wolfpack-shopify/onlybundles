@@ -1,4 +1,5 @@
 import { replaceManagedStyle } from "../assets/widgets/shared/managed-style";
+import { storefrontPath } from "../assets/widgets/shared/storefront-path";
 
 type RuntimeWindow = Window & Record<string, unknown>;
 
@@ -99,7 +100,8 @@ function applyCollectionQuickAddLinks(
   runtimeDocument.querySelectorAll<HTMLAnchorElement>('a[href*="/products/"]').forEach((anchor) => {
     const targetUrl = resolveBundleQuickAddTarget(anchor.getAttribute("href") || "", links, settingsControls);
     if (!targetUrl) return;
-    anchor.href = targetUrl;
+    const localizedTargetUrl = storefrontPath(targetUrl, runtimeWindow);
+    anchor.href = localizedTargetUrl;
 
     const card = anchor.closest('li, product-card, .card-wrapper, .product-card, [data-product-card]');
     const configuredSelectors = [
@@ -114,37 +116,21 @@ function applyCollectionQuickAddLinks(
     quickAdd.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      runtimeWindow.location.assign(targetUrl);
+      runtimeWindow.location.assign(localizedTargetUrl);
     });
   });
 }
 
-function installDynamicControlsObserver(
+function applyConfiguredCartIntegration(
   settingsControls: GlobalSettingsControls,
-  links: BundleQuickAddLink[],
   runtimeWindow: RuntimeWindow,
   runtimeDocument: Document,
 ) {
-  const Observer = runtimeWindow.MutationObserver as typeof MutationObserver | undefined;
-  if (!Observer || !runtimeDocument.body) return;
-
-  const previous = runtimeWindow.__WPB_SETTINGS_CONTROLS_OBSERVER__ as MutationObserver | undefined;
-  previous?.disconnect();
   const integrations = settingsControls.landingPage?.integrations;
+  if (!integrations?.cartIntegrationEnabled) return;
   const cartSelector = String(integrations?.cartItemSelectors || "").trim();
-  const seenCartItems = new WeakSet<Element>();
-  const applyDynamicControls = () => {
-    applyCollectionQuickAddLinks(settingsControls, links, runtimeWindow, runtimeDocument);
-    if (!integrations?.cartIntegrationEnabled || !cartSelector) return;
-    const cartItems = Array.from(runtimeDocument.querySelectorAll(cartSelector));
-    if (!cartItems.some((item) => !seenCartItems.has(item))) return;
-    cartItems.forEach((item) => seenCartItems.add(item));
-    executeMerchantCartIntegration(integrations.customCartIntegrationScript, runtimeWindow);
-  };
-  applyDynamicControls();
-  const observer = new Observer(applyDynamicControls);
-  observer.observe(runtimeDocument.body, { childList: true, subtree: true });
-  runtimeWindow.__WPB_SETTINGS_CONTROLS_OBSERVER__ = observer;
+  if (cartSelector && !runtimeDocument.querySelector(cartSelector)) return;
+  executeMerchantCartIntegration(integrations.customCartIntegrationScript, runtimeWindow);
 }
 
 export function applyGlobalSettingsControls(
@@ -180,32 +166,52 @@ export function applyGlobalSettingsControls(
     executeMerchantStorefrontScript(integrations.customThemeIntegrationScript, runtimeWindow);
   }
   if (integrations?.cartIntegrationEnabled) {
-    if (!String(integrations.cartItemSelectors || "").trim()) {
-      executeMerchantCartIntegration(integrations.customCartIntegrationScript, runtimeWindow);
-    }
+    applyConfiguredCartIntegration(settingsControls, runtimeWindow, runtimeDocument);
   }
   applyCollectionQuickAddLinks(settingsControls, bundleLinks, runtimeWindow, runtimeDocument);
-  installDynamicControlsObserver(settingsControls, bundleLinks, runtimeWindow, runtimeDocument);
 }
 
-export async function loadAndApplyGlobalSettingsControls(
+export async function initCollectionQuickAddControls(
+  settingsControls: GlobalSettingsControls,
   endpoint: string,
   runtimeWindow: RuntimeWindow = window as unknown as RuntimeWindow,
   runtimeDocument: Document = document,
 ) {
+  const quickAddEnabled = settingsControls.landingPage?.redirectCollectionQuickAddToBundle === true
+    || settingsControls.productPage?.redirectCollectionQuickAddToBundle === true;
+  if (!quickAddEnabled) return false;
   if (!endpoint) return false;
   try {
     const response = await runtimeWindow.fetch(endpoint, { credentials: "same-origin" });
     if (!response.ok) return false;
-    const payload = await response.json() as {
-      settingsControls?: GlobalSettingsControls;
-      bundleLinks?: BundleQuickAddLink[];
-    };
-    if (!payload.settingsControls) return false;
-    applyGlobalSettingsControls(payload.settingsControls, runtimeWindow, runtimeDocument, payload.bundleLinks ?? []);
+    const payload = await response.json() as { links?: BundleQuickAddLink[] };
+    const links = payload.links ?? [];
+    const applyLinks = () => applyCollectionQuickAddLinks(
+      settingsControls,
+      links,
+      runtimeWindow,
+      runtimeDocument,
+    );
+    applyLinks();
+    runtimeDocument.addEventListener("shopify:collection:update", applyLinks);
     return true;
   } catch (error: any) {
-    console.warn("[Only Bundles] Failed to load global Settings Controls", error);
+    console.warn("[Only Bundles] Failed to load collection bundle links", error);
     return false;
   }
+}
+
+export function bindCartIntegrationEvents(
+  settingsControls: GlobalSettingsControls,
+  runtimeWindow: RuntimeWindow = window as unknown as RuntimeWindow,
+  runtimeDocument: Document = document,
+) {
+  const applyIntegration = () => applyConfiguredCartIntegration(
+    settingsControls,
+    runtimeWindow,
+    runtimeDocument,
+  );
+  runtimeDocument.addEventListener("shopify:cart:view", applyIntegration);
+  runtimeDocument.addEventListener("shopify:cart:lines-update", applyIntegration);
+  runtimeDocument.addEventListener("shopify:section:load", applyIntegration);
 }

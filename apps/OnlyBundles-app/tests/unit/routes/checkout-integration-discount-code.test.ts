@@ -77,8 +77,8 @@ describe("checkout integration discount code route", () => {
       success: true,
       providerId: "gokwik",
       discountId: "gid://shopify/DiscountCodeNode/1",
-      code: "WPB-GOKWIK-12345678",
-      expiresAt: "2026-07-02T10:30:00.000Z",
+      code: "WPB-GOKWIK",
+      expiresAt: null,
     });
   });
 
@@ -86,7 +86,7 @@ describe("checkout integration discount code route", () => {
     process.env.SHOPIFY_API_SECRET = originalSecret;
   });
 
-  it("creates a discount code for a signed storefront request", async () => {
+  it("creates or returns a stable discount code for a signed storefront request", async () => {
     const response = await action({
       request: makeSignedRequest({ providerId: "gokwik" }),
       params: {},
@@ -99,8 +99,8 @@ describe("checkout integration discount code route", () => {
     expect(body).toEqual({
       ok: true,
       providerId: "gokwik",
-      code: "WPB-GOKWIK-12345678",
-      expiresAt: "2026-07-02T10:30:00.000Z",
+      code: "WPB-GOKWIK",
+      expiresAt: null,
     });
     expect(mockUnauthenticatedAdmin).toHaveBeenCalledWith("test-shop.myshopify.com");
     expect(mockCreateForProvider).toHaveBeenCalledWith(
@@ -161,8 +161,8 @@ describe("checkout integration discount code route", () => {
       success: true,
       providerId: "shopflo",
       discountId: "gid://shopify/DiscountCodeNode/2",
-      code: "WPB-SHOPFLO-87654321",
-      expiresAt: "2026-07-02T10:30:00.000Z",
+      code: "WPB-SHOPFLO",
+      expiresAt: null,
     });
 
     const response = await action({
@@ -177,7 +177,8 @@ describe("checkout integration discount code route", () => {
     expect(body).toMatchObject({
       ok: true,
       providerId: "shopflo",
-      code: "WPB-SHOPFLO-87654321",
+      code: "WPB-SHOPFLO",
+      expiresAt: null,
     });
     expect(mockCreateForProvider).toHaveBeenCalledWith(
       { graphql: expect.any(Function) },

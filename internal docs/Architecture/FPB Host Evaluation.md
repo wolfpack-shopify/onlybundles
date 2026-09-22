@@ -4,8 +4,8 @@ id: fpb-host-evaluation
 title: FPB App Proxy Host
 type: architecture-decision
 status: accepted
-summary: Full Page Bundles use the signed app proxy as their sole storefront document host.
-last_audited: 2026-09-10
+summary: Full Page Bundles use a signed app-proxy document backed by Shopify-hosted configuration snapshots.
+last_audited: 2026-09-22
 owners:
   - engineering
 domains:
@@ -18,6 +18,7 @@ source_paths:
   - extensions/bundle-builder/assets/bundle-widget-full-page-bundled.js
   - app/lib/fpb-storefront-url.ts
   - app/routes/root/wpb.$bundleId.tsx
+  - app/services/fpb-storefront-runtime.server.ts
   - app/routes/app/app.bundles.full-page-bundle.configure.$bundleId/route.tsx
   - app/services/bundles/fpb-public-number.server.ts
   - app/services/bundles/bundle-parent-product.server.ts
@@ -39,15 +40,19 @@ keywords:
 
 ## Decision
 
-`/apps/product-bundles/wpb/{publicNumber}` is the only FPB storefront document host. `publicNumber` is a positive, monotonic integer scoped to the shop. Shopify verifies and forwards the request through the installed default app-proxy root. The Remix route verifies the proxy HMAC before database access, resolves the bundle by `(shopId, publicNumber)`, and returns `application/liquid`, so Shopify wraps the response in the active theme layout.
+`/apps/product-bundles/wpb/{publicNumber}` is the only FPB storefront document host. `publicNumber` is a positive, monotonic integer scoped to the shop. Shopify verifies and forwards the request through the installed default app-proxy root. The Remix route uses Shopify's app-proxy authentication context before database access, resolves only the authorization fields by `(shopId, publicNumber)`, loads the published `$app.bundle_ui_config` and `$app.fpb_storefront_runtime` through the authenticated Storefront client, and returns the body through Shopify's `liquid()` response helper.
 
-Active and unlisted bundles are public. Draft bundles require a 15-minute `wpb_preview` token bound to version, shop, the internal bundle ID, and expiry. The public number is routing identity only; widget configuration, analytics, cart contracts, and authorization continue using the internal bundle ID. Archived, missing, cross-shop, invalid-number, opaque-ID, and invalid-preview requests return `404`; invalid Shopify signatures return `400`.
+Active and unlisted bundles are public. Draft bundles require a one-hour `wpb_preview` token bound to version, shop, the internal bundle ID, and expiry. The public number is routing identity only; widget configuration, analytics, cart contracts, and authorization continue using the internal bundle ID. Archived, missing, cross-shop, invalid-number, opaque-ID, and invalid-preview requests return `404`; invalid Shopify signatures are rejected by Shopify's app-proxy authenticator.
+
+The Shopify snapshot must have schema version 4 and match the database bundle ID, bundle type, public number, steps contract, and last published runtime-policy revision. The shop runtime must have schema version 1. Missing, malformed, or mismatched snapshots return `503`; the route has no formatter or bundle-JSON fallback. Ordinary public bundles receive a short shared cache policy, while previews and delivery-restricted requests remain private and non-cacheable. `Server-Timing` reports database, Storefront, and total route time.
 
 `Bundle.publicNumber` is unique with `shopId` and is non-null only for FPBs. `Shop.lastFpbPublicNumber` is incremented atomically in the same database transaction that creates an FPB. The migration backfills existing FPBs per shop in `createdAt`, then `id`, order and advances each shop counter to the assigned maximum. Deleted numbers are not reused.
 
 Admin Preview actions mint a fresh signed URL for every FPB status. Public bundles do not require the token, but using the same stateless action for active, unlisted, and draft previews prevents Admin surfaces from diverging and guarantees a new URL on every click. The click handler reserves a blank tab synchronously, before awaiting the authenticated preview response, then navigates that tab to the signed URL so browser popup protection does not discard the preview.
 
-The Liquid response embeds the complete formatted runtime configuration in `data-bundle-config`. The single app embed detects that marker and loads widget JavaScript and CSS from theme-extension assets through Shopify `asset_url`. App-proxy asset URLs and a Page fallback are not supported.
+The Liquid response embeds the validated Shopify configuration and FPB runtime in the marker. The single app embed detects that marker and loads widget JavaScript and CSS from theme-extension assets through Shopify `asset_url`. The initial FPB asset excludes the product-detail modal and DOMPurify; the app embed supplies a second Shopify asset URL that is loaded on first modal or rich review-badge use. App-proxy asset URLs, a bundle JSON fallback, and a Page fallback are not supported.
+
+The authenticated Storefront client returns JSON metafields through the serialized `Metafield.value` field. The proxy must parse that value and must not request Admin GraphQL's `jsonValue`, which is not part of the Storefront `Metafield` type.
 
 ## Canonical URL
 
@@ -133,8 +138,9 @@ remains usable. After normalization, Shopify's platform redirect is the primary
 and faster path because the old product URL no longer owns a valid resource.
 
 The Admin no longer creates, publishes, selects, renames, or writes metafields
-to Shopify Pages. FPB preview performs the normal storefront sync and returns a
-fresh signed app-proxy URL in the same authenticated response. Product-page
+to Shopify Pages. FPB preview performs a narrow read-only lookup and returns a
+fresh signed app-proxy URL in the authenticated response; normal save and Sync
+Bundle actions remain responsible for publication. Product-page
 upsell placement opens the matching product-template Theme Editor block
 directly; it does not select a Shopify Page.
 

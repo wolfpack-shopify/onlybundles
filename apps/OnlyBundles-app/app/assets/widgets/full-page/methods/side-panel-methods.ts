@@ -189,9 +189,9 @@ renderSidePanel(panel: any) {
   const selectedSlotItems = useInlineSummarySlots
     ? expandSelectedItemsForSummarySlots(allSelectedProducts)
     : [];
-  const selectedSummaryCount = useInlineSummarySlots
-    ? selectedSlotItems.length
-    : allSelectedProducts.length;
+  const selectedSummaryCount = allSelectedProducts.reduce(
+    (count: number, item: any) => count + getSummarySlotQuantity(item), 0
+  );
 
   panel.classList.toggle('full-page-side-panel--inline-slots', useInlineSummarySlots);
   panel.classList.toggle(

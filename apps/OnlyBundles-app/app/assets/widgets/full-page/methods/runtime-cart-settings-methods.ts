@@ -272,95 +272,14 @@ resolveFullPageOfferId() {
   return offerId.startsWith('FBP-') ? offerId : `FBP-${offerId}`;
 },
 
-async syncBundleDetailsCartMetafield(bundleDetailsKey: any, sourceProperties: any, runtimeToken: any, pendingLineCount: number) {
-    const displayProperties = this.buildBundleDetailsDisplayProperties(sourceProperties);
-    if (!bundleDetailsKey || !runtimeToken || Object.keys(displayProperties).length === 0) {
-      throw new Error('Missing bundle cart authorization');
-    }
-
-    const cartToken = await this.getBundleDetailsCartToken();
-    if (!cartToken) throw new Error('Unable to identify the Shopify cart');
-
-    const response = await fetch(buildStorefrontApiPath('cart-bundle-details'), {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        cartToken,
-        bundleDetailsKey,
-        displayProperties,
-        runtimeToken,
-        pendingLineCount,
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error(`bundle_details sync failed (${response.status})`);
-    }
-
-    const data = await response.json().catch(() => null);
-    if (data?.ok !== true) {
-      throw new Error(data?.error || 'bundle_details sync failed');
-    }
-},
-
-buildBundleDetailsDisplayProperties(sourceProperties: any) {
-  const displayProperties: any = {};
-  const raw = sourceProperties?._bundle_display_properties;
-  const cartLineLabels = this.getCartLineLabels();
-
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw);
-      if (parsed?.box) displayProperties.Box = String(parsed.box);
-      if (parsed?.items) displayProperties[cartLineLabels.items] = String(parsed.items);
-      if (parsed?.retailPrice) displayProperties[cartLineLabels.retailPrice] = String(parsed.retailPrice);
-      if (parsed?.youSave?.amountPercentage) displayProperties[cartLineLabels.youSave] = String(parsed.youSave.amountPercentage);
-    } catch {
-      // Ignore malformed display metadata; cart add must remain non-blocking.
-    }
-  }
-
-  ['Box', cartLineLabels.items, cartLineLabels.retailPrice, cartLineLabels.youSave, 'Items', 'Retail Price', 'You Save'].forEach((key) => {
-    if (sourceProperties?.[key] && !displayProperties[key]) {
-      displayProperties[key] = String(sourceProperties[key]);
-    }
-  });
-
-  return displayProperties;
-},
 
 getCartLineLabels() {
   const labels = this.config?.sharedCartLabels || {};
   return {
     items: labels.bundleContainsLabel || 'Items',
     retailPrice: labels.bundleOriginalPriceLabel || 'Retail Price',
-    youSave: labels.bundleDiscountDisplayLabel || 'You Save',
+    youSave: labels.bundleDiscountDisplayLabel || 'Bundle Savings',
   };
-},
-
-async getBundleDetailsCartToken() {
-  const response = await fetch('/cart.js?app=wolfpackProductBundles', {
-    credentials: 'same-origin'
-  });
-  if (!response.ok) return null;
-  const cart = await response.json().catch(() => null);
-  let token = cart?.token || null;
-  if (token && !token.includes('?key=')) {
-    const updateRes = await fetch('/cart/update.js', {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ note: cart?.note ?? '' })
-    }).catch(() => null);
-    if (updateRes && updateRes.ok) {
-      const updatedCart = await updateRes.json().catch(() => null);
-      if (updatedCart?.token) token = updatedCart.token;
-    }
-  }
-  return token;
 },
 
 generateBundleSessionKey() {

@@ -12,7 +12,7 @@ import {
   getInlineVariantSelectorPresentation,
   shouldRenderInlineVariantSelector,
 } from '../../shared/variant-selector-policy.js';
-import { BundleProductModal } from '../../../bundle-modal-component.js';
+import { ensureFpbProductModal } from '../product-modal-runtime.js';
 import { TemplateDesignSystem } from '../../shared/template-design-system.js';
 import { getSubscriptionProductCardPrice } from '../../shared/subscription-storefront-methods.js';
 import { resolveLowStockAlert } from '../../../../lib/low-stock-alert.js';
@@ -43,6 +43,10 @@ function shouldUseAddonDiscountBadge(designPreset: any) {
   const summaryMode = contract?.summary?.mode || '';
   const cardMode = contract?.productCard?.mode || '';
   return summaryMode !== 'compactSlots' && cardMode !== 'row';
+}
+
+function reportFpbModalLoadFailure(error: unknown) {
+  console.error('[WPB] Unable to load FPB product modal', error);
 }
 
 
@@ -97,13 +101,20 @@ createProductCard(product: any, stepIndex: string|number, options: any = {}) {
   const selectableVariantCount = Array.isArray(product?.variants)
     ? product.variants.filter((variant: any)  => variant?.available !== false).length
     : 0;
+  const displayProduct = this.buildPaidAddonProductDisplayData(product, step);
+  const outOfStock = typeof this.isVariantOutOfStock === 'function'
+    ? this.isVariantOutOfStock(displayProduct)
+    : displayProduct?.available === false;
+  const outOfStockLabel = resolveText('outOfStockText', 'Out of stock');
   const openVariantModalOnAdd =
     this.selectedBundle?.variantSelectorEnabled === false
     && displayVariantsAsIndividualProducts === false
     && selectableVariantCount > 1;
-  const addButtonText = openVariantModalOnAdd
-    ? resolveText('chooseOptionsButton', 'Choose Options')
-    : this.getProductCardAddButtonText(step);
+  const addButtonText = outOfStock
+    ? outOfStockLabel
+    : openVariantModalOnAdd
+      ? resolveText('chooseOptionsButton', 'Choose Options')
+      : this.getProductCardAddButtonText(step);
   const variantSelectorElement = shouldRenderVariantSelector
     ? usesConfiguredVariantSelector
       ? VariantSelectorComponent.createConfiguredElement(
@@ -126,10 +137,6 @@ createProductCard(product: any, stepIndex: string|number, options: any = {}) {
       : VariantSelectorComponent.createElement(product, primaryOptionName)
     : null;
 
-  const displayProduct = this.buildPaidAddonProductDisplayData(product, step);
-  const outOfStock = typeof this.isVariantOutOfStock === 'function'
-    ? this.isVariantOutOfStock(displayProduct)
-    : displayProduct?.available === false;
   const lowStockAlert = this.selectedBundle?.lowStockAlert
     ? resolveLowStockAlert(this.selectedBundle.lowStockAlert, [{
       quantityAvailable: typeof displayProduct.quantityAvailable === 'number'
@@ -144,7 +151,7 @@ createProductCard(product: any, stepIndex: string|number, options: any = {}) {
   if (lowStockAlert) {
     stockBadgeElement = document.createElement('div');
     stockBadgeElement.className = 'product-stock-badge product-stock-badge--low';
-    stockBadgeElement.textContent = lowStockAlert.message;
+    stockBadgeElement.textContent = lowStockAlert?.message ?? '';
   }
   const increaseDisabled = ConditionValidator.isProductQuantityIncreaseDisabled(
     this.selectedBundle?.validateQuantityPerProduct,
@@ -182,7 +189,7 @@ createProductCard(product: any, stepIndex: string|number, options: any = {}) {
         variantSelectorElement,
         mode: getFpbProductCardMode(designPreset) || 'grid',
         className: outOfStock ? 'is-out-of-stock' : '',
-        showCompareAtPrice: this._getLandingPageControls?.()?.showCompareAtPrice === true,
+        showCompareAtPrice: this._getLandingPageControls?.()?.showCompareAtPrices !== false,
         openImageLabel: resolveText('productImageLabel', 'Open product details'),
         openTitleLabel: resolveText('productTitleLabel', 'Open product details'),
         imageNavPreviousLabel: resolveText('productImagePreviousLabel', 'Previous image'),
@@ -195,8 +202,9 @@ createProductCard(product: any, stepIndex: string|number, options: any = {}) {
         variantAriaLabel: resolveText('variantLabel', 'Variant'),
         removeAriaLabel: removeActionLabel,
         soldOutAriaLabel: resolveText('noProductsAvailableText', 'No Products Available'),
-        addButtonAriaLabel: resolveText('addButtonText', 'Add'),
+        addButtonAriaLabel: outOfStock ? outOfStockLabel : resolveText('addButtonText', 'Add'),
         addButtonText,
+        addDisabled: outOfStock,
         increaseDisabled,
         cardBadgeElement,
         stockBadgeElement,
@@ -413,15 +421,12 @@ attachProductCardListeners(cardElement: any, product: any, stepIndex: any, optio
   // subsequent quantity clicks, while the captured product object can lag behind.
   const getProductId = () => getSelectionId(product);
   const getClickedProductId = (element: any) => element?.dataset?.productId || getProductId();
-  const openCardDetails = () => {
-    if (!this.productModal) {
-      this.productModal = new BundleProductModal(this);
-    }
-    if (!this.productModal) return;
+  const openCardDetails = async () => {
+    const productModal = await ensureFpbProductModal(this);
 
     const initialImageIndex = Number(cardElement.dataset.bwCardImageIndex || 0);
     const isClassicQuickView = isClassicFpbPreset(this.getFullPageDesignPreset?.());
-    this.productModal.open(product, step, {
+    productModal.open(product, step, {
       initialImageIndex,
       readOnly: isClassicQuickView,
     });
@@ -452,7 +457,7 @@ attachProductCardListeners(cardElement: any, product: any, stepIndex: any, optio
 
     if (!e.target.closest('.product-image, .product-title')) return;
     e.stopPropagation();
-    openCardDetails();
+    void openCardDetails().catch(reportFpbModalLoadFailure);
   });
 
   cardElement.addEventListener('keydown', (event: any) => {
@@ -463,7 +468,7 @@ attachProductCardListeners(cardElement: any, product: any, stepIndex: any, optio
     if (!cardElement.contains(normalizedTarget)) return;
     event.preventDefault();
     event.stopPropagation();
-    openCardDetails();
+    void openCardDetails().catch(reportFpbModalLoadFailure);
   });
 
   // Inline quantity increase/decrease buttons (delegated via card element)
@@ -489,17 +494,19 @@ attachProductCardListeners(cardElement: any, product: any, stepIndex: any, optio
   cardElement.addEventListener('click', (e: any) => {
     const addBtn = e.target.closest('.product-add-btn');
     if (!addBtn) return;
+    if (addBtn.disabled || addBtn.getAttribute?.('aria-disabled') === 'true') return;
     e.stopPropagation();
     if (options.openVariantModalOnAdd === true) {
-      if (!this.productModal) {
-        this.productModal = new BundleProductModal(this);
-      }
-      if (!this.productModal) return;
       const initialImageIndex = Number(cardElement.dataset.bwCardImageIndex || 0);
-      this.productModal.open(product, step, {
-        initialImageIndex,
-        readOnly: false,
-      });
+      const openVariantModal = (productModal: any) => productModal.open(product, step, {
+          initialImageIndex,
+          readOnly: false,
+        });
+      if (this.productModal) {
+        openVariantModal(this.productModal);
+      } else {
+        void ensureFpbProductModal(this).then(openVariantModal).catch(reportFpbModalLoadFailure);
+      }
       return;
     }
     const productId = getClickedProductId(addBtn);

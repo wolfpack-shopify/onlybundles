@@ -1,9 +1,8 @@
-import { withBundleCartLock } from "../../lib/bundle-cart-lock.js";
 'use strict';
 
-import { buildStorefrontApiPath } from '../../config/storefront-proxy-routes.js';
-import { buildOfferAnalyticsCartProperties } from '../widgets/shared/engine/cart-submit.js';
+import { buildBundleSelectionProperties, buildOfferAnalyticsCartProperties } from '../widgets/shared/engine/cart-submit.js';
 import { resolvePpbSelectionMetric } from '../widgets/shared/ppb-condition-selections.js';
+import { updateShopifyCart } from '../widgets/shared/shopify-cart-actions.js';
 
 function _generateBundleInstanceId(bundleId: string) {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -100,7 +99,6 @@ export function buildCartItems(state: any) {
 
       itemNumber += 1;
       var properties: any = {
-        'Box': String(itemNumber),
         '_bundleName': state.bundleName || '',
         '_wolfpackProductBundle:OfferId': offerId + '_' + sessionKey + '_' + itemNumber,
         '_wolfpackProductBundle:prodQty': String(qty),
@@ -108,6 +106,8 @@ export function buildCartItems(state: any) {
       if (step.isFreeGift) properties['_bundle_step_type'] = 'free_gift';
       if (step.isDefault) properties['_bundle_step_type'] = 'default';
 
+      Object.assign(properties, buildBundleSelectionProperties({ bundleId: state.bundleId,
+        revision: state.bundleData.runtimePolicyRevision, instanceId: offerId + '_' + sessionKey, groupId: step.id }));
       items.push({
         id: parseInt(variantId, 10),
         quantity: qty,
@@ -130,30 +130,16 @@ export function buildCartItems(state: any) {
     bundleName: state.bundleName,
     offerDelivery: state.bundleData && state.bundleData.offerDelivery,
   });
+  items.forEach(item => Object.assign(item.properties, sourceProperties));
   return {
     items: items,
     bundleInstanceId: bundleInstanceId,
     offerId: offerId,
     sessionKey: sessionKey,
-    bundleDetailsKey: offerId + '_' + sessionKey,
     sourceProperties: sourceProperties,
   };
 }
 
-function buildProductPageCartFormData(items: any[]) {
-  var formData = new FormData();
-  items.forEach(function (item: any, index: number) {
-    formData.append('items[' + index + '][id]', String(item.id));
-    formData.append('items[' + index + '][quantity]', String(item.quantity));
-    Object.keys(item.properties || {}).forEach(function (key) {
-      var value = item.properties[key];
-      if (value === null || typeof value === 'undefined') return;
-      if (key === '_bundle_display_properties' || key === '_wolfpack_bundle_runtime') return;
-      formData.append('items[' + index + '][properties][' + key + ']', String(value));
-    });
-  });
-  return formData;
-}
 
 export function buildBundleDetailsDisplayProperties(sourceProperties: any) {
   var displayProperties: any = {};
@@ -180,95 +166,6 @@ export function buildBundleDetailsDisplayProperties(sourceProperties: any) {
   return displayProperties;
 }
 
-function getBundleDetailsCartToken() {
-  return fetch('/cart.js', { credentials: 'same-origin' })
-    .then(function (response) {
-      if (!response.ok) return null;
-      return response.json().catch(function () { return null; });
-    })
-    .then(function (cart) {
-      var token = (cart && cart.token) || null;
-      if (token && token.indexOf('?key=') === -1) {
-        return fetch('/cart/update.js', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ note: (cart && cart.note) || '' })
-        })
-          .then(function (updateRes) {
-            if (!updateRes || !updateRes.ok) return token;
-            return updateRes.json().catch(function () { return null; });
-          })
-          .then(function (updatedCart) {
-            return (updatedCart && updatedCart.token) || token;
-          })
-          .catch(function () { return token; });
-      }
-      return token;
-    })
-    .catch(function () { return null; });
-}
-
-function syncBundleDetailsCartMetafield(bundleDetailsKey: any, sourceProperties: any, runtimeToken: any, pendingLineCount: number) {
-  var displayProperties = buildBundleDetailsDisplayProperties(sourceProperties);
-  if (!bundleDetailsKey || !runtimeToken || Object.keys(displayProperties).length === 0) {
-    return Promise.reject(new Error('Missing bundle cart authorization'));
-  }
-
-  return getBundleDetailsCartToken()
-    .then(function (cartToken) {
-      if (!cartToken) throw new Error('Unable to identify the Shopify cart');
-      return fetch(buildStorefrontApiPath('cart-bundle-details'), {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cartToken: cartToken,
-          bundleDetailsKey: bundleDetailsKey,
-          displayProperties: displayProperties,
-          runtimeToken: runtimeToken,
-          pendingLineCount,
-        }),
-      });
-    })
-    .then(function (response) {
-      if (!response || !response.ok) throw new Error('Failed to sync bundle cart authorization');
-      return response.json().catch(function () { return null; });
-    })
-    .then(function (data) {
-      if (!data || data.ok !== true) {
-        throw new Error((data && data.error) || 'Failed to sync bundle cart authorization');
-      }
-    });
-}
-
-function requestCartTransformRuntimeToken(state: any, cartResult: any) {
-  var components = cartResult.items.map(function (item: any) {
-    return { variantId: item.id, quantity: item.quantity };
-  });
-
-  return fetch(buildStorefrontApiPath('cart-transform-runtime-token'), {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      bundleId: state.bundleId,
-      bundleType: 'product_page',
-      offerGroupId: cartResult.offerId + '_' + cartResult.sessionKey,
-      components: components,
-      addons: [],
-    }),
-  })
-    .then(function (response) {
-      return response.json().catch(function () { return null; }).then(function (data) {
-        if (!response.ok || !data || !data.token) {
-          throw new Error((data && data.error) || 'Unable to validate bundle selection');
-        }
-        return data.token;
-      });
-    });
-}
-
 export function addBundleToCart(state: any, validateBundleFn: any, emitFn: any) {
   var validation = validateBundleFn();
   if (!validation.valid) {
@@ -284,34 +181,12 @@ export function addBundleToCart(state: any, validateBundleFn: any, emitFn: any) 
     return Promise.resolve();
   }
 
-  return withBundleCartLock(() => requestCartTransformRuntimeToken(state, cartResult)
-    .then(function (runtimeToken) {
-      return syncBundleDetailsCartMetafield(
-        cartResult.bundleDetailsKey,
-        cartResult.sourceProperties,
-        runtimeToken,
-        cartResult.items.length,
-      ).then(function () { return runtimeToken; });
-    })
-    .then(function () {
-      return fetch('/cart/add', {
-        method: 'POST',
-        body: buildProductPageCartFormData(cartResult.items),
+  return updateShopifyCart(cartResult.items)
+    .then(function (result) {
+      emitFn('wbp:cart-success', {
+        bundleId: state.bundleId,
+        warnings: Array.isArray(result?.warnings) ? result.warnings : [],
       });
-    })
-    )
-    .then(function (response) {
-      return response.text().then(function (text) {
-        if (!response.ok) {
-          var msg = 'Cart add failed (' + response.status + ')';
-          try { msg = JSON.parse(text).message || msg; } catch (_: any) {}
-          throw new Error(msg);
-        }
-        return text;
-      });
-    })
-    .then(function () {
-      emitFn('wbp:cart-success', { bundleId: state.bundleId });
     })
     .catch(function (err) {
       emitFn('wbp:cart-failed', { error: err.message });

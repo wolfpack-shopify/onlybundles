@@ -330,6 +330,9 @@ createFullPageProductGrid(stepIndex: string|number) {
       products: expandedProducts,
       shop,
       token: judgeMeToken,
+      controller: this,
+    }).catch((error) => {
+      console.error('[WPB] Unable to hydrate Judge.me badges', error);
     });
   }
 
@@ -354,6 +357,19 @@ expandProductsByVariant(products: any[], shouldExpand = true) {
       const parsedValue = Number.parseFloat(resolvedValue);
       return Number.isFinite(parsedValue) ? toCents(parsedValue) : null;
     };
+    const isTrackedZeroStock = (candidate: any) => (
+      candidate?.quantityAvailable === 0 && candidate?.currentlyNotInStock !== true
+    );
+    const shouldOmitVariant = (variant: any) => {
+      const runtimeInventory = typeof context.getRuntimeVariantInventory === 'function'
+        ? context.getRuntimeVariantInventory(variant)
+        : null;
+      const candidate = runtimeInventory ? { ...variant, ...runtimeInventory } : variant;
+      const trackInventoryOnAddToCart = typeof context.isInventoryTrackingOnAddToCartEnabled === 'function'
+        ? context.isInventoryTrackingOnAddToCartEnabled()
+        : false;
+      return trackInventoryOnAddToCart && isTrackedZeroStock(candidate);
+    };
     const isVariantSelectable = (variant: any) => {
       if (typeof context.isVariantSelectableForInventory === 'function') {
         return context.isVariantSelectableForInventory(variant);
@@ -369,7 +385,7 @@ expandProductsByVariant(products: any[], shouldExpand = true) {
     // If product has multiple variants, expand into separate cards
     if (product.variants && product.variants.length > 1) {
       return product.variants
-        .filter((variant: any)  => isVariantSelectable(variant))
+        .filter((variant: any)  => !shouldOmitVariant(variant))
         .map((variant: any)  => {
           const variantSelectionId = getSelectionId(variant);
           const runtimeInventory = typeof context.getRuntimeVariantInventory === 'function'
@@ -412,10 +428,10 @@ expandProductsByVariant(products: any[], shouldExpand = true) {
     // Single variant or no variants - return as-is
     if (Array.isArray(product.variants) && product.variants.length === 1) {
       const variant = product.variants[0];
-      if (!isVariantSelectable(variant)) return [];
+      if (shouldOmitVariant(variant)) return [];
       return [{ ...product, available: isVariantSelectable(variant) }];
     }
-    if (!isVariantSelectable(product)) return [];
+    if (shouldOmitVariant(product)) return [];
     return [{ ...product, available: isVariantSelectable(product) }];
   });
 },

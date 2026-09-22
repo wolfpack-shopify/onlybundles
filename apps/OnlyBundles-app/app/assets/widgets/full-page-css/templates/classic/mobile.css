@@ -199,6 +199,8 @@
     font-size: 14px;
     line-height: 18px;
     font-weight: 700;
+    text-align: left;
+    text-align: start;
     letter-spacing: 0;
     overflow: hidden;
     overflow-wrap: anywhere;

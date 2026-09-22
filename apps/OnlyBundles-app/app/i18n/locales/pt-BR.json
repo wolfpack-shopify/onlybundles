@@ -137,6 +137,12 @@
       "saveError": "Não foi possível salvar o idioma de administração"
     },
     "storefrontSetup": {
+      "sectionHeading": "Status da loja virtual",
+      "publishedThemeDescription": "Incorporações e blocos de app do tema publicado",
+      "appEmbedsHeading": "Incorporações de app",
+      "appBlocksHeading": "Blocos de app do tema",
+      "refresh": "Atualizar status",
+      "retry": "Tentar novamente",
       "loadingTitle": "Verificando configuração da vitrine",
       "loadingDescription": "Verificando seus componentes e aplicativos de temas publicados.",
       "errorTitle": "O status da Loja precisa de atenção",
@@ -185,7 +191,27 @@
         "enabled": "Ativado",
         "ready": "Pronto para ativar",
         "unavailable": "Não disponível"
+      },
+      "resourceLabels": {
+        "bundleAppEmbed": "Recursos de pacotes na vitrine",
+        "bundleProductPage": "Criador de pacotes da página de produto",
+        "bundleProductPageEmbed": "Posicionamento de pacote na página de produto",
+        "bundlePageBuilderEmbed": "Posicionamento de pacote no criador de páginas",
+        "bundleUpsell": "Upsell de pacote de página completa"
       }
+    },
+    "commercialMetrics": {
+      "heading": "Desempenho dos pacotes",
+      "description": "Últimos {{days}} dias em {{currency}}",
+      "bundleRevenue": "Receita de pacotes",
+      "ordersWithBundles": "Pedidos com pacotes",
+      "averageOrderValue": "Valor médio do pedido",
+      "viewToOrderConversion": "Conversão de visualização em pedido",
+      "unavailable": "Indisponível",
+      "loading": "Carregando desempenho",
+      "errorHeading": "Desempenho indisponível",
+      "errorDescription": "Não foi possível carregar estas métricas da Shopify.",
+      "retry": "Tentar novamente"
     }
   },
   "settingsDcp": {
@@ -490,6 +516,8 @@
     "title": "Oferecer agendamento e prioridade",
     "description": "Controle quando este pacote pode aparecer em Only Bundles posicionamento vitrine de loja e qual oferta correspondente é mostrada primeiro.",
     "shopifyOwnership": "O Shopify controles de datas de desconto de checkout e combinações. Estas configurações controlam apenas a visibilidade Only Bundles da frente da loja e oferecem seleção.",
+    "scheduleUnavailableHeading": "Agendamento indisponível para este desconto",
+    "scheduleUnavailableBody": "Este pacote usa regras de elegibilidade ou preço por componente que a Shopify não pode recalcular depois que os produtos base são mesclados. Remova essas regras para habilitar o agendamento. Se já houver um agendamento selecionado, escolha Sempre ativo antes de salvar.",
     "priorityLabel": "Prioridade da Loja",
     "priorityDetails": "Números inferiores são considerados primeiro quando múltiplas ofertas Only Bundles correspondem ao mesmo posicionamento.",
     "stopLowerLabel": "Parar ofertas de vitrine de baixa prioridade",
@@ -1157,6 +1185,8 @@
       "theCompleteBundleSolutionForShopifyBuildCustomizeAndPromoteProdu": "A solução completa de pacote para o Shopify - construir, personalizar e promover pacotes de produtos que são convertidos.",
       "getStarted": "####Comece agora",
       "goToDashboard": "Ir para Dashboard →",
+      "takeMeToMyDashboard": "Leve-me ao meu painel",
+      "valueStatement": "Aumente as vendas e o valor médio do pedido com pacotes personalizáveis.",
       "everythingIncluded": "Tudo incluso",
       "documentation": "Documentação"
     },
@@ -1488,6 +1518,7 @@
     }
   },
   "adminAttributes": {
+    "invalidJavaScriptSyntax": "Corrija a sintaxe JavaScript antes de salvar.",
     "searchCampaigns": "Buscar campanhas",
     "searchByCampaignName": "Pesquisar pelo nome da campanha",
     "sortTopCampaigns": "Ordenar melhores campanhas",

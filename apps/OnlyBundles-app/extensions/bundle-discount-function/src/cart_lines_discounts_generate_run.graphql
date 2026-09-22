@@ -1,54 +1,35 @@
-query Input {
+query Input($windowStart: TimeWithoutTimezone!, $windowEnd: TimeWithoutTimezone!) {
   presentmentCurrencyRate
   localization { country { isoCode } }
   shop {
     ppbPolicyRevisions: metafield(namespace: "$app", key: "ppb_policy_revisions") { value: jsonValue }
+    localTime { date afterStart: timeAfter(time: $windowStart) beforeEnd: timeBefore(time: $windowEnd) }
   }
   cart {
     lines {
       id
       quantity
-      wolfpackProductBundleOfferId: attribute(key: "_wolfpackProductBundle:OfferId") {
-        value
-      }
-      runtimeToken: attribute(key: "_wolfpack_bundle_runtime") {
-        value
-      }
-      lineAuthorization: attribute(key: "_wolfpack_line_auth") {
-        value
-      }
+      selection: attribute(key: "_wpb_selection") { value }
       sellingPlanAllocation { sellingPlan { id } }
-      stepType: attribute(key: "_bundle_step_type") {
-        value
-      }
       merchandise {
         __typename
         ... on ProductVariant {
           id
-          product { id }
+          weight
+          weightUnit
+          parentPolicy: metafield(namespace: "$app", key: "bundle_parent_policy") { value: jsonValue }
+          product {
+            id
+            runtimePolicies: metafield(namespace: "$app", key: "bundle_runtime_memberships") { value: jsonValue }
+          }
         }
       }
-      cost {
-        amountPerQuantity {
-          amount
-        }
-      }
+      cost { amountPerQuantity { amount } }
     }
   }
   discount {
     discountClasses
-    runtimeTokenSecret: metafield(namespace: "$app", key: "runtime_token_secret") {
-      value
-    }
-    discountRole: metafield(namespace: "$app", key: "discount_role") {
-      value
-    }
-    checkoutIntegrationConfig: metafield(namespace: "$app", key: "checkout_integration_config") {
-      jsonValue
-    }
-  }
-  enteredDiscountCodes {
-    code
+    configuration: metafield(namespace: "$app", key: "discount_configuration") { value: jsonValue }
   }
   triggeringDiscountCode
 }

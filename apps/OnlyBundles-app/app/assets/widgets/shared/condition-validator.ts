@@ -85,7 +85,20 @@ const ConditionValidator = (function () {
    * @param {number}  newQuantity       Proposed quantity (0 = remove)
    * @returns {{ allowed: boolean, limitText: string|null }}
    */
-  function canUpdateQuantity(step: any, currentSelections: any, targetProductId: any, newQuantity: any, targetValues: any = null) {
+  function canUpdateQuantity(step: any, currentSelections: any, targetProductId: any, newQuantity: any, targetValues: any = null, addonConditions: any[] = []) {
+    const rules = [step, ...addonConditions.map(rule => ({
+      conditionType: rule.type,
+      conditionOperator: rule.condition,
+      conditionValue: Number(rule.value),
+    }))];
+    for (const rule of rules) {
+      const result = canUpdateSingleCondition(rule, currentSelections, targetProductId, newQuantity, targetValues);
+      if (!result.allowed) return { ...result, conditionType: rule.conditionType };
+    }
+    return { allowed: true, limitText: null };
+  }
+
+  function canUpdateSingleCondition(step: any, currentSelections: any, targetProductId: any, newQuantity: any, targetValues: any = null) {
     // No explicit condition configured → no upper bound; always allow increases
     if (!step || !step.conditionType || !step.conditionOperator || !_isPositiveConditionValue(step.conditionValue)) {
       return { allowed: true, limitText: null };
@@ -425,12 +438,23 @@ const ConditionValidator = (function () {
     return `This step allows ${limitText} product${suffix} only.`;
   }
 
+  function isAddonStepSatisfied(evaluation: any, selections: any) {
+    const hasSelection = Object.values(selections || {}).some(value => _getSelectionValueByConditionType(value, 'quantity') > 0);
+    if (!hasSelection) return true;
+    if (evaluation?.tier == null) return true;
+    if (evaluation.isEligible !== true) return false;
+    return (evaluation.tier?.conditions || []).every((rule: any) => isStepConditionSatisfied({
+      conditionType: rule.type, conditionOperator: _normalizeOperator(rule.condition), conditionValue: rule.value,
+    }, selections));
+  }
+
   // ─── Public API ───────────────────────────────────────────────────────────
   return {
     OPERATORS,
     calculateStepTotalAfterUpdate,
     canUpdateQuantity,
     isStepConditionSatisfied,
+    isAddonStepSatisfied,
     evaluateCategoryRules,
     isCategoryRuleMode: _isCategoryRuleMode,
     getAllowedQuantityPerProduct,

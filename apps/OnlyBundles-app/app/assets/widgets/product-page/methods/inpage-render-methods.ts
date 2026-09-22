@@ -309,12 +309,10 @@ _renderInpageStepProducts(stepIndex: string|number, target: any) {
         requiredQuantity: 1,
       }])
       : null;
-    const stockBadgeElement = outOfStock || lowStockAlert ? document.createElement('div') : null;
+    const stockBadgeElement = lowStockAlert ? document.createElement('div') : null;
     if (stockBadgeElement) {
-      stockBadgeElement.className = `product-stock-badge ${outOfStock ? 'product-stock-badge--out' : 'product-stock-badge--low'}`;
-      stockBadgeElement.textContent = outOfStock
-        ? outOfStockText
-        : lowStockAlert?.message ?? '';
+      stockBadgeElement.className = 'product-stock-badge product-stock-badge--low';
+      stockBadgeElement.textContent = lowStockAlert?.message ?? '';
     }
     const variantSelectorElement = this.renderInlineCardVariantSelector(product, currentStep, stepIndex);
 
@@ -342,6 +340,7 @@ _renderInpageStepProducts(stepIndex: string|number, target: any) {
           addDisabled: outOfStock,
           increaseDisabled,
           stockBadgeElement,
+          showCompareAtPrice: this._getProductPageControls?.()?.showCompareAtPrices !== false,
         }
       );
     }
@@ -365,6 +364,7 @@ _renderInpageStepProducts(stepIndex: string|number, target: any) {
           addDisabled: outOfStock,
           increaseDisabled,
           stockBadgeElement,
+          showCompareAtPrice: this._getProductPageControls?.()?.showCompareAtPrices !== false,
         }
       );
     }
@@ -387,6 +387,7 @@ _renderInpageStepProducts(stepIndex: string|number, target: any) {
         addDisabled: outOfStock,
         increaseDisabled,
         stockBadgeElement,
+        showCompareAtPrice: this._getProductPageControls?.()?.showCompareAtPrices !== false,
       }
     );
   });

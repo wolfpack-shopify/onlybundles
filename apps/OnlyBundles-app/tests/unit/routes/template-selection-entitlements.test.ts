@@ -44,6 +44,10 @@ jest.mock("../../../app/routes/app/app.bundles.product-page-bundle.configure.$bu
   updateSyncMetafields: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock("../../../app/services/bundles/storefront-sync.server", () => ({
+  syncBundleStorefrontNow: jest.fn().mockResolvedValue({ skipped: false, synced: true }),
+}));
+
 const mockResolveShopEntitlements = resolveShopEntitlements as jest.MockedFunction<
   typeof resolveShopEntitlements
 >;

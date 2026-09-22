@@ -17,6 +17,7 @@ function makeState(overrides: object = {}) {
     offerId: 'MIX-894502',
     bundleName: 'Test Bundle',
     isReady: true,
+    bundleData: { runtimePolicyRevision: 'published-revision' },
     steps: [
       { id: 'step_1', isFreeGift: false, isDefault: false },
       { id: 'step_2', isFreeGift: true, isDefault: false },
@@ -35,7 +36,7 @@ function makeState(overrides: object = {}) {
 }
 
 describe('buildCartItems', () => {
-  it('produces EB-compatible product-page cart line properties', () => {
+  it('produces product-page cart selection properties', () => {
     const state = makeState();
     const { items } = buildCartItems(state);
     expect(items).toHaveLength(2);
@@ -43,7 +44,7 @@ describe('buildCartItems', () => {
     const itemA = items.find((i: { id: number }) => i.id === 123456);
     expect(itemA).toBeDefined();
     expect(itemA.quantity).toBe(2);
-    expect(itemA.properties.Box).toBe('1');
+    expect(itemA.properties).not.toHaveProperty('Box');
     expect(itemA.properties._bundleName).toBe('Test Bundle');
     expect(itemA.properties['_wolfpackProductBundle:OfferId']).toMatch(/^MIX-894502_[A-Z0-9]{12}_1$/);
     expect(itemA.properties['_wolfpackProductBundle:prodQty']).toBe('2');
@@ -55,6 +56,7 @@ describe('buildCartItems', () => {
   it('carries the public offer decision marker in private Shopify line properties', () => {
     const state = makeState({
       bundleData: {
+        runtimePolicyRevision: 'published-revision',
         offerDelivery: {
           offerPolicyId: 'policy-1',
           ruleVersion: 4,
@@ -72,7 +74,7 @@ describe('buildCartItems', () => {
     });
   });
 
-  it('all items in one call share the same EB offer-session key with unique item indexes', () => {
+  it('all items in one call share the same offer-session key with unique item indexes', () => {
     const state = makeState();
     const { items } = buildCartItems(state);
     const offerIds = items.map((i: { properties: { '_wolfpackProductBundle:OfferId': string } }) => i.properties['_wolfpackProductBundle:OfferId']);
@@ -127,7 +129,7 @@ describe('buildCartItems', () => {
     expect(items[0].properties).not.toHaveProperty('_bundle_you_save_amount');
     expect(items[0].properties).not.toHaveProperty('_bundle_you_save_percentage');
 
-    expect(items[0].properties).not.toHaveProperty('_bundle_display_properties');
+    expect(items[0].properties).toHaveProperty('_bundle_display_properties');
     const displayProperties = JSON.parse(sourceProperties['_bundle_display_properties']);
     expect(displayProperties).toEqual({
       box: '1',
@@ -162,94 +164,85 @@ describe('buildCartItems', () => {
 });
 
 describe('addBundleToCart', () => {
+  const installShopifyActions = (updateCart: jest.Mock) => {
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: { Shopify: { actions: { updateCart } } },
+    });
+  };
+
   afterEach(() => {
     jest.restoreAllMocks();
+    delete (globalThis as any).window;
   });
 
-  it('stores Cart Transform authorization before submitting clean Shopify component lines', async () => {
-    const calls: Array<{ url: string; init?: RequestInit }> = [];
-    global.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      calls.push({ url, init });
-      if (url.includes('cart-transform-runtime-token')) {
-        return { ok: true, json: async () => ({ token: 'signed-runtime-token' }) } as Response;
-      }
-      if (url === '/cart.js') {
-        return { ok: true, json: async () => ({ token: 'cart-token?key=secret' }) } as Response;
-      }
-      if (url.includes('cart-bundle-details')) {
-        return { ok: true, json: async () => ({ ok: true }) } as Response;
-      }
-      if (url === '/cart/add') {
-        return { ok: true, text: async () => '{}' } as Response;
-      }
-      throw new Error(`Unexpected request: ${url}`);
-    }) as jest.Mock;
+  it('submits clean Shopify component lines through the native cart action', async () => {
+    const updateCart = jest.fn().mockResolvedValue({ cart: { id: 'cart-1' }, userErrors: [], warnings: [] });
+    installShopifyActions(updateCart);
     const emit = jest.fn();
 
     await addBundleToCart(makeState(), () => ({ valid: true, errors: {} }), emit);
 
-    expect(calls[0].url).toContain('cart-transform-runtime-token');
-    expect(calls[1].url).toBe('/cart.js');
-    expect(calls[2].url).toContain('cart-bundle-details');
-    expect(JSON.parse(String(calls[2].init?.body))).toMatchObject({
-      bundleDetailsKey: expect.any(String),
-      runtimeToken: 'signed-runtime-token',
+    const body = updateCart.mock.calls[0][0];
+    expect(body.lines).toHaveLength(2);
+    expect(body.lines[0]).toMatchObject({
+      merchandiseId: 'gid://shopify/ProductVariant/123456',
+      quantity: 2,
     });
-    expect(calls[3].url).toBe('/cart/add');
-    expect(calls[3].init?.body).toBeInstanceOf(FormData);
-    expect((calls[3].init?.body as FormData).has('items[0][properties][_wolfpack_bundle_runtime]')).toBe(false);
-    expect((calls[3].init?.body as FormData).has('items[0][properties][_bundle_display_properties]')).toBe(false);
-    expect(emit).toHaveBeenCalledWith('wbp:cart-success', { bundleId: 'bundle_1' });
-  });
-
-  it('instantiates cold cart session via /cart/update.js before syncing cart-bundle-details', async () => {
-    const calls: Array<{ url: string; init?: RequestInit }> = [];
-    global.fetch = jest.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-      const url = String(input);
-      calls.push({ url, init });
-      if (url.includes('cart-transform-runtime-token')) {
-        return { ok: true, json: async () => ({ token: 'signed-runtime-token' }) } as Response;
-      }
-      if (url === '/cart.js') {
-        return { ok: true, json: async () => ({ token: 'cold-placeholder-token', note: '' }) } as Response;
-      }
-      if (url === '/cart/update.js') {
-        return { ok: true, json: async () => ({ token: 'persisted-token?key=abc', note: '' }) } as Response;
-      }
-      if (url.includes('cart-bundle-details')) {
-        return { ok: true, json: async () => ({ ok: true }) } as Response;
-      }
-      if (url === '/cart/add') {
-        return { ok: true, text: async () => '{}' } as Response;
-      }
-      throw new Error(`Unexpected request: ${url}`);
-    }) as jest.Mock;
-    const emit = jest.fn();
-
-    await addBundleToCart(makeState(), () => ({ valid: true, errors: {} }), emit);
-
-    expect(calls[0].url).toContain('cart-transform-runtime-token');
-    expect(calls[1].url).toBe('/cart.js');
-    expect(calls[2].url).toBe('/cart/update.js');
-    expect(calls[3].url).toContain('cart-bundle-details');
-    expect(JSON.parse(String(calls[3].init?.body))).toMatchObject({
-      cartToken: 'persisted-token?key=abc',
+    expect(body.lines[0].attributes).toEqual(expect.arrayContaining([
+      { key: '_bundleName', value: 'Test Bundle' },
+      { key: '_wolfpackProductBundle:prodQty', value: '2' },
+    ]));
+    expect(body.lines[1]).toMatchObject({
+      merchandiseId: 'gid://shopify/ProductVariant/789012',
+      quantity: 1,
     });
-    expect(calls[4].url).toBe('/cart/add');
-    expect(emit).toHaveBeenCalledWith('wbp:cart-success', { bundleId: 'bundle_1' });
+    expect(body.lines[1].attributes).toContainEqual({ key: '_bundle_step_type', value: 'free_gift' });
+    expect(emit).toHaveBeenCalledWith('wbp:cart-success', { bundleId: 'bundle_1', warnings: [] });
   });
 
-  it('emits cart failure and does not submit when runtime authorization fails', async () => {
-    global.fetch = jest.fn(async () => ({
-      ok: false,
-      json: async () => ({ error: 'Not authorized' }),
-    })) as jest.Mock;
+  it('does not invoke any Ajax cart or app-proxy authorization endpoint', async () => {
+    const updateCart = jest.fn().mockResolvedValue({ cart: {}, userErrors: [], warnings: [] });
+    installShopifyActions(updateCart);
+    global.fetch = jest.fn();
     const emit = jest.fn();
 
     await addBundleToCart(makeState(), () => ({ valid: true, errors: {} }), emit);
 
-    expect(global.fetch).toHaveBeenCalledTimes(1);
-    expect(emit).toHaveBeenCalledWith('wbp:cart-failed', { error: 'Not authorized' });
+    expect(updateCart).toHaveBeenCalledTimes(1);
+    expect(global.fetch).not.toHaveBeenCalled();
   });
+
+  it('emits wbp:cart-failed when Shopify returns a user error', async () => {
+    installShopifyActions(jest.fn().mockResolvedValue({
+      cart: null,
+      userErrors: [{ message: 'Product is sold out' }],
+      warnings: [],
+    }));
+    const emit = jest.fn();
+
+    await addBundleToCart(makeState(), () => ({ valid: true, errors: {} }), emit);
+
+    expect(emit).toHaveBeenCalledWith('wbp:cart-failed', { error: 'Product is sold out' });
+  });
+
+  it('emits wbp:cart-failed without network calls when bundle validation fails', async () => {
+    global.fetch = jest.fn();
+    const emit = jest.fn();
+
+    await addBundleToCart(makeState(), () => ({ valid: false, errors: { step_1: 'Select a product' } }), emit);
+
+    expect(global.fetch).not.toHaveBeenCalled();
+    expect(emit).toHaveBeenCalledWith('wbp:cart-failed', {
+      error: 'Bundle validation failed. Complete all required steps.',
+    });
+  });
+});
+
+
+test('SDK submits published selection identifiers without minting authorization', () => {
+  const { items } = buildCartItems(makeState());
+  const selected = JSON.parse(items[0].properties._wpb_selection);
+  expect(selected).toMatchObject({ bundleId: 'bundle_1', revision: 'published-revision', groupId: 'step_1' });
+  expect(items[0].properties).not.toHaveProperty('_wolfpack_bundle_runtime');
 });

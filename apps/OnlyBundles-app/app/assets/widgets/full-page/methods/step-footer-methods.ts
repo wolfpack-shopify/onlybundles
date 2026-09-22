@@ -1,4 +1,3 @@
-import { withBundleCartLock } from "../../../../lib/bundle-cart-lock.js";
 import { BUNDLE_WIDGET } from '../../shared/constants.js';
 import { CurrencyManager } from '../../shared/currency-manager.js';
 import { PricingCalculator } from '../../shared/pricing-calculator.js';
@@ -7,11 +6,12 @@ import { ToastManager } from '../../shared/toast-manager.js';
 import {
   buildCartLineDisplayProperties as buildSharedCartLineDisplayProperties,
   buildCartLineSourceProperties as buildSharedCartLineSourceProperties,
+  extractTierProgressForBundle,
 } from '../../shared/engine/cart-lines.js';
 import { shouldDisplayClassicFixedBundleRawTotal } from '../shared/summary-pricing-display.js';
-import { preflightVariantOnStorefront } from '../../shared/variant-preflight.js';
-import { buildStorefrontApiPath } from '../../../../config/storefront-proxy-routes.js';
+import { updateShopifyCart } from '../../shared/shopify-cart-actions.js';
 import {
+  buildBundleSelectionProperties,
   applySellingPlanToJsonCartItems,
   buildOfferAnalyticsCartProperties,
 } from '../../shared/engine/cart-submit.js';
@@ -166,6 +166,7 @@ export const fullPageStepFooterMethods: Record<string, any> & ThisType<any> = {
       discountPercentage,
       includeBox: shouldIncludeBundleQuantityCartProperties(this),
       labels: this.getCartLineLabels?.(),
+      tierProgress: extractTierProgressForBundle(this.selectedBundle),
     });
 
     return sourceProperties;
@@ -184,10 +185,10 @@ export const fullPageStepFooterMethods: Record<string, any> & ThisType<any> = {
   await Promise.resolve();
 
   try {
-    // Final validation: all paid steps must be satisfied.
-    // Free gift and default steps are non-blocking and are intentionally skipped here —
-    // the customer may choose not to select a free gift, and default items are pre-seeded.
-    const allStepsValid = this.areBundleConditionsMet();
+    // An optional add-on may be omitted; selected add-ons must satisfy their tier.
+    const addonStepsValid = (this.selectedBundle?.steps || []).every((step: any, index: number) =>
+      !step.isFreeGift || this.validateStep(index));
+    const allStepsValid = this.areBundleConditionsMet() && addonStepsValid;
     if (!allStepsValid) {
       ToastManager.show('Please complete all bundle steps before adding to cart.');
       return;
@@ -203,7 +204,6 @@ export const fullPageStepFooterMethods: Record<string, any> & ThisType<any> = {
     const offerId = this.resolveFullPageOfferId();
     const baseOfferId = `${offerId}_${sessionKey}`;
     const selectedLines: any[] = [];
-    const variantPreflightCache = new Map();
     const unavailableLines: any[] = [];
     let itemNumber = 0;
     const hasAddonStepConfigured = (this.selectedBundle?.steps || []).some((candidateStep: any) => {
@@ -245,21 +245,6 @@ export const fullPageStepFooterMethods: Record<string, any> & ThisType<any> = {
           continue;
         }
 
-        let preflightResult = variantPreflightCache.get(numericVariantId);
-        if (!preflightResult) {
-          preflightResult = await preflightVariantOnStorefront(
-            numericVariantId,
-            typeof fetch === 'function' ? fetch : null,
-          );
-        }
-        variantPreflightCache.set(numericVariantId, preflightResult);
-        if (!preflightResult.ok) {
-          unavailableLines.push(
-            `runtime-preflight blocked: step ${stepIndex + 1} product ${productsInStep.indexOf(product) + 1} variant ${numericVariantId} (status ${preflightResult.status})`,
-          );
-          continue;
-        }
-
         const availability = typeof this.getVariantAvailable === 'function'
           ? this.getVariantAvailable(stepIndex, resolvedSelectionId)
           : { available: null, outOfStock: false, acceptsBackorder: false };
@@ -283,9 +268,6 @@ export const fullPageStepFooterMethods: Record<string, any> & ThisType<any> = {
           '_wolfpackProductBundle:prodQty': String(quantity),
           '_wolfpackProductBundle:OfferId': `${offerId}_${sessionKey}_${itemNumber}`,
         };
-        if (shouldIncludeBundleQuantityCartProperties(this)) {
-          properties.Box = String(itemNumber);
-        }
         const addonEval = this.getAddonTierEvaluation?.(step) || {};
         const addonDiscount = typeof this.getAddonLineDiscount === 'function'
           ? this.getAddonLineDiscount(step)
@@ -293,7 +275,6 @@ export const fullPageStepFooterMethods: Record<string, any> & ThisType<any> = {
         const isAddonCartLine = fullPageStepFooterMethods.isSelectedAddonCartLine.call(this, step);
         if (isAddonCartLine && addonEval?.tier) {
           hasSelectedAddonLine = true;
-          properties.Box = '1';
           properties._addon_product = 'true';
           properties._addon_offer_id = baseOfferId;
           properties._boxProduct = 'addonProduct';
@@ -313,9 +294,11 @@ export const fullPageStepFooterMethods: Record<string, any> & ThisType<any> = {
           id: numericVariantId,
           quantity: quantity,
           properties,
-          _runtimeProductId: [product?.productId, product?.graphqlId, product?.id]
-            .find(value => String(value || '').includes('/Product/')) || null,
         };
+        Object.assign(properties, buildBundleSelectionProperties({ bundleId: this.selectedBundle.id,
+          revision: this.selectedBundle.runtimePolicyRevision, instanceId: baseOfferId,
+          groupId: product.isDirectDefaultProduct ? 'default-products' : String(step.id) }));
+        if (product.isDirectDefaultProduct) properties._bundle_step_type = 'default';
         items.push(cartItem);
         selectedLines.push({ product, quantity, step });
       }
@@ -347,60 +330,15 @@ export const fullPageStepFooterMethods: Record<string, any> & ThisType<any> = {
       items,
       this.selectedSellingPlanId || '',
     );
-    const itemsForRuntimeToken = items;
 
     try {
-      const requestRuntimeToken = typeof this.requestCartTransformRuntimeToken === 'function'
-        ? this.requestCartTransformRuntimeToken
-        : fullPageStepFooterMethods.requestCartTransformRuntimeToken;
-      const runtimeToken = await requestRuntimeToken.call(this, items, {
-        offerGroupId: baseOfferId,
-        bundleType: 'full_page',
-      });
-      items = mergeDuplicateCartLines(itemsForRuntimeToken);
-      items.forEach(item => {
-        if (
-          this.selectedSellingPlanId
-          || String(item?.properties?._bundle_step_type || '').startsWith('addon')
-        ) {
-          item.properties._wolfpack_bundle_runtime = runtimeToken;
-        }
-        delete item._runtimeProductId;
-      });
-
-      const response = await withBundleCartLock(async () => {
-      await this.syncBundleDetailsCartMetafield(
-        `${offerId}_${sessionKey}`,
-        sourceProperties,
-        runtimeToken,
-        items.length,
-      );
-
-      // Add to Shopify cart
-      return fetch('/cart/add.js', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ items })
-      });
-      });
-
-      if (!response.ok) {
-        const responseText = await response.text();
-        let errorMessage = `Failed to add bundle to cart (${response.status})`;
-        try {
-          const payload = JSON.parse(responseText);
-          errorMessage = payload?.message || payload?.description || errorMessage;
-        } catch {
-          if (responseText) {
-            errorMessage = responseText;
-          }
-        }
-        throw new Error(errorMessage);
-      }
-
-      await response.json();
+      items = mergeDuplicateCartLines(items);
+      items.forEach(item => Object.assign(item.properties, sourceProperties));
+      const cartResult = await updateShopifyCart(items);
+      const warning = Array.isArray(cartResult?.warnings)
+        ? cartResult.warnings.find((entry: any) => entry?.message)?.message
+        : null;
+      if (warning) ToastManager.show(warning);
 
       // Storefront analytics: bundle successfully added to cart.
       this._sendEngagementBeacon?.('bundle-add-to-cart-success');
@@ -427,68 +365,6 @@ export const fullPageStepFooterMethods: Record<string, any> & ThisType<any> = {
     this.hideLoadingOverlay();
     this._setWidgetBusy(false, actionButton);
   }
-},
-
-parseRuntimeAddonDiscount(stepType: string) {
-  if (typeof stepType !== 'string') return null;
-  const parts = stepType.split(':');
-  if (parts.length !== 3 || parts[0] !== 'addon' || String(parts[1]).toUpperCase() !== 'PERCENTAGE') {
-    return null;
-  }
-  const value = Number(parts[2]);
-  if (!Number.isFinite(value) || value <= 0) return null;
-  return { type: 'PERCENTAGE', value: Math.min(100, value) };
-},
-
-async requestCartTransformRuntimeToken(items: any[], { offerGroupId, bundleType }: any) {
-  const components: { variantId: any; productId: any; quantity: any; }[] = [];
-  const addons: { discount: any; variantId: any; productId: any; quantity: any; }[] = [];
-  const parseAddonDiscount = typeof this.parseRuntimeAddonDiscount === 'function'
-    ? this.parseRuntimeAddonDiscount
-    : fullPageStepFooterMethods.parseRuntimeAddonDiscount;
-
-  items.forEach((item: any) => {
-    const stepType = item?.properties?._bundle_step_type;
-    const isAddon = stepType === 'addon' || (typeof stepType === 'string' && stepType.startsWith('addon:'));
-    const line: any = {
-      variantId: item.id,
-      productId: item._runtimeProductId || item.productId || undefined,
-      quantity: item.quantity,
-    };
-    if (isAddon) {
-      addons.push({
-        ...line,
-        discount: parseAddonDiscount.call(this, stepType),
-      });
-    } else {
-      components.push(line);
-    }
-  });
-
-  const response = await fetch(buildStorefrontApiPath('cart-transform-runtime-token'), {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      bundleId: this.selectedBundle?.id,
-      bundleType,
-      offerGroupId,
-      components,
-      addons,
-      ...(this.selectedSellingPlanId ? {
-        subscription: {
-          sellingPlanGroupId: this.selectedBundle?.subscription?.selectedGroup?.id,
-          sellingPlanId: this.selectedSellingPlanId,
-          recurringBundleDiscount: this.selectedBundle?.subscription?.recurringBundleDiscount === true,
-        },
-      } : {}),
-    }),
-  });
-  const data = await response.json().catch(() => null);
-  if (!response.ok || !data?.token) {
-    throw new Error(data?.error || 'Unable to validate bundle selection');
-  }
-  return data.token;
 },
 
 createStepElement(step: any, index: number) {

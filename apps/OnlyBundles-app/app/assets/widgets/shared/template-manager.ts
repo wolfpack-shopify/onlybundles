@@ -91,7 +91,9 @@ export class TemplateManager {
     ) {
       discountData = {
         ...discountData,
-        discountText: dtoDiscountDisplay.text,
+        discountText: discountMethod === BUNDLE_WIDGET.DISCOUNT_METHODS.BUY_X_GET_Y
+          ? `Buy ${ruleToUse.customerBuys}, get ${ruleToUse.customerGets} at ${dtoDiscountDisplay.valueToken} off`
+          : dtoDiscountDisplay.text,
         discountValue: dtoDiscountDisplay.valueToken,
         discountValueUnit: ''
       };
@@ -322,7 +324,7 @@ export class TemplateManager {
           currencyInfo.locale,
         );
         return {
-          discountText: bundlePrice,
+          discountText: `Bundle price: ${bundlePrice}`,
           discountValue: bundlePrice,
           discountValueUnit: ''
         };
@@ -339,14 +341,14 @@ export class TemplateManager {
             currencyInfo.locale,
           );
           return {
-            discountText: `${bxyAmountOff} off`,
+            discountText: `Buy ${rule?.customerBuys}, get ${rule?.customerGets} at ${bxyAmountOff} off`,
             discountValue: bxyAmountOff,
             discountValueUnit: ''
           };
         }
         const bxyPercentage = Math.round(safeValue);
         return {
-          discountText: `${bxyPercentage}% off`,
+          discountText: `Buy ${rule?.customerBuys}, get ${rule?.customerGets} at ${bxyPercentage}% off`,
           discountValue: String(bxyPercentage),
           discountValueUnit: '%'
         };

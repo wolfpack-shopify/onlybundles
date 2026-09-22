@@ -5,6 +5,22 @@
  */
 
 const INTERNAL_PROPERTY_REGEX = /^\s*_(?:is_bundle_parent|bundle_name|bundle_total_retail_cents|wolfpackProductBundle|wolfpack_bundle_runtime|addon_offer_id|wpb_offer_analytics|[a-zA-Z0-9_:-]+)\s*:/;
+const BUNDLE_PARENT_PROPERTY_REGEX = /^\s*_is_bundle_parent\s*:/;
+const BUNDLE_PRICE_PROPERTY_REGEX = /^\s*Bundle Price\s*:\s*$/;
+const CART_LINE_SELECTOR = 'tr, cart-item, line-item, [data-cart-item], .cart-item, .cart__item, .line-item';
+
+export const CART_CONTAINER_SELECTORS = [
+  'form[action*="/cart"]',
+  'cart-drawer',
+  '.cart-drawer',
+  '#cart-drawer',
+  '.cart__items',
+  '#CartContainer',
+  '[data-cart-view]',
+  '.cart-items',
+  '.ajax-cart',
+  '.mini-cart',
+].join(', ');
 
 function findPropertyWrapper(element: Element | null): Element | null {
   let current = element;
@@ -63,7 +79,15 @@ export function cleanupInternalCartProperties(root: ParentNode = document): void
   let currentNode: Node | null = walker.nextNode();
   while (currentNode) {
     const text = currentNode.textContent ?? '';
+    if (BUNDLE_PRICE_PROPERTY_REGEX.test(text)) {
+      const cartLine = currentNode.parentElement?.closest<HTMLElement>(CART_LINE_SELECTOR);
+      if (cartLine) cartLine.dataset.wpbBp = 'true';
+    }
     if (INTERNAL_PROPERTY_REGEX.test(text)) {
+      if (BUNDLE_PARENT_PROPERTY_REGEX.test(text)) {
+        const cartLine = currentNode.parentElement?.closest<HTMLElement>(CART_LINE_SELECTOR);
+        if (cartLine) cartLine.dataset.wpbBp = 'true';
+      }
       const wrapper = findPropertyWrapper(currentNode.parentElement);
       if (wrapper) {
         nodesToRemove.push(wrapper);
@@ -106,34 +130,43 @@ let cleanupScheduled = false;
 export function scheduleCartPropertiesCleanup(root?: ParentNode): void {
   if (cleanupScheduled || typeof window === 'undefined') return;
   cleanupScheduled = true;
-  requestAnimationFrame(() => {
+
+  const scheduleFn = typeof window.requestIdleCallback === 'function'
+    ? window.requestIdleCallback
+    : typeof window.requestAnimationFrame === 'function'
+      ? window.requestAnimationFrame
+      : (cb: () => void) => setTimeout(cb, 16);
+
+  scheduleFn(() => {
     cleanupScheduled = false;
     cleanupInternalCartProperties(root);
   });
 }
 
 export function initCartPropertiesCleaner(): void {
-  cleanupInternalCartProperties();
-
   if (typeof document === 'undefined') return;
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => cleanupInternalCartProperties(), { once: true });
-  }
-
-  document.addEventListener('shopify:section:load', () => scheduleCartPropertiesCleanup());
-  document.addEventListener('cart:updated', () => scheduleCartPropertiesCleanup());
-  document.addEventListener('cart:refresh', () => scheduleCartPropertiesCleanup());
-
-  if (typeof MutationObserver !== 'undefined' && document.body) {
-    const observer = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        if (mutation.addedNodes.length > 0) {
-          scheduleCartPropertiesCleanup();
-          break;
-        }
-      }
+  const cleanupKnownContainers = () => {
+    document.querySelectorAll(CART_CONTAINER_SELECTORS).forEach((container) => {
+      scheduleCartPropertiesCleanup(container);
     });
-    observer.observe(document.body, { childList: true, subtree: true });
+  };
+  const marker = document.querySelector<HTMLElement>('[data-wpb-app-embed]');
+  if (marker?.dataset.cartHasWpbPrivateProperties === 'true') cleanupKnownContainers();
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', cleanupKnownContainers, { once: true });
   }
+
+  document.addEventListener('shopify:section:load', cleanupKnownContainers);
+  document.addEventListener('shopify:cart:view', cleanupKnownContainers);
+  document.addEventListener('shopify:cart:lines-update', (event: Event) => {
+    const detail = (event as CustomEvent).detail;
+    const completion = detail?.cart ?? detail?.promise ?? detail;
+    if (completion && typeof completion.then === 'function') {
+      void Promise.resolve(completion).then(cleanupKnownContainers).catch(() => undefined);
+      return;
+    }
+    cleanupKnownContainers();
+  });
 }

@@ -36,7 +36,8 @@ export function createSharedProductCardElement(product: any = {}, currentQuantit
     ? options.displayPrice
     : product.price;
   const price = formatProductCardPrice(displayPrice, product.currencyCode, currencyInfo);
-  const shouldRenderCompareAtPrice = product.compareAtPrice !== null
+  const shouldRenderCompareAtPrice = options.showCompareAtPrice !== false
+    && product.compareAtPrice !== null
     && product.compareAtPrice !== undefined;
   const compareAtPrice = shouldRenderCompareAtPrice
     ? formatProductCardPrice(

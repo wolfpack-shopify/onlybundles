@@ -46,6 +46,9 @@ export function FpbProgressBarOptions({
             </div>
             <QuestionHelpTooltip tooltipKey="discountProgressBar" />
             <s-switch
+              accessibilityLabel={translateAdmin(
+                "tooltips.discountProgressBar.title"
+              )}
               checked={pricingState.showDiscountProgressBar || undefined}
               onChange={(e) =>
                 pricingState.setShowDiscountProgressBar(

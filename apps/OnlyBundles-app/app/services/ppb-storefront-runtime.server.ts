@@ -2,7 +2,6 @@ import { generateCSSFromSettings } from "../lib/css-generators";
 import type { CSSDesignSettings } from "../lib/css-generators/types";
 import { sanitizeCss } from "../lib/css-sanitizer";
 import { BundleType } from "../constants/bundle";
-import { buildSettingsControlsResponse } from "../lib/settings-controls-runtime";
 import { buildSettingsLanguageResponse } from "../lib/settings-language-runtime";
 import { buildSettingsDesignRuntime } from "../lib/settings-design-runtime";
 import { isShopBrandColors } from "../lib/shop-brand-colors";
@@ -115,23 +114,18 @@ export function buildPpbStorefrontRuntime(input: {
   storefrontProxyRoot: string;
   generalSettings: Record<string, unknown>;
 }) {
-  const controls = buildSettingsControlsResponse(
-    input.generalSettings.settingsControls,
-    BundleType.PRODUCT_PAGE,
-  );
   const languages = Object.fromEntries(languageLocales(input.generalSettings.settingsLanguage).map((locale) => [
     locale,
     buildPpbLanguageSnapshot(input.generalSettings.settingsLanguage, locale),
   ]));
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     storefrontApiVersion: "2026-07",
     storefrontAccessToken: input.storefrontAccessToken,
     storefrontProxyRoot: resolveStorefrontProxyRoot({
       configuredRoot: input.storefrontProxyRoot,
     }),
     loadingScreen: resolveBundleLoadingScreenSettings(input.generalSettings),
-    controls,
     languages,
   };
 }

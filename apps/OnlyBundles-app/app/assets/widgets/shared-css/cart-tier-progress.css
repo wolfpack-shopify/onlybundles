@@ -1,0 +1,133 @@
+.wpb-cart-tier-progress-bar {
+  box-sizing: border-box;
+  position: relative;
+  width: 100%;
+  margin: 0 0 20px;
+  padding: 14px 18px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  background: var(--wpb-cart-tier-progress-bg, #fff);
+  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+  font-family: inherit;
+  transition: background-color 0.3s ease, border-color 0.3s ease;
+}
+
+.wpb-cart-tier-progress-bar--max-tier {
+  border-color: rgba(34, 197, 94, 0.3);
+  background: #f0fdf4;
+}
+
+.wpb-cart-tier-progress-bar__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.wpb-cart-tier-progress-bar__title-group {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.wpb-cart-tier-progress-bar__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--bundle-cart-footer-discount-progress-bar-filled-color, var(--wpb-cart-tier-progress-filled, #15a524));
+}
+
+.wpb-cart-tier-progress-bar__message {
+  margin: 0;
+  color: var(--wpb-cart-tier-progress-text, #1f2937);
+  font-size: clamp(12px, 1.8vw, 13.5px);
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.wpb-cart-tier-progress-bar__message strong {
+  color: #111827;
+  font-weight: 700;
+}
+
+.wpb-cart-tier-progress-bar__badge {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #4b5563;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.wpb-cart-tier-progress-bar__badge--unlocked {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.wpb-cart-tier-progress-bar__track-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.wpb-cart-tier-progress-bar__track {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--bundle-cart-footer-discount-progress-bar-empty-color, var(--wpb-cart-tier-progress-empty, #e5e7eb));
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.wpb-cart-tier-progress-bar__fill {
+  position: relative;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--bundle-cart-footer-discount-progress-bar-filled-color, var(--wpb-cart-tier-progress-filled, #15a524)) 0%, #10b981 100%);
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.wpb-cart-tier-progress-bar__fill::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.25) 50%, rgba(255, 255, 255, 0) 100%);
+  background-size: 200% 100%;
+  animation: wpb-shimmer 2.5s infinite;
+  content: '';
+}
+
+[data-wpb-bp] .cart-items__unit-price-wrapper {
+  display: none;
+}
+
+@keyframes wpb-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@media (max-width: 640px) {
+  .wpb-cart-tier-progress-bar {
+    margin-bottom: 16px;
+    padding: 12px 14px;
+  }
+
+  .wpb-cart-tier-progress-bar__message {
+    font-size: 12.5px;
+  }
+
+  .wpb-cart-tier-progress-bar__badge {
+    padding: 2px 6px;
+    font-size: 10px;
+  }
+}

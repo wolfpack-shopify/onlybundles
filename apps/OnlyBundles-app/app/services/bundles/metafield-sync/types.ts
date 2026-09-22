@@ -54,7 +54,8 @@ export interface PriceAdjustment {
  * Bundle UI configuration for widget
  */
 export interface BundleUiConfig {
-  schemaVersion?: 3;
+  schemaVersion?: 4;
+  runtimePolicyRevision?: string;
   id: string;
   name: string;
   description: string;
@@ -121,19 +122,7 @@ export interface BundleUiConfig {
     ruleVersion: number | null;
     eligibilitySource: 'always' | 'specific_link' | 'schedule' | 'country' | 'priority' | null;
   };
-  runtimeAuthorization?: {
-    version: 2;
-    revision: string;
-    bundleToken: string;
-    lines: Array<{
-      variantId: string;
-      productId?: string;
-      role: "component" | "default" | "free_gift" | "addon";
-      maxQuantity: number;
-      maxDiscountPercentage: number;
-      token: string;
-    }>;
-  };
+
 }
 
 export interface BundleUiStep {

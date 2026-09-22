@@ -75,14 +75,33 @@ describe("FPB Controls integrations", () => {
       product_external_id: 11,
       badge: "<div>4.9 stars</div>",
     }), { status: 200 }));
-
-    await hydrateJudgeMeReviewCards({
-      root,
-      products: [{ id: 11 }],
-      shop: "test.myshopify.com",
-      token: "public-token",
-      fetcher,
+    const originalWindow = globalThis.window;
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: {
+        __WOLFPACK_FPB_PRODUCT_MODAL_RUNTIME__: {
+          create: jest.fn(),
+          sanitize: (source: string) => {
+            const template = dom.window.document.createElement("template");
+            template.innerHTML = source;
+            return template.content;
+          },
+        },
+      },
     });
+
+    try {
+      await hydrateJudgeMeReviewCards({
+        root,
+        products: [{ id: 11 }],
+        shop: "test.myshopify.com",
+        token: "public-token",
+        controller: {},
+        fetcher,
+      });
+    } finally {
+      Object.defineProperty(globalThis, "window", { configurable: true, value: originalWindow });
+    }
 
     expect(root?.querySelector(".bw-product-card__text [data-wpb-judgeme-badge='11']")?.textContent)
       .toBe("4.9 stars");

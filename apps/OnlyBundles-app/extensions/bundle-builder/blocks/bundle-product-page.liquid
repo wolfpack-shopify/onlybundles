@@ -35,7 +35,7 @@
 {% endif %}
 
 {% assign bundle_config_json = 'null' %}
-{% if bundle_ui_config and bundle_ui_config.schemaVersion == 3 %}
+{% if bundle_ui_config and bundle_ui_config.schemaVersion == 4 %}
   {% assign bundle_config_json = bundle_ui_config | json %}
 {% endif %}
 
@@ -96,6 +96,7 @@
 {% endif %}
 
 {% assign ppb_runtime_field = shop.metafields[app_namespace]['ppb_storefront_runtime'] %}
+{% assign storefront_controls_runtime_field = shop.metafields[app_namespace]['storefront_controls_runtime'] %}
 {% assign ppb_css_field = shop.metafields[app_namespace]['ppb_storefront_css'] %}
 {%- capture product_collections_json -%}
 [
@@ -124,6 +125,7 @@
     },
     "bundleWidgetContext": true,
     "__WOLFPACK_PPB_STOREFRONT_RUNTIME__": {% if ppb_runtime_field and ppb_runtime_field.value %}{{ ppb_runtime_field.value | json }}{% else %}null{% endif %},
+    "__WOLFPACK_SETTINGS_CONTROLS_RUNTIME__": {% if storefront_controls_runtime_field and storefront_controls_runtime_field.value %}{{ storefront_controls_runtime_field.value | json }}{% else %}null{% endif %},
     "__WOLFPACK_PPB_TEMPLATE_CSS_URLS__": {
       "GRID": {{ 'bundle-widget-product-page-grid.css' | asset_url | json }},
       "LIST": {{ 'bundle-widget-product-page-cascade.css' | asset_url | json }},
@@ -147,12 +149,16 @@
 
 {% schema %}
 {
-  "name": "Bundle Builder",
+  "name": "t:theme_resources.product_page_builder.name",
   "target": "section",
   "enabled_on": {
     "templates": ["product"]
   },
   "settings": [
+    {
+      "type": "paragraph",
+      "content": "t:theme_resources.product_page_builder.description"
+    },
     {
       "type": "text",
       "id": "bundle_id",

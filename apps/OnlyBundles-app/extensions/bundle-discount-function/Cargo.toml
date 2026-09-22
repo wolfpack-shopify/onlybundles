@@ -4,11 +4,11 @@ version = "1.0.0"
 edition = "2021"
 
 [dependencies]
+bundle-runtime-policy = { path = "../bundle-runtime-policy" }
 shopify_function = "2.1.0"
 serde = { version = "1.0", features = ["derive"] }
-serde_json = { version = "1.0", features = ["raw_value"] }
-hmac = { version = "0.12.1", default-features = false }
-sha2 = { version = "0.10.9", default-features = false, features = ["force-soft-compact"] }
+# Match the shared policy crate and Cart Transform's measured WASM size constraint.
+serde_json = { version = "=1.0.146", features = ["raw_value"] }
 
 [profile.release]
 lto = true

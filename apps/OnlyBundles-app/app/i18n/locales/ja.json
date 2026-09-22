@@ -137,6 +137,12 @@
       "saveError": "管理画面の言語を保存できませんでした"
     },
     "storefrontSetup": {
+      "sectionHeading": "ストアフロントのステータス",
+      "publishedThemeDescription": "公開中のテーマのアプリ埋め込みとブロック",
+      "appEmbedsHeading": "アプリ埋め込み",
+      "appBlocksHeading": "テーマアプリブロック",
+      "refresh": "ステータスを更新",
+      "retry": "もう一度試す",
       "loadingTitle": "ストアフロント設定を確認しています",
       "loadingDescription": "公開されたテーマのコンポーネントとアプリの埋め込みを確認しています。",
       "errorTitle": "ストアフロント状態に注意が必要です",
@@ -185,7 +191,27 @@
         "enabled": "有効",
         "ready": "有効にする準備ができました",
         "unavailable": "利用できません"
+      },
+      "resourceLabels": {
+        "bundleAppEmbed": "バンドルストアフロント機能",
+        "bundleProductPage": "商品ページバンドルビルダー",
+        "bundleProductPageEmbed": "商品ページバンドル配置",
+        "bundlePageBuilderEmbed": "ページビルダーバンドル配置",
+        "bundleUpsell": "フルページバンドルアップセル"
       }
+    },
+    "commercialMetrics": {
+      "heading": "バンドルのパフォーマンス",
+      "description": "過去{{days}}日間（{{currency}}）",
+      "bundleRevenue": "バンドル売上",
+      "ordersWithBundles": "バンドルを含む注文",
+      "averageOrderValue": "平均注文額",
+      "viewToOrderConversion": "閲覧から注文へのコンバージョン",
+      "unavailable": "利用できません",
+      "loading": "パフォーマンスを読み込み中",
+      "errorHeading": "パフォーマンスを利用できません",
+      "errorDescription": "Shopifyから指標を読み込めませんでした。",
+      "retry": "もう一度試す"
     }
   },
   "settingsDcp": {
@@ -490,6 +516,8 @@
     "title": "スケジューリングと優先度",
     "description": "このバンドルがOnly Bundlesストアの店舗配置に表示され、最初にどのマッチングオファーが表示されるかを制御します。",
     "shopifyOwnership": "Shopifyのコントロールチェックアウト割引日時と組み合わせ. これらの設定はOnly Bundlesストアの表示と選択を制御します.",
+    "scheduleUnavailableHeading": "この割引ではスケジュールを利用できません",
+    "scheduleUnavailableBody": "このバンドルには、基本商品を統合した後にShopifyが再計算できないコンポーネント単位の対象条件または価格設定があります。スケジュールを有効にするには、それらのルールを削除してください。すでにスケジュールが選択されている場合は、保存する前に「常に有効」を選択してください。",
     "priorityLabel": "ストアフロント優先",
     "priorityDetails": "複数のOnly Bundlesが同じ配置に一致する場合、低い数字が最初に考慮されます。",
     "stopLowerLabel": "優先度の低い店舗のオファーを停止する",
@@ -1157,6 +1185,8 @@
       "theCompleteBundleSolutionForShopifyBuildCustomizeAndPromoteProdu": "Shopifyの完全なバンドルソリューション — 変換された製品バンドルを構築、カスタマイズ、促進します。",
       "getStarted": "<unk> Get Started",
       "goToDashboard": "ダッシュボードへ移動 →",
+      "takeMeToMyDashboard": "ダッシュボードに移動",
+      "valueStatement": "カスタマイズ可能なバンドルで売上と平均注文額を向上させます。",
       "everythingIncluded": "すべてが含まれています",
       "documentation": "ドキュメント"
     },
@@ -1488,6 +1518,7 @@
     }
   },
   "adminAttributes": {
+    "invalidJavaScriptSyntax": "保存する前にJavaScriptの構文を修正してください。",
     "searchCampaigns": "キャンペーンを検索",
     "searchByCampaignName": "キャンペーン名で検索",
     "sortTopCampaigns": "トップキャンペーンをソート",

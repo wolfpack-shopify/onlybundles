@@ -8,15 +8,11 @@ type Owner = {
   id: string;
   discount: { __typename: string; appDiscountType?: { functionId: string }; startsAt?: string; endsAt?: string | null; recurringCycleLimit?: number; discountClasses?: string[]; combinesWith?: Record<string, boolean> };
   config?: { id?: string; value: string } | null;
-  role?: { id?: string; value: string } | null;
-  secret?: { id?: string; value: string } | null;
 };
-const HANDLE = 'scheduled-bundle-discount';
+const HANDLE = 'bundle-discount-function';
 const OWNER_FIELDS = `
   id
-  config: metafield(namespace: "$app", key: "scheduled_offer") { id value }
-  role: metafield(namespace: "$app", key: "discount_role") { id value }
-  secret: metafield(namespace: "$app", key: "runtime_token_secret") { id value }
+  config: metafield(namespace: "$app", key: "discount_configuration") { id value }
   discount {
     __typename
     ... on DiscountAutomaticApp {
@@ -30,7 +26,7 @@ const OWNER_FIELDS = `
 async function execute(admin: Admin, query: string, variables?: Record<string, unknown>) {
   const response = await admin.graphql(query, { apiVersion: '2026-07', variables });
   const payload = await response.json();
-  // Do not include returned values: owner metadata contains the runtime signing secret.
+  // Keep remote failures concise; do not log whole Shopify response payloads.
   if (payload.errors?.length || !payload.data) throw new Error('Shopify scheduled discount request failed');
   return payload.data;
 }
@@ -88,6 +84,12 @@ function scheduledConfig(policy: BundleAuthorizationPolicy, timing: OfferPolicyT
   };
 }
 
+function nativeScheduleInstant(value: Date | string): string {
+  const date = new Date(value);
+  date.setUTCMilliseconds(0);
+  return date.toISOString();
+}
+
 async function remove(admin: Admin, id: string) {
   const data = await execute(admin, `mutation DeleteScheduledDiscount($id: ID!) {
     discountAutomaticDelete(id: $id) { deletedAutomaticDiscountId userErrors { field message code } }
@@ -99,7 +101,7 @@ async function remove(admin: Admin, id: string) {
 /** Prepare and verify native owners before publishing the matching Function policy revision. */
 export async function syncScheduledBundleDiscounts(input: {
   admin: Admin; policy: BundleAuthorizationPolicy; timing: OfferPolicyTiming; title: string;
-  secret: string; recurringSubscription: boolean;
+  recurringSubscription: boolean;
 }) {
   const { admin, policy } = input;
   const { owners, functionId, timezone } = await inventory(admin);
@@ -117,25 +119,22 @@ export async function syncScheduledBundleDiscounts(input: {
     return ids;
   }
   if (!functionId) throw new Error('The scheduled bundle Discount Function must be deployed before syncing scheduled offers');
-  if (!input.secret || !input.title.trim()) throw new Error('Scheduled discount requires a signing secret and configured bundle title');
+  if (!input.title.trim()) throw new Error('Scheduled discount requires a configured bundle title');
   const config = scheduledConfig(policy, input.timing, timezone);
   const configValue = JSON.stringify(config);
   if (Buffer.byteLength(configValue, 'utf8') > 10_000) throw new Error('Scheduled offer exceeds Shopify Function metafield input limit');
   const roles: Role[] = input.recurringSubscription ? ['scheduled_initial', 'scheduled_recurring'] : ['scheduled_initial'];
   const kept = new Set<string>();
   for (const role of roles) {
-    const previous = existing.find(owner => owner.role?.value === role);
-    const metafields = [
-      { key: 'scheduled_offer', type: 'json', value: configValue },
-      { key: 'discount_role', type: 'single_line_text_field', value: role },
-      { key: 'runtime_token_secret', type: 'single_line_text_field', value: input.secret },
-    ].map(value => ({ ...value, namespace: '$app' }));
+    const previous = existing.find(owner => { try { return JSON.parse(owner.config?.value ?? 'null')?.role === role; } catch { return false; } });
+    const ownerConfig = { ...config, role };
+    const metafields = [{ namespace: '$app', key: 'discount_configuration', type: 'json', value: JSON.stringify(ownerConfig) }];
     const discount = {
       title: input.title, functionHandle: HANDLE, discountClasses: ['PRODUCT'],
       // A recurrence has no absolute end: the Function owns each local occurrence.
       startsAt: input.timing.scheduleMode === 'one_time' && input.timing.startsAt
-        ? new Date(input.timing.startsAt).toISOString() : '1970-01-01T00:00:00.000Z',
-      endsAt: input.timing.scheduleMode === 'one_time' && input.timing.endsAt ? new Date(input.timing.endsAt).toISOString() : null,
+        ? nativeScheduleInstant(input.timing.startsAt) : '1970-01-01T00:00:00.000Z',
+      endsAt: input.timing.scheduleMode === 'one_time' && input.timing.endsAt ? nativeScheduleInstant(input.timing.endsAt) : null,
       recurringCycleLimit: role === 'scheduled_recurring' ? 0 : 1,
       combinesWith: { productDiscounts: true, orderDiscounts: true, shippingDiscounts: false }, metafields,
     };
@@ -154,7 +153,7 @@ export async function syncScheduledBundleDiscounts(input: {
     const owner: Owner | undefined = verified.discountNode;
     const sameDate = (actual: string | null | undefined, expected: string | null) => expected === null ? actual === null : actual != null && new Date(actual).getTime() === new Date(expected).getTime();
     if (owner?.id !== id || owner.discount?.appDiscountType?.functionId !== functionId
-      || !sameConfig(owner.config?.value, config) || owner.role?.value !== role || owner.secret?.value !== input.secret
+      || !sameConfig(owner.config?.value, ownerConfig)
       || !sameDate(owner.discount.startsAt, discount.startsAt) || !sameDate(owner.discount.endsAt, discount.endsAt)
       || owner.discount.recurringCycleLimit !== discount.recurringCycleLimit
       || owner.discount.discountClasses?.length !== 1 || owner.discount.discountClasses[0] !== 'PRODUCT'

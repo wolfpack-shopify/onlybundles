@@ -630,7 +630,8 @@ body:has([data-fpb-design-preset]) {
     font-size: 0.8125rem;
     line-height: 1.375rem;
     font-weight: 700;
-    text-align: center;
+    text-align: left;
+    text-align: start;
     letter-spacing: 0.0375rem;
     overflow: visible;
     text-overflow: clip;
@@ -841,7 +842,8 @@ body:has([data-fpb-design-preset]) {
     font-weight: 700;
     line-height: var(--standard-mobile-title-line-height, 1.125rem);
     letter-spacing: 0;
-    text-align: center;
+    text-align: left;
+    text-align: start;
     padding-block-end: 0.25rem;
     border-bottom: thin solid #e3e3e3;
     box-sizing: border-box;
@@ -1693,6 +1695,7 @@ body:has([data-fpb-design-preset]) {
   min-height: var(--fpb-icon-cta-size);
   padding: 0;
   font-size: 0;
+  position: relative;
 }
 
 .layout-sidebar[data-fpb-design-preset="STANDARD"][data-fpb-card-cta-mode="icon"]
@@ -1703,6 +1706,10 @@ body:has([data-fpb-design-preset]) {
   font-size: 1rem;
   font-weight: 700;
   line-height: 1;
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
 }
 
 @keyframes fpb-standard-qty-expand {

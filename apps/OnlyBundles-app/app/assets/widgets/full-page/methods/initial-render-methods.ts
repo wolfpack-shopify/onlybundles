@@ -112,7 +112,7 @@ updateMessagesFromBundle() {
   const messaging = this.selectedBundle?.messaging;
   const pricingMessages = this.selectedBundle?.pricing?.messages;
   const pricingDisplay = this.selectedBundle?.pricing?.display;
-  const displayOptions = messaging?.displayOptions || this.selectedBundle?.pricing?.displayOptions || {};
+  const displayOptions = this.selectedBundle?.pricing?.displayOptions || messaging?.displayOptions || {};
   const progressBarOptions = displayOptions?.progressBar || {};
 
   if (messaging) {

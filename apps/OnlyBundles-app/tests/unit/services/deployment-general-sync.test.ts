@@ -79,6 +79,8 @@ function makeDeps() {
     getAdmin: jest.fn().mockResolvedValue(admin),
     ensureMetafieldDefinitions: jest.fn().mockResolvedValue(true),
     syncPpbRuntime: jest.fn().mockResolvedValue(true),
+    syncFpbRuntime: jest.fn().mockResolvedValue(true),
+    syncStorefrontControlsRuntime: jest.fn().mockResolvedValue(true),
     syncBundle: jest.fn().mockResolvedValue({ synced: true }),
     setupAddonDiscount: jest.fn().mockResolvedValue({ success: true }),
     setupSubscriptionDiscount: jest.fn().mockResolvedValue({ success: true }),
@@ -129,6 +131,8 @@ describe("deployment general sync", () => {
       failedShops: 0,
       metafieldDefinitionShopsSynced: 2,
       ppbRuntimeShopsSynced: 2,
+      fpbRuntimeShopsSynced: 2,
+      storefrontControlsRuntimeShopsSynced: 2,
       addonDiscountShopsSynced: 1,
       subscriptionDiscountShopsSynced: 1,
       variantRemediation: {
@@ -142,6 +146,8 @@ describe("deployment general sync", () => {
     });
     expect(deps.ensureMetafieldDefinitions).toHaveBeenCalledTimes(2);
     expect(deps.syncPpbRuntime).toHaveBeenCalledTimes(2);
+    expect(deps.syncFpbRuntime).toHaveBeenCalledTimes(2);
+    expect(deps.syncStorefrontControlsRuntime).toHaveBeenCalledTimes(2);
     expect(deps.syncBundle).toHaveBeenCalledWith({
       admin: expect.objectContaining({ graphql: expect.any(Function) }),
       shopDomain: "alpha.myshopify.com",
@@ -314,18 +320,10 @@ describe("deployment general sync", () => {
     expect(deps.syncBundle).not.toHaveBeenCalled();
   });
 
-  it("does not publish policies when metafield access provisioning returns false", async () => {
-    const deps = makeDeps();
-    deps.ensureMetafieldDefinitions.mockResolvedValueOnce(false);
-    const result = await runDeploymentGeneralSync(parseDeploymentGeneralSyncEnv({WPB_DEPLOYMENT_GENERAL_SYNC: "true"}), deps);
-    expect(result.failedShops).toBe(1);
-    expect(deps.syncBundle).not.toHaveBeenCalledWith(expect.objectContaining({shopDomain: "alpha.myshopify.com"}));
-  });
-
   it("records shop setup failures and skips that shop's bundles", async () => {
     const deps = makeDeps();
-    deps.ensureMetafieldDefinitions.mockRejectedValueOnce(
-      new Error("definition sync failed"),
+    deps.syncFpbRuntime.mockRejectedValueOnce(
+      new Error("runtime sync failed"),
     );
 
     const result = await runDeploymentGeneralSync(

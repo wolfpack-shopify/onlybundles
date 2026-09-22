@@ -340,6 +340,7 @@ _renderInpageStepProducts(stepIndex: string|number, target: any) {
           addDisabled: outOfStock,
           increaseDisabled,
           stockBadgeElement,
+          showCompareAtPrice: this._getProductPageControls?.()?.showCompareAtPrices !== false,
         }
       );
     }
@@ -363,6 +364,7 @@ _renderInpageStepProducts(stepIndex: string|number, target: any) {
           addDisabled: outOfStock,
           increaseDisabled,
           stockBadgeElement,
+          showCompareAtPrice: this._getProductPageControls?.()?.showCompareAtPrices !== false,
         }
       );
     }
@@ -385,6 +387,7 @@ _renderInpageStepProducts(stepIndex: string|number, target: any) {
         addDisabled: outOfStock,
         increaseDisabled,
         stockBadgeElement,
+        showCompareAtPrice: this._getProductPageControls?.()?.showCompareAtPrices !== false,
       }
     );
   });

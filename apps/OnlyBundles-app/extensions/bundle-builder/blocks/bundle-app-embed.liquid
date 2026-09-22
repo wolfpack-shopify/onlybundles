@@ -5,6 +5,19 @@
 {% assign app_namespace = '$app' %}
 {% assign ppb_runtime_field = shop.metafields[app_namespace]['ppb_storefront_runtime'] %}
 {% assign ppb_runtime = ppb_runtime_field.value %}
+{% assign storefront_controls_runtime_field = shop.metafields[app_namespace]['storefront_controls_runtime'] %}
+{% assign storefront_controls_runtime = storefront_controls_runtime_field.value %}
+{% assign cart_has_wpb_private_properties = false %}
+{% for item in cart.items %}
+  {% for property in item.properties %}
+    {% assign property_prefix = property.first | slice: 0 %}
+    {% if property_prefix == '_' %}
+      {% assign cart_has_wpb_private_properties = true %}
+      {% break %}
+    {% endif %}
+  {% endfor %}
+  {% if cart_has_wpb_private_properties %}{% break %}{% endif %}
+{% endfor %}
 {% assign ppb_css_field = shop.metafields[app_namespace]['ppb_storefront_css'] %}
 {% assign storefront_proxy_root = ppb_runtime.storefrontProxyRoot %}
 {% assign fpb_public_number = nil %}
@@ -29,7 +42,7 @@
 {% assign fpb_upsells_endpoint = storefront_proxy_root | append: '/api/fpb-upsells.json' %}
 {% assign ppb_embed_endpoint = storefront_proxy_root | append: '/api/ppb-embed.json' %}
 {% assign page_builder_embed_endpoint = storefront_proxy_root | append: '/api/page-builder-embed.json' %}
-{% assign controls_settings_endpoint = storefront_proxy_root | append: '/api/controls-settings?bundleType=full_page' %}
+{% assign bundle_links_endpoint = storefront_proxy_root | append: '/api/bundle-links' %}
 {% capture product_collection_ids %}{% if product %}{% for collection in product.collections %}{{ collection.id }}{% unless forloop.last %},{% endunless %}{% endfor %}{% endif %}{% endcapture %}
 
 <div
@@ -37,16 +50,24 @@
   data-wpb-app-embed
   data-storefront-proxy-root="{{ storefront_proxy_root | escape }}"
   data-ppb-storefront-runtime='{{ ppb_runtime | json | escape }}'
+  data-storefront-controls-runtime='{{ storefront_controls_runtime | json | escape }}'
+  data-cart-has-wpb-private-properties="{{ cart_has_wpb_private_properties }}"
+  data-page-type="{{ request.page_type | escape }}"
+  data-bundle-links-endpoint="{{ bundle_links_endpoint | escape }}"
   data-shop-base-currency="{{ shop.currency | escape }}"
   data-customer-currency="{{ cart.currency.iso_code | escape }}"
   data-redirect-path="{{ fpb_proxy_path }}"
   data-full-page-script-url="{{ 'bundle-widget-full-page-bundled.js' | asset_url }}"
+  data-full-page-modal-script-url="{{ 'bundle-widget-full-page-modal.js' | asset_url }}"
+  data-product-features-script-url="{{ 'bundle-app-product-features.js' | asset_url }}"
+  data-controls-script-url="{{ 'bundle-app-controls.js' | asset_url }}"
+  data-cart-script-url="{{ 'bundle-app-cart.js' | asset_url }}"
   data-fpb-upsells-endpoint="{{ fpb_upsells_endpoint }}"
   data-ppb-embed-endpoint="{{ ppb_embed_endpoint }}"
   data-page-builder-embed-endpoint="{{ page_builder_embed_endpoint }}"
-  data-controls-settings-endpoint="{{ controls_settings_endpoint }}"
   data-product-id="{% if product %}{{ product.id }}{% endif %}"
   data-product-handle="{% if product %}{{ product.handle | escape }}{% endif %}"
+  data-is-fpb-parent-product="{% if fpb_public_number != blank %}true{% else %}false{% endif %}"
   data-collection-ids="{{ product_collection_ids | strip }}"
   data-locale="{{ request.locale.iso_code }}"
   data-country-code="{{ localization.country.iso_code }}"
@@ -71,13 +92,13 @@
 
 {% schema %}
 {
-  "name": "Only Bundles",
+  "name": "t:theme_resources.storefront_features.name",
   "target": "body",
   "stylesheet": "bundle-widget-bootstrap.css",
   "settings": [
     {
       "type": "paragraph",
-      "content": "Activates Only Bundles storefront features, including product-page bundle offers and embedded bundle builders."
+      "content": "t:theme_resources.storefront_features.description"
     }
   ]
 }

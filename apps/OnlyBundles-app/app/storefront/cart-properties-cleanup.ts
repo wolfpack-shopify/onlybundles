@@ -22,11 +22,6 @@ export const CART_CONTAINER_SELECTORS = [
   '.mini-cart',
 ].join(', ');
 
-export function isCartContainerOrDescendant(node: Node): boolean {
-  if (typeof Element === 'undefined' || !(node instanceof Element)) return false;
-  return Boolean(node.matches(CART_CONTAINER_SELECTORS) || node.querySelector(CART_CONTAINER_SELECTORS));
-}
-
 function findPropertyWrapper(element: Element | null): Element | null {
   let current = element;
   let candidate: Element | null = null;
@@ -149,50 +144,29 @@ export function scheduleCartPropertiesCleanup(root?: ParentNode): void {
 }
 
 export function initCartPropertiesCleaner(): void {
-  cleanupInternalCartProperties();
-
   if (typeof document === 'undefined') return;
 
+  const cleanupKnownContainers = () => {
+    document.querySelectorAll(CART_CONTAINER_SELECTORS).forEach((container) => {
+      scheduleCartPropertiesCleanup(container);
+    });
+  };
+  const marker = document.querySelector<HTMLElement>('[data-wpb-app-embed]');
+  if (marker?.dataset.cartHasWpbPrivateProperties === 'true') cleanupKnownContainers();
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => cleanupInternalCartProperties(), { once: true });
+    document.addEventListener('DOMContentLoaded', cleanupKnownContainers, { once: true });
   }
 
-  document.addEventListener('shopify:section:load', () => scheduleCartPropertiesCleanup());
-  document.addEventListener('cart:updated', () => scheduleCartPropertiesCleanup());
-  document.addEventListener('cart:refresh', () => scheduleCartPropertiesCleanup());
-
-  if (typeof MutationObserver !== 'undefined' && document.body) {
-    const cartContainers = document.querySelectorAll(CART_CONTAINER_SELECTORS);
-    if (cartContainers.length > 0) {
-      const cartObserver = new MutationObserver((mutations) => {
-        for (const mutation of mutations) {
-          if (mutation.type === 'attributes' || mutation.addedNodes.length > 0) {
-            scheduleCartPropertiesCleanup(mutation.target as ParentNode);
-            break;
-          }
-        }
-      });
-      cartContainers.forEach((container) => {
-        cartObserver.observe(container, {
-          childList: true,
-          subtree: true,
-          attributes: true,
-          attributeFilter: ['open', 'class', 'aria-hidden'],
-        });
-      });
-    } else {
-      const bodyObserver = new MutationObserver((mutations) => {
-        for (const mutation of mutations) {
-          for (let i = 0; i < mutation.addedNodes.length; i++) {
-            const addedNode = mutation.addedNodes[i];
-            if (isCartContainerOrDescendant(addedNode)) {
-              scheduleCartPropertiesCleanup(addedNode as ParentNode);
-              return;
-            }
-          }
-        }
-      });
-      bodyObserver.observe(document.body, { childList: true, subtree: false });
+  document.addEventListener('shopify:section:load', cleanupKnownContainers);
+  document.addEventListener('shopify:cart:view', cleanupKnownContainers);
+  document.addEventListener('shopify:cart:lines-update', (event: Event) => {
+    const detail = (event as CustomEvent).detail;
+    const completion = detail?.cart ?? detail?.promise ?? detail;
+    if (completion && typeof completion.then === 'function') {
+      void Promise.resolve(completion).then(cleanupKnownContainers).catch(() => undefined);
+      return;
     }
-  }
+    cleanupKnownContainers();
+  });
 }

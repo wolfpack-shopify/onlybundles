@@ -8,12 +8,16 @@ import { build } from 'esbuild';
 
 const rootDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 const outputDir = process.env.WPB_STOREFRONT_OUTDIR || join(rootDir, 'extensions/bundle-builder/assets');
-const widgetVersion = '24.0.0';
+const widgetVersion = '24.1.0';
 
 const targets = {
   'full-page': {
     entry: join(rootDir, 'app/storefront/full-page.ts'),
     output: 'bundle-widget-full-page-bundled.js',
+  },
+  'full-page-modal': {
+    entry: join(rootDir, 'app/storefront/full-page-modal.ts'),
+    output: 'bundle-widget-full-page-modal.js',
   },
   'product-page': {
     entry: join(rootDir, 'app/storefront/product-page.ts'),
@@ -26,6 +30,18 @@ const targets = {
   embed: {
     entry: join(rootDir, 'app/storefront/app-embed.ts'),
     output: 'bundle-app-embed.js',
+  },
+  'embed-product-features': {
+    entry: join(rootDir, 'app/storefront/app-product-features.ts'),
+    output: 'bundle-app-product-features.js',
+  },
+  'embed-controls': {
+    entry: join(rootDir, 'app/storefront/app-controls.ts'),
+    output: 'bundle-app-controls.js',
+  },
+  'embed-cart': {
+    entry: join(rootDir, 'app/storefront/app-cart.ts'),
+    output: 'bundle-app-cart.js',
   },
 };
 

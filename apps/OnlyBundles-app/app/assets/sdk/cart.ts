@@ -1,8 +1,8 @@
 'use strict';
 
-import { withBundleCartLock } from "../../lib/bundle-cart-lock.js";
 import { buildBundleSelectionProperties, buildOfferAnalyticsCartProperties } from '../widgets/shared/engine/cart-submit.js';
 import { resolvePpbSelectionMetric } from '../widgets/shared/ppb-condition-selections.js';
+import { updateShopifyCart } from '../widgets/shared/shopify-cart-actions.js';
 
 function _generateBundleInstanceId(bundleId: string) {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -181,38 +181,12 @@ export function addBundleToCart(state: any, validateBundleFn: any, emitFn: any) 
     return Promise.resolve();
   }
 
-  return withBundleCartLock(function () {
-    return fetch('/cart/add.js', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        items: cartResult.items.map(function (item: any) {
-          return {
-            id: item.id,
-            quantity: item.quantity,
-            properties: item.properties,
-          };
-        }),
-      }),
-    });
-  })
-    .then(function (response) {
-      return response.text().then(function (text) {
-        if (!response.ok) {
-          var msg = 'Cart add failed (' + response.status + ')';
-          try {
-            var data = JSON.parse(text);
-            msg = data.message || data.description || msg;
-          } catch (_: any) {}
-          throw new Error(msg);
-        }
-        return text;
+  return updateShopifyCart(cartResult.items)
+    .then(function (result) {
+      emitFn('wbp:cart-success', {
+        bundleId: state.bundleId,
+        warnings: Array.isArray(result?.warnings) ? result.warnings : [],
       });
-    })
-    .then(function () {
-      emitFn('wbp:cart-success', { bundleId: state.bundleId });
     })
     .catch(function (err) {
       emitFn('wbp:cart-failed', { error: err.message });

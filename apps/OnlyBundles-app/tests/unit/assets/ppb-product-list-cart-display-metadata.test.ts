@@ -100,7 +100,7 @@ function makeProductPageContext() {
 }
 
 describe('PPB Product List cart display metadata', () => {
-  it('builds presentation metadata and stable identifiers for Product List cart lines', () => {
+  it('builds presentation metadata for Product List cart lines', () => {
     const context = makeProductPageContext();
 
     const items = ProductPageCartMethods.buildCartItems.call(context, 'MIX-894502', 'K1K');
@@ -130,17 +130,6 @@ describe('PPB Product List cart display metadata', () => {
       },
     });
 
-    const cartContext = ProductPageCartMethods.buildProductPageCartFormData.call(context, items, {
-      bundleName: 'PPB Product List Fixture',
-      offerId: 'MIX-894502',
-      sessionKey: 'K1K',
-    });
-    expect(cartContext).not.toHaveProperty('bundleDetailsKey');
-    expect((Array.from(cartContext.formData.entries()) as Array<[string, unknown]>).filter(([key]: any) => key.endsWith('[_wolfpackProductBundle:OfferId]'))).toEqual([
-      ['items[0][properties][_wolfpackProductBundle:OfferId]', 'MIX-894502_K1K_1'],
-      ['items[1][properties][_wolfpackProductBundle:OfferId]', 'MIX-894502_K1K_2'],
-      ['items[2][properties][_wolfpackProductBundle:OfferId]', 'MIX-894502_K1K_3'],
-    ]);
   });
 });
 

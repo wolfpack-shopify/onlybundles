@@ -330,6 +330,9 @@ createFullPageProductGrid(stepIndex: string|number) {
       products: expandedProducts,
       shop,
       token: judgeMeToken,
+      controller: this,
+    }).catch((error) => {
+      console.error('[WPB] Unable to hydrate Judge.me badges', error);
     });
   }
 

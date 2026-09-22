@@ -4,8 +4,8 @@ id: widget-architecture
 title: Widget Architecture
 type: architecture
 status: authoritative
-summary: FPB and PPB bootstrap, signed settings, Shopify-hosted CSS, market pricing, and fail-closed hydration architecture.
-last_audited: 2026-09-14
+summary: FPB and PPB bootstrap, Shopify-hosted settings, feature-gated app embeds, market pricing, and fail-closed hydration architecture.
+last_audited: 2026-09-23
 owners:
   - engineering
 domains:
@@ -15,6 +15,8 @@ systems:
 source_paths:
   - apps/OnlyBundles-app/app/config/storefront-proxy-routes.ts
   - apps/OnlyBundles-app/app/assets/bundle-widget-full-page.ts
+  - apps/OnlyBundles-app/app/storefront/full-page-modal.ts
+  - apps/OnlyBundles-app/app/services/fpb-storefront-runtime.server.ts
   - apps/OnlyBundles-app/app/storefront/fpb-product-page-upsell.ts
   - apps/OnlyBundles-app/app/storefront/fpb-upsell-handoff.ts
   - apps/OnlyBundles-app/app/storefront/ppb-bundle-embed.ts
@@ -35,6 +37,7 @@ source_paths:
   - apps/OnlyBundles-app/app/assets/sdk/hydration.ts
   - apps/OnlyBundles-app/app/storefront/sdk.ts
   - apps/OnlyBundles-app/app/storefront/app-embed-marker.ts
+  - apps/OnlyBundles-app/app/storefront/cart-tier-progress-bar.ts
   - apps/OnlyBundles-app/app/lib/ppb-widget-placement.client.ts
   - apps/OnlyBundles-app/app/lib/dashboard-preview-window.ts
   - apps/OnlyBundles-app/types/wolfpack-bundles.d.ts
@@ -58,8 +61,7 @@ source_paths:
   - apps/OnlyBundles-app/app/assets/widgets/product-page/ppb-modal-card-presentation.ts
   - apps/OnlyBundles-app/app/routes/api/api.storefront-products.tsx
   - apps/OnlyBundles-app/app/routes/api/api.storefront-collections.tsx
-  - apps/OnlyBundles-app/app/routes/api/api.controls-settings.tsx
-  - apps/OnlyBundles-app/app/routes/api/api.language-settings.tsx
+  - apps/OnlyBundles-app/app/routes/api/api.bundle-links.tsx
   - apps/OnlyBundles-app/app/routes/api/api.fpb-upsells[.]json.tsx
   - apps/OnlyBundles-app/app/routes/api/api.ppb-embed[.]json.tsx
   - apps/OnlyBundles-app/app/routes/api/api.page-builder-embed[.]json.tsx
@@ -104,8 +106,8 @@ shared locale projector before exposing step, category, add-on, pricing,
 widget, embed, and general text fields to their existing renderers. Locale
 matching is case-insensitive, prefers the exact Shopify locale, then its base
 language, and finally retains the base configured copy. The projector is
-immutable and does not change the FPB metafield-first, proxy-fallback load
-priority. Subscription copy is excluded because its dedicated storefront
+immutable and does not change the FPB Shopify-snapshot-only load contract.
+Subscription copy is excluded because its dedicated storefront
 resolver already performs exact/base locale resolution and deep-merges plan
 copy. Pricing projection includes the localized global success message as well
 as per-rule messages, progress tiers, and bundle-quantity labels. The dedicated
@@ -494,6 +496,16 @@ the marker exists.
 - Full-page bundle public links use the signed app-proxy document URL (`/apps/product-bundles/wpb/{publicNumber}`). The positive integer is unique per shop and hides the internal database ID. Shopify wraps `application/liquid` in the active theme layout and the app embed loads extension assets through `asset_url`.
 - Storefront JS/CSS must be loaded from Shopify theme-extension assets with Liquid `asset_url`. App proxy routes are only for API/data responses, not widget asset hosting.
 
+Cart-page discount progress is line-metadata driven and fails closed. FPB and
+PPB cart-line builders retain an explicit `_bundle_tier_progress` marker with
+`progressBar.enabled: false` when the merchant disables progress; they do not
+omit that decision. Missing progress configuration is also disabled. Because
+the cart page owns one global progress surface, it renders only when every
+participating bundle-progress marker explicitly enables it. A mixed cart with
+an enabled and disabled marker renders no global bar instead of combining
+incompatible bundle rules or allowing an older enabled line to override the
+merchant's current disabled choice.
+
 Proxy URL ownership is centralized at each build boundary. TypeScript callers use
 `app/config/storefront-proxy-routes.ts` for the installed proxy root and API or
 document path composition. Theme-extension blocks read `storefrontProxyRoot`
@@ -522,24 +534,35 @@ and a production-root target would silently hand the shopper to the wrong app.
 
 > **Do not modify the load order** — see `CLAUDE.md` → "Do Not Touch" section.
 
-### App-Proxy Marker and API Fallback
+### Shopify Storefront Snapshot Marker
 
-The app-proxy document writes the complete source-marked configuration into
-`data-bundle-config`. If that primary marker is absent or malformed, the widget
-uses the existing bundle API fallback. There is no Page block or Page-body
-marker stage.
+The app-proxy document writes the validated Shopify-hosted configuration and
+FPB runtime into the marker. The widget accepts only a bundle-ID-matched
+`data-bundle-config-source="shopify_storefront"` payload. Missing or malformed
+snapshots fail before widget bootstrap; there is no bundle API, Page block, or
+Page-body fallback stage.
 
 ### App Proxy Document — Public FPB Route
 
 The public FPB route is `GET /apps/product-bundles/wpb/{publicNumber}`. Shopify forwards it to Remix as `/wpb/{publicNumber}` and app-proxy HMAC verification is required before lookup. The route rejects non-positive or opaque path segments and resolves by `(shopId, publicNumber)`. Preview-token authorization and the emitted widget marker remain bound to the resolved internal bundle ID.
 
-The route returns an escaped full `formatBundleForWidget()` payload in the existing marker, marks it with `data-bundle-config-source="app_proxy"`, and responds with `Content-Type: application/liquid` and `Cache-Control: no-store`. The widget treats only this source-marked, bundle-ID-matched full payload as authoritative and renders it without requesting bundle JSON. If the app-proxy marker is absent or malformed, the widget uses the bundle JSON fallback. Active and unlisted bundles render publicly; drafts require a 15-minute shop-and-bundle-bound `wpb_preview` token. The route never emits `/apps/product-bundles/assets/...` URLs.
+The route performs one narrow database authorization lookup and one Storefront
+GraphQL query for the parent variant's `$app.bundle_ui_config` plus the shop's
+`$app.fpb_storefront_runtime`. It validates snapshot schema, identity, steps,
+and runtime-policy revision before returning through Shopify's `liquid()`
+helper. Active and unlisted bundles render publicly; drafts require a one-hour
+shop-and-bundle-bound `wpb_preview` token. Unrestricted public documents use a
+short shared cache; preview and delivery-restricted responses are private and
+non-cacheable. Missing or mismatched Shopify state returns `503`.
 
-### API Fallback
+### Interaction-Only Product Modal
 
-If metafield cache is absent/malformed → `GET /apps/product-bundles/api/bundle/{id}.json`
-
-- Single retry after 3s for `503`/`504` responses (Render cold-start tolerance)
+The initial full-page asset excludes the product-detail modal and DOMPurify.
+The app embed passes the Shopify `asset_url` for
+`bundle-widget-full-page-modal.js`; the controller loads it only when a shopper
+opens product details or an enabled Judge.me badge needs rich-HTML sanitation.
+Plain product-card descriptions are reduced to text with an inert template and
+do not require the sanitizer.
 
 ## Product Hydration Strategy
 
@@ -620,14 +643,15 @@ Runtime behavior in `app/assets/widgets/product-page/methods/config-lifecycle-me
 
 1. Accept only a complete schema-v3 Product Page snapshot with signed v2
    authorization.
-2. Read store controls, locale data, and the Storefront API version/token from
-   the Shopify-hosted shop `$app.ppb_storefront_runtime` metafield emitted by
+2. Read store controls from `$app.storefront_controls_runtime`, and locale data
+   plus the Storefront API version/token from the Shopify-hosted shop
+   `$app.ppb_storefront_runtime` metafield emitted by
    Liquid. The direct parent-product block emits this context in its JSON
    payload; automatic and direct page-builder PPB surfaces receive the same
    owning snapshot from the app-embed marker before the widget runtime starts.
-   Read exact Design CSS from `$app.ppb_storefront_css`. The signed
-   `/api/controls-settings` and `/api/language-settings` app-proxy routes remain
-   the live settings source for FPB surfaces; they are not a fallback for PPB.
+   Read exact Design CSS from `$app.ppb_storefront_css`. Controls are never
+   refetched through an app proxy. FPB localized copy is resolved locally from
+   `$app.fpb_storefront_runtime` using exact locale, base locale, then English.
 3. Hydrate product and variant state directly from Shopify Storefront API;
    category and collection membership is already materialized at sync time.
 4. If the snapshot is missing/invalid:
@@ -704,8 +728,8 @@ known, available hydrated variants. The shared PPB condition-selection adapter
 maps selected variants to their parent products for category rules and supplies
 hydrated cent and gram metrics for amount and weight rules. Rejected mutations
 do not change selection state. Successful mutation events use `quantity` in
-their detail payload. Cart submission retains the signed Cart Transform runtime
-token request before Shopify Ajax cart submission.
+their detail payload. Cart submission uses `Shopify.actions.updateCart`,
+matching FPB and the standard PPB runtime.
 
 The SDK is support-enabled and limited to one Product Page Bundle runtime on an
 Online Store 2.0 page. There is no npm, public CDN, Hydrogen, or Full Page
@@ -778,7 +802,13 @@ selectors and verify the generated asset; otherwise `.parent :is(.child-a,
 - `public/bundle-product-placeholder.svg` has been decommissioned and should not be used anymore.
 
 The app embed exposes the extension asset URLs and loads exactly one active
-preset stylesheet. The widget runtime must not take over stylesheet ownership.
+preset stylesheet. Its core bundle owns environment selection, Shopify-hosted
+context, and FPB marker hydration. It then loads independent product, Controls,
+and cart feature bundles only when their page/runtime gates match. Cart features
+also load on the first `shopify:cart:view` or `shopify:cart:lines-update` event,
+so a product-page cart drawer remains supported without paying the cart runtime
+cost on every initial page load. The widget runtime must not take over
+stylesheet ownership.
 Do not solve the limit by minifying readable source into one-line CSS; remove
 redundant or conflicting rules and split assets only along real ownership
 boundaries.

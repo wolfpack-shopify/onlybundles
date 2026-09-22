@@ -5,7 +5,7 @@ title: Metafields
 type: shopify-integration
 status: authoritative
 summary: Storefront bundle metafield ownership, synchronization, payload limits, and Shopify validation constraints.
-last_audited: 2026-09-01
+last_audited: 2026-09-23
 owners:
   - engineering
 domains:
@@ -18,7 +18,9 @@ source_paths:
   - app/routes/root/wpb.$bundleId.tsx
   - app/services/bundles/metafield-sync/
   - app/services/bundles/metafield-sync/operations/bundle-product.server.ts
+  - app/services/bundles/bundle-parent-product.server.ts
   - app/services/ppb-storefront-runtime.server.ts
+  - app/services/storefront-controls-runtime.server.ts
   - app/services/ppb-static-authorization.server.ts
   - app/routes/app/app.bundles.product-page-bundle.configure.$bundleId/handlers/save-bundle.server.ts
 related_docs:
@@ -79,6 +81,20 @@ compare every line's revision with current Shopify state before applying a
 merge or discount. Parent product metafields remain the source for EXPAND and
 display metadata.
 
+## Parent Product Placeholder Media
+
+FPB and PPB parent products share the same placeholder-media contract. Existing
+merchant media is preserved; the app adds the Only Bundles placeholder only
+when the product has no media or when every returned media node has Shopify
+status `FAILED`.
+
+Use the public `.png` placeholder URL for Shopify `CreateMediaInput`. The SIT
+host served the AVIF asset as `application/octet-stream`, and Shopify retained a
+failed media node after rejecting that upload. The status-aware check must not
+treat such a node as valid product media, and it must inspect more than the
+first node so an older failure cannot hide a later `READY` or `PROCESSING`
+merchant image.
+
 ## Why Bootstrap Hydration
 
 The canonical app-proxy FPB document embeds the full configuration for immediate
@@ -98,7 +114,7 @@ embedding the complete multilingual Settings document in every entry; the
 input metafields are separately limited to 10KB, so the shop
 `$app.ppb_policy_revisions` map is checked against that smaller boundary.
 
-The shop `$app.ppb_storefront_runtime` schema-v2 snapshot includes
+The shop `$app.ppb_storefront_runtime` schema-v3 snapshot includes
 `storefrontProxyRoot`. Normal runtime sync resolves it from the active app
 environment: PROD uses `/apps/product-bundles`, SIT uses
 `/apps/product-bundles-sit`, and both retain Shopify's `apps` prefix. Liquid and
@@ -106,6 +122,15 @@ compiled storefront entrypoints consume this Shopify-hosted value so one shared
 theme extension does not hardcode traffic to the other installed app.
 Install/reauthorization and deployment general sync rewrite the snapshot;
 malformed configured roots fail before `metafieldsSet`.
+
+The shop `$app.storefront_controls_runtime` schema-v2 snapshot is the sole
+storefront delivery source for Settings -> Controls. It contains the Landing
+Page and Product Page layout controls, including the independent compare-at
+price toggles. Configure Save and deployment general sync write the snapshot;
+Liquid reads the JSON metafield through `.value` and exposes it to direct and
+app-embed widget surfaces. Storefront code does not refetch Controls through an
+app-proxy endpoint. The writer enforces Shopify's 128KB JSON boundary before
+`metafieldsSet`.
 
 Runtime category payloads must be compacted at `app/lib/bundle-config/category-runtime.ts` before they are written by `app/services/bundles/metafield-sync/operations/bundle-product.server.ts`. Preserve storefront-required fields only: product IDs/title/handle/image/price/weight, compact product options, and compact variants with ID/title/price/compare-at/weight/availability/inventory/options/image/selling-plan data. Strip admin/cache-only fields such as metafields, SKU, selectedOptions blobs, inventory policy, timestamps, and extra image metadata.
 
@@ -145,19 +170,10 @@ that requires a different representation. The Shopify
 `component_quantities` writer is such a boundary and enforces Shopify's
 minimum component quantity there, without changing Admin or runtime state.
 
-## Bundle Details Order Attribution
+## Cart and Order Attribution
 
-FPB writes app-owned cart metafield `bundle_details` through the signed
-app-proxy route `/apps/product-bundles/api/cart-bundle-details`. Parent-product
-PPB reads and merges the same metafield directly with Storefront API
-`cartMetafieldsSet` and the synchronized public Storefront token. Both omit a
-namespace so Shopify stores the key in the app-owned namespace (`$app`).
-
-FPB requests `/apps/product-bundles/api/cart-transform-runtime-token` before
-cart add. Parent-product PPB instead attaches the synchronized v2
-`_wolfpack_bundle_runtime` and `_wolfpack_line_auth` values without a network
-request to Wolfpack.
-
-`shopify.app.toml` and `shopify.app.wolfpack-product-bundles-sit.toml` define `[order.metafields.app.bundle_details]` with `capabilities.cart_to_order_copyable = true`. Shopify requires the cart and order metafields to have matching namespace and key before checkout completion can copy the cart value to the order.
-
-This preserves EB-style bundle display metadata on created orders without adding a post-order reconstruction job.
+FPB, PPB, and SDK submit bundle lines through `Shopify.actions.updateCart`.
+Private line attributes carry the published bundle selection and presentation
+metadata consumed by Cart Transform, checkout UI, and attribution. There is no
+pre-cart runtime-token request, cart-metafield write, or duplicate Ajax cart
+submission path.

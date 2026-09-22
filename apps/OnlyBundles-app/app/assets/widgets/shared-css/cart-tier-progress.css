@@ -12,15 +12,6 @@
   transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
-cart-drawer .wpb-cart-tier-progress-bar,
-.cart-drawer .wpb-cart-tier-progress-bar,
-cart-drawer-component .wpb-cart-tier-progress-bar,
-#CartDrawer .wpb-cart-tier-progress-bar,
-.cart-drawer__dialog .wpb-cart-tier-progress-bar {
-  width: calc(100% - 40px);
-  margin: 12px 20px;
-}
-
 .wpb-cart-tier-progress-bar--max-tier {
   border-color: rgba(34, 197, 94, 0.3);
   background: #f0fdf4;
@@ -118,21 +109,6 @@ cart-drawer-component .wpb-cart-tier-progress-bar,
 
 [data-wpb-bp] .cart-items__unit-price-wrapper {
   display: none;
-}
-
-:is(cart-drawer, .cart-drawer, cart-drawer-component, #CartDrawer, .cart-drawer__dialog) .wpb-cart-tier-progress-bar__header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-items: stretch;
-  gap: 8px;
-}
-
-:is(cart-drawer, .cart-drawer, cart-drawer-component, #CartDrawer, .cart-drawer__dialog) .wpb-cart-tier-progress-bar__title-group {
-  align-items: flex-start;
-}
-
-:is(cart-drawer, .cart-drawer, cart-drawer-component, #CartDrawer, .cart-drawer__dialog) .wpb-cart-tier-progress-bar__badge {
-  justify-self: start;
 }
 
 @keyframes wpb-shimmer {

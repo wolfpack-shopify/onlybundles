@@ -1,11 +1,13 @@
 /**
  * Cart Tier Progress Bar
  *
- * Displays a tier discount progress bar at the top of the theme cart drawer
- * or cart page, reacting in real time to Shopify AJAX cart updates.
+ * Displays a tier discount progress bar on the cart page, reacting in real
+ * time to Shopify cart updates without modifying theme-owned cart drawers.
  */
 
 'use strict';
+
+import { storefrontPath } from '../assets/widgets/shared/storefront-path.js';
 
 export interface TierRule {
   conditionType?: 'quantity' | 'amount' | string;
@@ -94,6 +96,9 @@ export function calculateCartTierProgress(
     }
 
     if (itemTierProgress?.rules && Array.isArray(itemTierProgress.rules)) {
+      if (itemTierProgress.progressBar?.enabled !== true) {
+        return null;
+      }
       if (!metadata) {
         metadata = itemTierProgress;
       }
@@ -110,7 +115,7 @@ export function calculateCartTierProgress(
     return null;
   }
 
-  if (metadata.progressBar?.enabled === false) {
+  if (metadata.progressBar?.enabled !== true) {
     return null;
   }
 
@@ -196,20 +201,7 @@ const TAG_ICON_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none
 
 const CHECK_ICON_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`;
 
-const CART_CONTAINER_SELECTORS = [
-  '#cart-drawer-header',
-  'cart-drawer-component .cart-drawer__header',
-  '.cart-drawer__header',
-  'cart-drawer .drawer__header',
-  '.drawer__header',
-  'cart-drawer-component .cart-drawer__content',
-  'cart-drawer .cart-drawer-items',
-  'cart-drawer .drawer__inner',
-  '.cart-drawer__inner',
-  '.cart-drawer__dialog',
-  '#sidebar-cart',
-  '#rebuy-cart',
-  'upcart-cart',
+const CART_PAGE_CONTAINER_SELECTORS = [
   '#main-cart-items',
   '.cart-items__wrapper',
   '.cart-page__items',
@@ -220,24 +212,38 @@ const CART_CONTAINER_SELECTORS = [
 ];
 
 function findCartMountTarget(doc: Document): HTMLElement | null {
-  for (const selector of CART_CONTAINER_SELECTORS) {
-    const target = doc.querySelector<HTMLElement>(selector);
-    if (target) {
-      return target;
+  for (const selector of CART_PAGE_CONTAINER_SELECTORS) {
+    const targets = doc.querySelectorAll<HTMLElement>(selector);
+    for (const target of targets) {
+      if (!target.closest('cart-drawer, cart-drawer-component, .cart-drawer, #CartDrawer, .cart-drawer__dialog')) {
+        return target;
+      }
     }
   }
   return null;
 }
 
-function formatStyledMessage(rawMessage: string, isMaxTier: boolean): string {
+function appendStyledMessage(element: Element, rawMessage: string, isMaxTier: boolean): void {
+  const doc = element.ownerDocument;
+  element.replaceChildren();
   if (isMaxTier) {
-    return `🎉 <strong>${rawMessage}</strong> Best tier discount applied.`;
+    element.append(doc.createTextNode('🎉 '));
+    const strong = doc.createElement('strong');
+    strong.textContent = rawMessage;
+    element.append(strong, doc.createTextNode(' Best tier discount applied.'));
+    return;
   }
-  return rawMessage
-    .replace(/(\d+% off)/gi, '<strong>$1</strong>')
-    .replace(/(\d+% unlocked!)/gi, '<strong>$1</strong>')
-    .replace(/(\d+ more)/gi, '<strong>$1</strong>')
-    .replace(/(\$[\d.]+ more)/gi, '<strong>$1</strong>');
+  const emphasis = /(\d+% off|\d+% unlocked!|\d+ more|\$[\d.]+ more)/gi;
+  let cursor = 0;
+  for (const match of rawMessage.matchAll(emphasis)) {
+    const index = match.index ?? 0;
+    if (index > cursor) element.append(doc.createTextNode(rawMessage.slice(cursor, index)));
+    const strong = doc.createElement('strong');
+    strong.textContent = match[0];
+    element.append(strong);
+    cursor = index + match[0].length;
+  }
+  if (cursor < rawMessage.length) element.append(doc.createTextNode(rawMessage.slice(cursor)));
 }
 
 /**
@@ -311,15 +317,7 @@ export function renderCartTierProgressBar(
     barElement.appendChild(trackWrapper);
   }
 
-  if (
-    mountTarget.classList.contains('drawer__header')
-    || mountTarget.classList.contains('cart-drawer__header')
-    || mountTarget.id === 'cart-drawer-header'
-  ) {
-    if (mountTarget.nextElementSibling !== barElement) {
-      mountTarget.after(barElement);
-    }
-  } else if (barElement.parentElement !== mountTarget) {
+  if (barElement.parentElement !== mountTarget) {
     mountTarget.prepend(barElement);
   }
 
@@ -333,7 +331,7 @@ export function renderCartTierProgressBar(
 
   const messageEl = barElement.querySelector(`.${BAR_CLASS}__message`);
   if (messageEl) {
-    messageEl.innerHTML = formatStyledMessage(state.message, state.isMaxTier);
+    appendStyledMessage(messageEl, state.message, state.isMaxTier);
   }
 
   const badgeEl = barElement.querySelector(`.${BAR_CLASS}__badge`);
@@ -360,7 +358,7 @@ export function renderCartTierProgressBar(
  */
 export async function syncCartTierProgressBar(doc: Document = document): Promise<void> {
   try {
-    const res = await fetch('/cart.js?app=wolfpackProductBundles', {
+    const res = await fetch(storefrontPath('cart.js?app=wolfpackProductBundles'), {
       credentials: 'same-origin',
       headers: { Accept: 'application/json' },
     });
@@ -387,62 +385,17 @@ export function initCartTierProgressBar(doc: Document = document): void {
 
   void syncCartTierProgressBar(doc);
 
-  doc.addEventListener('cart:updated', () => void syncCartTierProgressBar(doc));
-  doc.addEventListener('cart:refresh', () => void syncCartTierProgressBar(doc));
   doc.addEventListener('shopify:section:load', () => void syncCartTierProgressBar(doc));
-  doc.addEventListener('theme:cart:open', () => void syncCartTierProgressBar(doc));
-  doc.addEventListener('cart:open', () => void syncCartTierProgressBar(doc));
-  doc.addEventListener('drawer:open', () => void syncCartTierProgressBar(doc));
-
-  // Observe side-cart drawer mutations (open state and dynamic content changes)
-  if (typeof MutationObserver !== 'undefined' && doc.body) {
-    const drawerObserver = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        if (mutation.type === 'attributes') {
-          const target = mutation.target as HTMLElement;
-          if (target.matches?.('dialog, cart-drawer, cart-drawer-component, .cart-drawer, #CartDrawer')) {
-            void syncCartTierProgressBar(doc);
-            break;
-          }
-        } else if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-          for (let i = 0; i < mutation.addedNodes.length; i += 1) {
-            const node = mutation.addedNodes[i] as HTMLElement;
-            if (node.nodeType === 1 && (
-              node.matches?.('.cart-drawer__header, .drawer__header, cart-items-component, .cart-drawer__content')
-              || node.querySelector?.('.cart-drawer__header, .drawer__header, cart-items-component')
-            )) {
-              void syncCartTierProgressBar(doc);
-              break;
-            }
-          }
-        }
-      }
-    });
-
-    drawerObserver.observe(doc.body, {
-      childList: true,
-      subtree: true,
-      attributes: true,
-      attributeFilter: ['open', 'class', 'aria-hidden'],
-    });
-  }
-
-  // Patch fetch to detect cart mutations
-  const originalFetch = window.fetch;
-  if (typeof originalFetch === 'function') {
-    window.fetch = async function (...args) {
-      const response = await originalFetch.apply(this, args);
-      try {
-        const url = typeof args[0] === 'string' ? args[0] : (args[0] as Request)?.url || '';
-        if (/\/cart\/(add|change|update|clear)/i.test(url)) {
-          setTimeout(() => void syncCartTierProgressBar(doc), 150);
-        }
-      } catch {
-        // Safe bypass
-      }
-      return response;
-    };
-  }
+  doc.addEventListener('shopify:cart:view', () => void syncCartTierProgressBar(doc));
+  doc.addEventListener('shopify:cart:lines-update', (event: Event) => {
+    const detail = (event as CustomEvent).detail;
+    const completion = detail?.cart ?? detail?.promise ?? detail;
+    if (completion && typeof completion.then === 'function') {
+      void Promise.resolve(completion).then(() => syncCartTierProgressBar(doc)).catch(() => undefined);
+      return;
+    }
+    void syncCartTierProgressBar(doc);
+  });
 }
 
 /**
@@ -456,10 +409,6 @@ export function extractTierProgressForBundle(bundle: any): BundleTierProgressMet
   const progressBar = bundle?.pricing?.displayOptions?.progressBar
     || bundle?.messaging?.displayOptions?.progressBar
     || null;
-
-  if (progressBar?.enabled === false) {
-    return null;
-  }
 
   const normalizedRules = rules.map((r: any) => {
     const conditionType = r.conditionType || (r.minSubtotal !== undefined ? 'amount' : 'quantity');
@@ -479,10 +428,10 @@ export function extractTierProgressForBundle(bundle: any): BundleTierProgressMet
   return {
     rules: normalizedRules,
     progressBar: progressBar ? {
-      enabled: progressBar.enabled !== false,
+      enabled: progressBar.enabled === true,
       type: progressBar.type || 'simple',
       progressText: progressBar.progressText,
       successText: progressBar.successText,
-    } : { enabled: true, type: 'simple' },
+    } : { enabled: false, type: 'simple' },
   };
 }

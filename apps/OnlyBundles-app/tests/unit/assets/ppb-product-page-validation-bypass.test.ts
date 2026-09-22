@@ -120,7 +120,7 @@ describe('PPB validation control disables cart gating when disabled', () => {
     }
   });
 
-  it('continues to /cart/add when control is disabled and step validation fails', async () => {
+  it('continues to the native cart action when control is disabled and step validation fails', async () => {
     const toastSpy = jest.spyOn(ToastManager, 'show').mockImplementation(() => {});
     const fetchSpy = jest.spyOn(global, 'fetch' as any).mockResolvedValue({
       ok: true,
@@ -128,6 +128,9 @@ describe('PPB validation control disables cart gating when disabled', () => {
       json: async () => ({ available: true }),
       text: async () => '{}',
     } as any);
+    const originalWindow = (global as any).window;
+    const updateCart = jest.fn().mockResolvedValue({ cart: {}, userErrors: [], warnings: [] });
+    (global as any).window = { Shopify: { actions: { updateCart } } };
 
     try {
       const context = {
@@ -153,12 +156,6 @@ describe('PPB validation control disables cart gating when disabled', () => {
         getDiscountInfoWithSelectedAddonDiscount(value: Record<string, unknown>) {
           return value;
         },
-        buildProductPageCartFormData() {
-          return {
-            formData: new FormData(),
-            sourceProperties: {},
-          };
-        },
         resolveProductPageOfferId: () => 'MIX-1',
         generateBundleSessionKey: () => 'K1K',
         elements: {
@@ -169,14 +166,13 @@ describe('PPB validation control disables cart gating when disabled', () => {
 
       await ProductPageCartMethods.addToCart.call(context);
 
-      expect(fetchSpy).toHaveBeenCalledWith('/variants/101.js', expect.objectContaining({
-        method: 'GET',
-        headers: { 'Accept': 'application/json' },
-      }));
+      expect(updateCart).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).not.toHaveBeenCalled();
       expect(toastSpy).not.toHaveBeenCalledWith('Please complete all bundle steps before adding to cart.');
     } finally {
       toastSpy.mockRestore();
       fetchSpy.mockRestore();
+      (global as any).window = originalWindow;
     }
   });
 
@@ -225,12 +221,15 @@ describe('PPB validation control disables cart gating when disabled', () => {
     }
   });
 
-  it('continues to /cart/add when a later enabled step has no configured products', async () => {
+  it('continues to the native cart action when a later enabled step has no configured products', async () => {
     const toastSpy = jest.spyOn(ToastManager, 'show').mockImplementation(() => {});
     const fetchSpy = jest.spyOn(global, 'fetch' as any).mockResolvedValue({
       ok: true,
       text: async () => '{}',
     } as any);
+    const originalWindow = (global as any).window;
+    const updateCart = jest.fn().mockResolvedValue({ cart: {}, userErrors: [], warnings: [] });
+    (global as any).window = { Shopify: { actions: { updateCart } } };
 
     try {
       const context = {
@@ -257,12 +256,6 @@ describe('PPB validation control disables cart gating when disabled', () => {
         getDiscountInfoWithSelectedAddonDiscount(value: Record<string, unknown>) {
           return value;
         },
-        buildProductPageCartFormData() {
-          return {
-            formData: new FormData(),
-            sourceProperties: {},
-          };
-        },
         resolveProductPageOfferId: () => 'MIX-1',
         generateBundleSessionKey: () => 'K1K',
         hideLoadingOverlay: jest.fn(),
@@ -278,14 +271,13 @@ describe('PPB validation control disables cart gating when disabled', () => {
 
       await ProductPageCartMethods.addToCart.call(context);
 
-      expect(fetchSpy).toHaveBeenCalledWith('/variants/101.js', expect.objectContaining({
-        method: 'GET',
-        headers: { 'Accept': 'application/json' },
-      }));
+      expect(updateCart).toHaveBeenCalledTimes(1);
+      expect(fetchSpy).not.toHaveBeenCalled();
       expect(toastSpy).not.toHaveBeenCalledWith('Please complete all bundle steps before adding to cart.');
     } finally {
       toastSpy.mockRestore();
       fetchSpy.mockRestore();
+      (global as any).window = originalWindow;
     }
   });
 });

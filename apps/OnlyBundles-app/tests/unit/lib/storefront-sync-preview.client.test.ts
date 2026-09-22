@@ -51,16 +51,28 @@ describe("storefront sync preview client", () => {
   });
 
   it("throws the compact server error when preview preparation fails", async () => {
-    global.fetch = jest.fn().mockResolvedValue({
+    const fetchMock = jest.fn().mockResolvedValue({
       ok: false,
       json: jest.fn().mockResolvedValue({
         success: false,
         error: "publish failed",
       }),
     });
+    global.fetch = fetchMock;
 
     await expect(prepareStorefrontPreviewForOpen()).rejects.toThrow(
       "publish failed",
     );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not fall back to posting the configure document after a network failure", async () => {
+    const fetchMock = jest.fn().mockRejectedValue(new Error("network failed"));
+    global.fetch = fetchMock;
+
+    await expect(prepareStorefrontPreviewForOpen()).rejects.toThrow(
+      "network failed",
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,14 +1,9 @@
-import { resolveShowProductComparedAtPrice } from '../../../app/lib/bundle-config/product-page-display';
 import { createSharedProductCardElement } from '../../../app/assets/widgets/shared/components/product-card';
 import { JSDOM } from 'jsdom';
 import { applyProductPageVariantSelection } from '../../../app/assets/widgets/product-page/methods/modal-methods';
 
 describe('PPB compare-at price visibility contract', () => {
-  it('keeps compare-at capability enabled regardless of persisted bundle settings', () => {
-    expect(resolveShowProductComparedAtPrice()).toBe(true);
-  });
-
-  it('renders available product compare-at data even when a stale flag is false', () => {
+  it('hides available product compare-at data when the layout control is disabled', () => {
     const document = new JSDOM('<!doctype html>').window.document;
     const card = createSharedProductCardElement(
       { selectionId: 'variant-1', title: 'Sale product', price: 800, compareAtPrice: 1000 },
@@ -17,7 +12,7 @@ describe('PPB compare-at price visibility contract', () => {
       { showCompareAtPrice: false, document },
     );
 
-    expect(card.textContent).toMatch(/\$10\.00/);
+    expect(card.textContent).not.toMatch(/\$10\.00/);
     expect(card.textContent).toMatch(/\$8\.00/);
   });
 
@@ -34,7 +29,7 @@ describe('PPB compare-at price visibility contract', () => {
     expect(card.textContent).not.toMatch(/\$10\.00/);
   });
 
-  it('updates compare-at text when a selected variant provides it', () => {
+  it('removes compare-at text on variant selection when the layout control is disabled', () => {
     const compareElement = { textContent: '', remove: jest.fn() };
     const productCard = {
       dataset: {},
@@ -52,7 +47,6 @@ describe('PPB compare-at price visibility contract', () => {
       showCompareAtPrice: false,
     });
 
-    expect(compareElement.textContent).toContain('$10.00');
-    expect(compareElement.remove).not.toHaveBeenCalled();
+    expect(compareElement.remove).toHaveBeenCalled();
   });
 });

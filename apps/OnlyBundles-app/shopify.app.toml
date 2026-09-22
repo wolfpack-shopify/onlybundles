@@ -46,7 +46,25 @@ prefix = "apps"
 embedded = false
 
 [metafields]
-api_version = "2025-10"
+api_version = "2026-07"
+
+[shop.metafields.app.fpb_storefront_runtime]
+type = "json"
+name = "FPB Storefront Runtime"
+description = "Shopify-hosted Full Page Bundle language and loading runtime"
+
+  [shop.metafields.app.fpb_storefront_runtime.access]
+  admin = "merchant_read_write"
+  storefront = "public_read"
+
+[shop.metafields.app.ppb_policy_revisions]
+type = "json"
+name = "PPB Policy Revisions"
+description = "Current bundle policy revisions for Shopify Function authorization"
+
+  [shop.metafields.app.ppb_policy_revisions.access]
+  admin = "merchant_read"
+  storefront = "none"
 
 [shop.metafields.app.serverUrl]
 type = "single_line_text_field"
@@ -63,6 +81,15 @@ name = "PPB Storefront Runtime"
 description = "Shopify-hosted Product Page Bundle runtime settings and public Storefront API client configuration"
 
   [shop.metafields.app.ppb_storefront_runtime.access]
+  admin = "merchant_read_write"
+  storefront = "public_read"
+
+[shop.metafields.app.storefront_controls_runtime]
+type = "json"
+name = "Storefront Controls Runtime"
+description = "Shopify-hosted storefront Controls settings"
+
+  [shop.metafields.app.storefront_controls_runtime.access]
   admin = "merchant_read_write"
   storefront = "public_read"
 

@@ -338,11 +338,46 @@ describe('api.bundle.$bundleId.json — status filtering', () => {
 
 describe('wpb.$bundleId (FPB proxy page) — draft access control', () => {
   const originalSecret = process.env.SHOPIFY_API_SECRET;
+  const storefront = { graphql: jest.fn() };
+  const fpbRuntime = {
+    schemaVersion: 1,
+    loadingScreen: { gifUrl: null, backgroundColor: '#ffffff' },
+    languages: { en: { activeLocale: 'en' } },
+  };
+
+  function storefrontSnapshot(runtimePolicyRevision: string | null = null) {
+    return {
+      json: async () => ({
+        data: {
+          product: {
+            variants: {
+              nodes: [{ bundleConfig: { value: JSON.stringify({
+                schemaVersion: 4,
+                id: 'bundle-1',
+                publicNumber: 1,
+                bundleType: 'full_page',
+                bundleDesignTemplate: 'FBP_SIDE_FOOTER',
+                bundleDesignPresetId: 'STANDARD',
+                runtimePolicyRevision,
+                steps: [],
+              }) } }],
+            },
+          },
+          shop: { fpbRuntime: { value: JSON.stringify(fpbRuntime) } },
+        },
+      }),
+    };
+  }
 
   beforeEach(() => {
     jest.clearAllMocks();
     process.env.SHOPIFY_API_SECRET = 'test_api_secret';
-    mockAppProxy.mockResolvedValue({ session: { shop: 'test-shop.myshopify.com' } });
+    storefront.graphql.mockResolvedValue(storefrontSnapshot());
+    mockAppProxy.mockResolvedValue({
+      session: { shop: 'test-shop.myshopify.com' },
+      storefront,
+      liquid: (body: string, init?: ResponseInit) => new Response(body, init),
+    });
     mockFindDesignSettings().mockResolvedValue(null);
   });
 
@@ -374,6 +409,9 @@ describe('wpb.$bundleId (FPB proxy page) — draft access control', () => {
       shopId: 'test-shop.myshopify.com',
       bundleType: 'full_page',
       status: BundleStatus.DRAFT,
+      shopifyProductId: 'gid://shopify/Product/100',
+      runtimePolicyRevision: null,
+      offerPolicy: null,
     });
 
     const response = await wpbProxyLoader({
@@ -395,8 +433,8 @@ describe('wpb.$bundleId (FPB proxy page) — draft access control', () => {
       shopId: 'test-shop.myshopify.com',
       bundleType: 'full_page',
       status: BundleStatus.ACTIVE,
-      steps: [],
-      pricing: null,
+      shopifyProductId: 'gid://shopify/Product/100',
+      runtimePolicyRevision: null,
       offerPolicy: {
         id: 'policy-1',
         specificLinkRequired: true,
@@ -423,7 +461,7 @@ describe('wpb.$bundleId (FPB proxy page) — draft access control', () => {
 
     expect(hidden.status).toBe(404);
     expect(visible.status).toBe(200);
-    expect(visible.headers.get('Cache-Control')).toBe('no-store');
+    expect(visible.headers.get('Cache-Control')).toBe('private, no-store');
   });
 
   it('serves an ACTIVE FPB bundle with specific-link policy when an authorized preview token is provided', async () => {
@@ -433,8 +471,8 @@ describe('wpb.$bundleId (FPB proxy page) — draft access control', () => {
       shopId: 'test-shop.myshopify.com',
       bundleType: 'full_page',
       status: BundleStatus.ACTIVE,
-      steps: [],
-      pricing: null,
+      shopifyProductId: 'gid://shopify/Product/100',
+      runtimePolicyRevision: null,
       offerPolicy: {
         id: 'policy-1',
         specificLinkRequired: true,
@@ -460,6 +498,6 @@ describe('wpb.$bundleId (FPB proxy page) — draft access control', () => {
     } as any);
 
     expect(response.status).toBe(200);
-    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store');
   });
 });

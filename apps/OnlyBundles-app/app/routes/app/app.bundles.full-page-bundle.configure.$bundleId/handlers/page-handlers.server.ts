@@ -5,9 +5,10 @@ import db from "../../../../db.server";
 import { resolveShopEntitlements } from "../../../../services/subscriptions/subscription-service.server";
 import { assertTemplateSelectionAllowed } from "../../../../services/subscriptions/bundle-entitlement-gate.server";
 import { EntitlementDeniedError } from "../../../../lib/subscriptions/entitlements";
+import { syncBundleStorefrontNow } from "../../../../services/bundles/storefront-sync.server";
 
 export async function handleUpdateBundleDesignTemplate(
-  _admin: ShopifyAdmin,
+  admin: ShopifyAdmin,
   session: Session,
   bundleId: string,
   formData: FormData,
@@ -46,6 +47,13 @@ export async function handleUpdateBundleDesignTemplate(
   await db.bundle.update({
     where: { id: bundleId, shopId: session.shop },
     data: { bundleDesignTemplate, bundleDesignPresetId },
+  });
+  await syncBundleStorefrontNow({
+    admin,
+    shopDomain: session.shop,
+    bundleId,
+    bundleType: "full_page",
+    reason: "save",
   });
 
   return json({ success: true });

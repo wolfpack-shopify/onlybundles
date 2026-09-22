@@ -26,7 +26,10 @@ type ParentProductNode = {
   handle: string;
   status: string;
   media?: {
-    nodes?: Array<{ id?: string | null }>;
+    nodes?: Array<{
+      id?: string | null;
+      status?: "FAILED" | "PROCESSING" | "READY" | "UPLOADED" | string | null;
+    }>;
   } | null;
   variants?: {
     nodes?: Array<{ id?: string | null }>;
@@ -303,8 +306,8 @@ async function loadParentProduct(
           id
           handle
           status
-          media(first: 1) {
-            nodes { id }
+          media(first: 10) {
+            nodes { id status }
           }
           variants(first: 1) {
             nodes { id }
@@ -322,13 +325,17 @@ async function loadParentProduct(
   return data.data?.product ?? null;
 }
 
-async function addMissingFpbParentPlaceholder(input: {
+async function addMissingParentPlaceholder(input: {
   admin: ShopifyAdmin;
   appUrl?: string;
   bundleName: string;
   product: ParentProductNode;
 }): Promise<void> {
-  if (input.product.media?.nodes?.length !== 0) return;
+  const mediaNodes = input.product.media?.nodes;
+  if (!mediaNodes) return;
+  if (mediaNodes.length > 0 && !mediaNodes.every((node) => node.status === "FAILED")) {
+    return;
+  }
 
   const media = buildBundleProductPlaceholderMediaInput(
     input.appUrl,
@@ -361,13 +368,13 @@ async function addMissingFpbParentPlaceholder(input: {
     };
     errors?: unknown[];
   };
-  throwTransportErrors("add FPB parent placeholder media", data.errors);
+  throwTransportErrors("add bundle parent placeholder media", data.errors);
   throwUserErrors(
-    "add FPB parent placeholder media",
+    "add bundle parent placeholder media",
     data.data?.productUpdate?.userErrors,
   );
   if (!data.data?.productUpdate?.product?.id) {
-    throw new BundleParentProductError("add FPB parent placeholder media", [
+    throw new BundleParentProductError("add bundle parent placeholder media", [
       { message: "Shopify did not return the updated parent product" },
     ]);
   }
@@ -593,13 +600,13 @@ export async function ensureBundleParentProduct(input: {
         liveHandle: product.handle,
       });
       product.handle = host;
-      await addMissingFpbParentPlaceholder({
-        admin: input.admin,
-        appUrl: input.appUrl,
-        bundleName: input.bundle.name,
-        product,
-      });
     }
+    await addMissingParentPlaceholder({
+      admin: input.admin,
+      appUrl: input.appUrl,
+      bundleName: input.bundle.name,
+      product,
+    });
     if (product.handle !== input.bundle.shopifyProductHandle) {
       await db.bundle.update({
         where: { id: input.bundle.id, shopId: input.shopDomain },

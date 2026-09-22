@@ -6,11 +6,16 @@
 
 {% schema %}
 {
-  "name": "Bundle Upsell",
+  "name": "t:theme_resources.full_page_upsell.name",
   "target": "section",
   "enabled_on": {
     "templates": ["product"]
   },
-  "settings": []
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "t:theme_resources.full_page_upsell.description"
+    }
+  ]
 }
 {% endschema %}

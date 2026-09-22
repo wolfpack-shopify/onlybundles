@@ -5,15 +5,10 @@ import {
 import { syncBundleStorefrontNow } from "../../../app/services/bundles/storefront-sync.server";
 import { verifyBundlePreviewToken } from "../../../app/lib/bundle-preview-token.server";
 import db from "../../../app/db.server";
-import { recordFirstBundlePreviewEvent } from "../../../app/services/bundles/bundle-preview-event.server";
 
 jest.mock("../../../app/db.server", () => ({
   __esModule: true,
   default: { bundle: { findUnique: jest.fn() } },
-}));
-
-jest.mock("../../../app/services/bundles/bundle-preview-event.server", () => ({
-  recordFirstBundlePreviewEvent: jest.fn().mockResolvedValue(true),
 }));
 
 jest.mock("../../../app/services/bundles/storefront-sync.server", () => ({
@@ -27,8 +22,6 @@ jest.mock("../../../app/services/bundles/storefront-sync.server", () => ({
 const mockSyncBundleStorefrontNow =
   syncBundleStorefrontNow as jest.MockedFunction<typeof syncBundleStorefrontNow>;
 const mockDb = db as jest.Mocked<typeof db>;
-const mockRecordFirstBundlePreviewEvent =
-  recordFirstBundlePreviewEvent as jest.MockedFunction<typeof recordFirstBundlePreviewEvent>;
 
 const admin = { graphql: jest.fn() } as any;
 const session = { shop: "test.myshopify.com" } as any;
@@ -49,7 +42,7 @@ describe("storefront sync action handlers", () => {
     });
   });
 
-  it("prepares FPB preview with one sync and returns the signed proxy URL", async () => {
+  it("prepares FPB preview without syncing and returns the signed proxy URL", async () => {
     const response = await handlePrepareStorefrontPreview(
       admin,
       session,
@@ -59,19 +52,16 @@ describe("storefront sync action handlers", () => {
     const body = await response.json() as any;
     const previewUrl = new URL(body.shareablePreviewUrl);
 
-    expect(mockSyncBundleStorefrontNow).toHaveBeenCalledTimes(1);
+    expect(mockSyncBundleStorefrontNow).not.toHaveBeenCalled();
     expect(previewUrl.pathname).toBe("/apps/product-bundles/wpb/1");
     expect(verifyBundlePreviewToken({
       token: previewUrl.searchParams.get("wpb_preview"),
       shop: session.shop,
       bundleId: "bundle-1",
     })).toBe(true);
-    expect(mockRecordFirstBundlePreviewEvent).toHaveBeenCalledWith({
-      admin,
-      shopDomain: session.shop,
-      bundle: expect.objectContaining({ id: "bundle-1", bundleType: "full_page" }),
-      bundleLink: body.shareablePreviewUrl,
-      routeFamily: "fpb_configure",
+    expect(mockDb.bundle.findUnique).toHaveBeenCalledWith({
+      where: { id: "bundle-1", shopId: "test.myshopify.com" },
+      select: { id: true, publicNumber: true, bundleType: true, status: true },
     });
   });
 
@@ -103,7 +93,7 @@ describe("storefront sync action handlers", () => {
     expect(body).not.toHaveProperty("stats");
   });
 
-  it("prepares PPB preview with one direct sync and a bound authorization token", async () => {
+  it("prepares PPB preview without syncing and returns a bound authorization token", async () => {
     const response = await handlePrepareStorefrontPreview(
       admin,
       session,
@@ -112,13 +102,7 @@ describe("storefront sync action handlers", () => {
     );
     const body = await response.json() as any;
 
-    expect(mockSyncBundleStorefrontNow).toHaveBeenCalledWith({
-      admin,
-      shopDomain: "test.myshopify.com",
-      bundleId: "bundle-1",
-      bundleType: "product_page",
-      reason: "preview",
-    });
+    expect(mockSyncBundleStorefrontNow).not.toHaveBeenCalled();
     expect(body).toEqual({
       success: true,
       statusCode: 200,
@@ -136,8 +120,13 @@ describe("storefront sync action handlers", () => {
     expect(body).not.toHaveProperty("stats");
   });
 
-  it("returns a compact error when direct sync fails", async () => {
-    mockSyncBundleStorefrontNow.mockRejectedValueOnce(new Error("publish failed"));
+  it("rejects an FPB preview when the canonical public number is missing", async () => {
+    (mockDb.bundle.findUnique as jest.Mock).mockResolvedValueOnce({
+      id: "bundle-1",
+      publicNumber: null,
+      bundleType: "full_page",
+      status: "draft",
+    });
 
     const response = await handlePrepareStorefrontPreview(
       admin,
@@ -151,9 +140,9 @@ describe("storefront sync action handlers", () => {
     expect(body).toEqual({
       success: false,
       statusCode: 500,
-      error: "publish failed",
+      error: "Bundle public number is missing",
     });
     expect(body).not.toHaveProperty("storefrontSync");
-    expect(body).not.toHaveProperty("attemptId");
+    expect(mockSyncBundleStorefrontNow).not.toHaveBeenCalled();
   });
 });

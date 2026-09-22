@@ -12,8 +12,9 @@ import {
 } from "../../routes/app/app.bundles.product-page-bundle.configure.$bundleId/handlers/runtime-config.server";
 import { ensureBundleParentProduct } from "./bundle-parent-product.server";
 import { syncPpbStorefrontRuntime } from "../ppb-storefront-runtime.server";
+import { syncFpbStorefrontRuntime } from "../fpb-storefront-runtime.server";
 
-export type StorefrontSyncReason = "save" | "retry" | "sync_bundle" | "preview" | "downgrade";
+export type StorefrontSyncReason = "save" | "retry" | "sync_bundle" | "downgrade";
 
 async function loadBundleForStorefrontSync(shopDomain: string, bundleId: string) {
   return (db.bundle as any).findUnique({
@@ -76,7 +77,7 @@ async function syncFullPageBundleFromDb(
     bundle,
   });
 
-  await syncPpbStorefrontRuntime(admin, shopDomain);
+  await syncFpbStorefrontRuntime(admin, shopDomain);
   const bundleConfig = buildFullPageBundleMetafieldConfig(bundle);
   await updateBundleProductMetafields(admin, bundle.shopifyProductId, bundleConfig);
   stats.productMetafields = true;
@@ -100,6 +101,13 @@ async function syncProductPageBundleFromDb(
   if (!bundle.shopifyProductId) {
     return stats;
   }
+
+  await ensureBundleParentProduct({
+    admin,
+    shopDomain,
+    appUrl: process.env.SHOPIFY_APP_URL,
+    bundle,
+  });
 
   stats.productState = true;
 

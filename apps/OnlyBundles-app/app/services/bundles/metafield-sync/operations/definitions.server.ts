@@ -1,192 +1,109 @@
-/**
- * Metafield Definition Operations
- *
- * Creates and ensures metafield definitions exist in Shopify
- */
-
-import { METAFIELD_NAMESPACE, METAFIELD_KEYS } from "../../../../constants/metafields";
+import { METAFIELD_KEYS, METAFIELD_NAMESPACE } from "../../../../constants/metafields";
 import { AppLogger } from "../../../../lib/logger";
 
-/**
- * Ensures bundle variant and shop-level metafield definitions exist in Shopify
- * (Shopify Standard - Approach 1: Hybrid)
- *
- * Creates 5 metafield definitions for ProductVariant owner type with access controls:
- * - component_reference (list.variant_reference) - PUBLIC_READ for cart transform
- * - component_quantities (list.number_integer) - PUBLIC_READ for cart transform
- * - price_adjustment (json) - NONE (Functions API only)
- * - bundle_ui_config (json) - PUBLIC_READ for Liquid widget
- * - component_pricing (json) - PUBLIC_READ for cart transform
- *
- * All definitions use:
- * - Namespace: $app (app-reserved)
- * - Admin access: MERCHANT_READ_WRITE
- * - API Version: 2025-04
- *
- * Reference: https://shopify.dev/docs/apps/build/custom-data/metafields/definitions/use-access-controls-metafields
- */
-export async function ensureVariantBundleMetafieldDefinitions(admin: any): Promise<boolean> {
-  const CREATE_METAFIELD_DEFINITION = `
-    mutation CreateVariantMetafieldDefinition($definition: MetafieldDefinitionInput!) {
-      metafieldDefinitionCreate(definition: $definition) {
-        createdDefinition {
-          id
-          name
-          namespace
-          key
-          ownerType
-        }
-        userErrors {
-          field
-          message
-          code
-        }
-      }
-    }
-  `;
+const VARIANT_DEFINITIONS = [
+  {
+    name: "Bundle Component Variants",
+    key: METAFIELD_KEYS.COMPONENT_REFERENCE,
+    type: "list.variant_reference",
+    access: { admin: "MERCHANT_READ_WRITE", storefront: "PUBLIC_READ" },
+  },
+  {
+    name: "Component Quantities",
+    key: METAFIELD_KEYS.COMPONENT_QUANTITIES,
+    type: "list.number_integer",
+    validations: [{ name: "min", value: "1" }, { name: "max", value: "100" }],
+    access: { admin: "MERCHANT_READ_WRITE", storefront: "PUBLIC_READ" },
+  },
+  {
+    name: "Bundle Price Adjustment",
+    key: "price_adjustment",
+    type: "json",
+    access: { admin: "MERCHANT_READ_WRITE", storefront: "NONE" },
+  },
+  {
+    name: "Bundle Widget Configuration",
+    key: METAFIELD_KEYS.BUNDLE_UI_CONFIG,
+    type: "json",
+    access: { admin: "MERCHANT_READ_WRITE", storefront: "PUBLIC_READ" },
+  },
+  {
+    name: "Component Pricing",
+    key: METAFIELD_KEYS.COMPONENT_PRICING,
+    type: "json",
+    access: { admin: "MERCHANT_READ_WRITE", storefront: "PUBLIC_READ" },
+  },
+  {
+    name: "Bundle Parent Policy",
+    key: "bundle_parent_policy",
+    type: "json",
+    access: { admin: "MERCHANT_READ", storefront: "NONE" },
+  },
+] as const;
 
-  // Define metafield definitions for variant-level bundle data (Shopify Standard)
-  // API Version: 2025-04
-  // Access controls added per: https://shopify.dev/docs/apps/build/custom-data/metafields/definitions/use-access-controls-metafields
-  const definitions = [
-    {
-      name: "Bundle Component Variants",
-      namespace: METAFIELD_NAMESPACE,
-      key: METAFIELD_KEYS.COMPONENT_REFERENCE,
-      description: "Product variants included in this bundle (Shopify standard)",
-      type: "list.variant_reference",
-      ownerType: "PRODUCTVARIANT",
-      access: {
-        admin: "MERCHANT_READ_WRITE",
-        storefront: "PUBLIC_READ"  // Required for cart transform to read component references
-      }
-    },
-    {
-      name: "Component Quantities",
-      namespace: METAFIELD_NAMESPACE,
-      key: METAFIELD_KEYS.COMPONENT_QUANTITIES,
-      description: "Quantity of each component in the bundle (Shopify standard)",
-      type: "list.number_integer",
-      ownerType: "PRODUCTVARIANT",
-      validations: [
-        {
-          name: "min",
-          value: "1"
-        },
-        {
-          name: "max",
-          value: "100"
-        }
-      ],
-      access: {
-        admin: "MERCHANT_READ_WRITE",
-        storefront: "PUBLIC_READ"  // Required for cart transform to read quantities
-      }
-    },
-    {
-      name: "Bundle Price Adjustment",
-      namespace: METAFIELD_NAMESPACE,
-      key: "price_adjustment",
-      description: "Discount configuration for cart transform (method, value, conditions)",
-      type: "json",
-      ownerType: "PRODUCTVARIANT",
-      access: {
-        admin: "MERCHANT_READ_WRITE",
-        storefront: "NONE"  // Cart transform only (Functions API), not needed in Liquid
-      }
-    },
-    {
-      name: "Bundle Widget Configuration",
-      namespace: METAFIELD_NAMESPACE,
-      key: METAFIELD_KEYS.BUNDLE_UI_CONFIG,
-      description: "UI configuration for storefront widget (steps, messaging, display settings)",
-      type: "json",
-      ownerType: "PRODUCTVARIANT",
-      access: {
-        admin: "MERCHANT_READ_WRITE",
-        storefront: "PUBLIC_READ"  // CRITICAL: Required for Liquid widget to read configuration
-      }
-    },
-    {
-      name: "Component Pricing",
-      namespace: METAFIELD_NAMESPACE,
-      key: METAFIELD_KEYS.COMPONENT_PRICING,
-      description: "Per-component pricing breakdown for expanded bundle checkout display (cents)",
-      type: "json",
-      ownerType: "PRODUCTVARIANT",
-      access: {
-        admin: "MERCHANT_READ_WRITE",
-        storefront: "PUBLIC_READ"  // Required for cart transform to add pricing attributes
-      }
-    },
-    {
-      name: "PPB Policy Revisions",
-      namespace: METAFIELD_NAMESPACE,
-      key: METAFIELD_KEYS.PPB_POLICY_REVISIONS,
-      description: "Current bundle policy revision per bundle for Shopify Function authorization",
-      type: "json",
-      ownerType: "SHOP",
-      access: {
-        admin: "MERCHANT_READ",
-        storefront: "NONE"
-      }
-    }
-    ,{
-      name: "Bundle Parent Policy", namespace: METAFIELD_NAMESPACE, key: "bundle_parent_policy",
-      description: "Published dedicated bundle parent identity",
-      type: "json", ownerType: "PRODUCTVARIANT", access: { admin: "MERCHANT_READ", storefront: "NONE" }
-    }
-  ];
-
-  AppLogger.info("[METAFIELD_DEF] Creating bundle metafield definitions", {
-    component: "definitions.server",
-  }, { count: definitions.length });
-
+export async function ensureVariantBundleMetafieldDefinitions(admin: any) {
   let success = true;
-  for (const definition of definitions) {
+  for (const definition of VARIANT_DEFINITIONS) {
     try {
-      const response = await admin.graphql(CREATE_METAFIELD_DEFINITION, {
-        variables: { definition }
-      });
-
-      const data = await response.json();
-
-      if (data.errors?.length || !data.data?.metafieldDefinitionCreate) { success = false; continue; }
-      if (data.data?.metafieldDefinitionCreate?.userErrors?.length > 0) {
-        const error = data.data.metafieldDefinitionCreate.userErrors[0];
-        if (error.code === "TAKEN") {
-          if (definition.access.admin === "MERCHANT_READ") {
-            const updated = await admin.graphql(`mutation UpdateRuntimePolicyDefinition($definition: MetafieldDefinitionUpdateInput!) {
-              metafieldDefinitionUpdate(definition: $definition) { updatedDefinition { id access { admin storefront } } userErrors { message } }
-            }`, { variables: { definition: { namespace: definition.namespace, key: definition.key, ownerType: definition.ownerType, access: definition.access } } });
-            const payload = await updated.json();
-            const result = payload.data?.metafieldDefinitionUpdate;
-            if (payload.errors?.length || result?.userErrors?.length || result?.updatedDefinition?.access?.admin !== "MERCHANT_READ") success = false;
+      const response = await admin.graphql(`
+        mutation CreateVariantMetafieldDefinition($definition: MetafieldDefinitionInput!) {
+          metafieldDefinitionCreate(definition: $definition) {
+            createdDefinition { id key }
+            userErrors { field message code }
           }
-          AppLogger.debug("[METAFIELD_DEF] Definition already exists", {
-            component: "definitions.server",
-          }, { key: definition.key });
-        } else {
-          success = false;
-          AppLogger.error("[METAFIELD_DEF] Error creating definition", {
-            component: "definitions.server",
-          }, { key: definition.key, error });
         }
-      } else {
-        AppLogger.debug("[METAFIELD_DEF] Created definition", {
-          component: "definitions.server",
-        }, { key: definition.key });
+      `, {
+        variables: {
+          definition: {
+            ...definition,
+            namespace: METAFIELD_NAMESPACE,
+            ownerType: "PRODUCTVARIANT",
+          },
+        },
+      });
+      const data = await response.json();
+      const errors = data.data?.metafieldDefinitionCreate?.userErrors ?? [];
+      if (data.errors?.length || errors.some((error: any) => error.code !== "TAKEN")) {
+        success = false;
       }
-    } catch (error: any) {
+      if (
+        errors.some((error: any) => error.code === "TAKEN")
+        && definition.access.admin === "MERCHANT_READ"
+      ) {
+        const updateResponse = await admin.graphql(`
+          mutation UpdateVariantMetafieldDefinition($definition: MetafieldDefinitionUpdateInput!) {
+            metafieldDefinitionUpdate(definition: $definition) {
+              updatedDefinition { access { admin storefront } }
+              userErrors { field message code }
+            }
+          }
+        `, {
+          variables: {
+            definition: {
+              namespace: METAFIELD_NAMESPACE,
+              key: definition.key,
+              ownerType: "PRODUCTVARIANT",
+              access: definition.access,
+            },
+          },
+        });
+        const updateData = await updateResponse.json();
+        const result = updateData.data?.metafieldDefinitionUpdate;
+        if (
+          updateData.errors?.length
+          || result?.userErrors?.length
+          || result?.updatedDefinition?.access?.admin !== "MERCHANT_READ"
+        ) {
+          success = false;
+        }
+      }
+    } catch (error) {
       success = false;
-      AppLogger.error("[METAFIELD_DEF] Failed to create definition", {
+      AppLogger.error("Failed to ensure variant metafield definition", {
         component: "definitions.server",
-      }, { key: definition.key, error: error instanceof Error ? error.message : String(error) });
+        key: definition.key,
+      }, error);
     }
   }
-
-  AppLogger.info("[METAFIELD_DEF] Finished ensuring bundle metafield definitions", {
-    component: "definitions.server",
-  });
   return success;
 }

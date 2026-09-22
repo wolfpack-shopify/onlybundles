@@ -1,10 +1,8 @@
-import { withBundleCartLock } from "../../../../lib/bundle-cart-lock.js";
 import { buildCartLineSourceProperties } from '../../shared/engine/cart-lines.js';
 import { extractTierProgressForBundle } from '../../shared/engine/cart-lines.js';
 import {
   buildBundleSelectionProperties,
   buildOfferAnalyticsCartProperties,
-  buildProductPageCartFormData,
 } from '../../shared/engine/cart-submit.js';
 import { ToastManager } from '../../shared/toast-manager.js';
 import { CurrencyManager } from '../../shared/currency-manager.js';
@@ -14,7 +12,7 @@ import {
   calculateBundleTotalForPurchaseOption,
 } from '../../shared/subscription-storefront-methods.js';
 import { areRequiredProductPageStepsValid } from './step-validation.js';
-import { preflightVariantOnStorefront, resolveRuntimeVariantNumericId } from '../../shared/variant-preflight.js';
+import { updateShopifyCart } from '../../shared/shopify-cart-actions.js';
 import { captureDiscountTierState } from '../../shared/discount-tier-feedback.js';
 import { hasProductPageHydrationFailure } from './product-data-methods.js';
 
@@ -81,60 +79,35 @@ export const ProductPageCartMethods: Record<string, any> & ThisType<any> = {
       const bundleName = this.selectedBundle?.name || '';
       const sellingPlanId = this.selectedSellingPlanId || '';
       const cartItems = this.buildCartItems(offerId, sessionKey);
-      const variantPreflightCache = new Map();
-      for (let itemIndex = 0; itemIndex < cartItems.length; itemIndex += 1) {
-        const cartItem = cartItems[itemIndex];
-        const numericId = resolveRuntimeVariantNumericId(cartItem.id);
-        if (!numericId) {
-          throw new Error(`runtime-preflight blocked: invalid variant id for cart item ${itemIndex + 1}.`);
-        }
-
-        const preflightResult = variantPreflightCache.get(numericId)
-          || await preflightVariantOnStorefront(numericId, fetch);
-        variantPreflightCache.set(numericId, preflightResult);
-        if (!preflightResult?.ok) {
-          throw new Error(
-            `runtime-preflight blocked: variant ${numericId} in cart item ${itemIndex + 1} (status ${preflightResult?.status || 0}).`,
-          );
-        }
-
-        cartItem.id = numericId;
-      }
-
       this.elements.addToCartButton.disabled = true;
       this.elements.addToCartButton.textContent = this._resolveText('addingToCart', 'Adding to Cart...');
       this.showLoadingOverlay(this.config?.loadingScreen?.gifUrl || null);
 
-      const cartContext = this.buildProductPageCartFormData(cartItems, {
-        bundleName,
-        offerId,
-        sessionKey,
-        sellingPlanId,
-      });
-      const response = await withBundleCartLock(async () => {
-        return fetch('/cart/add.js', {
-          method: 'POST',
-          body: cartContext.formData
-        });
-      });
-      const responseText = await response.text();
-
-      if (!response.ok) {
-        let errorMessage = `Cart add failed (${response.status})`;
-        try {
-          const errorData = JSON.parse(responseText);
-          errorMessage = errorData.message || errorData.description || errorMessage;
-        } catch {
-          // Response was not JSON, so the status-code message is clearer.
+      const nativeLines = cartItems.map((item: any, index: number) => {
+        const properties = {
+          ...item.properties,
+          _bundleName: bundleName,
+          '_wolfpackProductBundle:OfferId': `${offerId}_${sessionKey}_${index + 1}`,
+          '_wolfpackProductBundle:prodQty': String(item.quantity),
+        };
+        const rawDisplayProperties = properties._bundle_display_properties;
+        if (rawDisplayProperties) {
+          try {
+            const parsed = typeof rawDisplayProperties === 'string'
+              ? JSON.parse(rawDisplayProperties)
+              : rawDisplayProperties;
+            if (parsed?.tierProgress) properties._bundle_tier_progress = JSON.stringify(parsed.tierProgress);
+          } catch {
+            // Invalid optional display metadata must not block the cart action.
+          }
         }
-        throw new Error(errorMessage);
-      }
-
-      try {
-        JSON.parse(responseText);
-      } catch {
-        // Shopify can return an HTML cart page after a successful multipart add.
-      }
+        return { ...item, properties, sellingPlanId };
+      });
+      const cartResult = await updateShopifyCart(nativeLines);
+      const warning = Array.isArray(cartResult?.warnings)
+        ? cartResult.warnings.find((entry: any) => entry?.message)?.message
+        : null;
+      if (warning) ToastManager.show(warning);
 
       const successMessage = this._resolveText?.('addBundleSuccess', '');
       if (successMessage) ToastManager.show(successMessage);
@@ -285,20 +258,6 @@ export const ProductPageCartMethods: Record<string, any> & ThisType<any> = {
     });
 
     return cartItems;
-  },
-
-  buildProductPageCartFormData(cartItems: any, {
-    bundleName = '',
-    offerId = '',
-    sessionKey = '',
-    sellingPlanId = '',
-  }: any = {}) {
-    return buildProductPageCartFormData(cartItems, {
-      bundleName,
-      offerId,
-      sessionKey,
-      sellingPlanId,
-    });
   },
 
   resolveProductPageOfferId() {

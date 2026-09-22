@@ -2,13 +2,12 @@ import { BundleDataManager } from '../../shared/bundle-data-manager.js';
 import { TemplateManager } from '../../shared/template-manager.js';
 import {
   claimCheckoutIntegrationInvocation,
-  invokeCheckoutIntegrationProvider,
 } from '../../shared/checkout-integration-adapters.js';
 import { TemplateDesignSystem } from '../../shared/template-design-system.js';
 import { buildBundleConfigApiUrl } from '../../../../lib/bundle-preview-url.js';
 import { ppbExpandSingleStepCategoriesAsSteps } from '../single-step-categories.js';
 import { localizeBundleConfig } from '../../shared/localized-bundle-config.js';
-import { parseThemeSectionResponse } from '../../shared/theme-section-parser.js';
+import { storefrontPath } from '../../shared/storefront-path.js';
 
 function getWindow() {
   return typeof window === 'undefined' ? null : window;
@@ -113,26 +112,6 @@ _runProductPageLoadScriptOnce() {
   this._runControlsScript(this._getProductPageControls()?.scripts?.executeCustomScript);
 },
 
-async _refreshConfiguredCartSection(action: string) {
-  const controls = this._getProductPageControls();
-  const selectors = controls?.selectors || {};
-  const onCartPage = action === 'cart';
-  const sectionId = onCartPage ? selectors.cartPageItemsSectionId : selectors.sideCartSectionId;
-  const selector = onCartPage ? selectors.cartPageItems : selectors.sideCart;
-  if (!sectionId || !selector || typeof fetch !== 'function' || typeof document === 'undefined') return false;
-
-  try {
-    const response = await fetch(`/?section_id=${encodeURIComponent(sectionId)}`, { credentials: 'same-origin' });
-    const replacement = await parseThemeSectionResponse(response, selector, document);
-    const current = document.querySelector(selector);
-    if (!replacement || !current) return false;
-    current.replaceWith(replacement);
-    return true;
-  } catch (_: any) {
-    return false;
-  }
-},
-
 async _handlePostAddToCartAction(actionConfig: any, lifecycleKey: any) {
   const controls = this._getProductPageControls();
   const redirect = actionConfig || controls?.redirect || {};
@@ -145,47 +124,26 @@ async _handlePostAddToCartAction(actionConfig: any, lifecycleKey: any) {
   }
 
   this._runControlsScript(redirect.executeScript);
-  const action = redirect.action || 'cart';
+  const action = redirect.action || 'stay';
   if (action === 'checkout') {
     const runtimeWindow = getWindow();
     if (!runtimeWindow) return;
 
     setTimeout(() => {
-      runtimeWindow.location.href = '/checkout';
+      runtimeWindow.location.href = storefrontPath('checkout', runtimeWindow);
     }, 1000);
     return;
   }
 
-  if (action === 'side_cart') {
-    await this._refreshConfiguredCartSection?.('side_cart');
-    const selector = redirect.selectors?.sideCartOpenButton
-      || controls?.selectors?.sideCartOpenButton
-      || controls?.selectors?.sideCart;
-    const invocation = await invokeCheckoutIntegrationProvider(
-      'theme_cart_drawer',
-      getWindow(),
-      {
-        openThemeCartDrawer: () => {
-          if (!selector) return false;
-          const sideCartTrigger = document.querySelector(selector);
-          if (!sideCartTrigger) return false;
-          setTimeout(() => sideCartTrigger.click(), 300);
-          return true;
-        },
-      },
-    );
-    if (invocation.ok) return;
-  }
-
-  if (action === 'cart') {
-    await this._refreshConfiguredCartSection?.('cart');
+  if (action !== 'cart') {
+    return;
   }
 
   setTimeout(() => {
     const runtimeWindow = getWindow();
     if (!runtimeWindow) return;
 
-    runtimeWindow.location.href = '/cart';
+    runtimeWindow.location.href = storefrontPath('cart', runtimeWindow);
   }, 1000);
 },
 
@@ -199,7 +157,13 @@ parseConfiguration() {
     || storefrontRuntime?.languages?.[locale.split('-')[0]]
     || storefrontRuntime?.languages?.en
     || null;
-  const controlsSettings = storefrontRuntime?.controls || existingConfig.controlsSettings || null;
+  const controlsRuntime = (runtimeWindow as any)?.__WOLFPACK_SETTINGS_CONTROLS_RUNTIME__ || null;
+  const controlsSettings = controlsRuntime ? {
+    schemaVersion: controlsRuntime.schemaVersion,
+    bundleType: 'product_page',
+    settingsControls: controlsRuntime,
+    activeControls: controlsRuntime.productPage,
+  } : existingConfig.controlsSettings || null;
   const controls = this._getProductPageControls() || {};
   const datasetShowQuantity = dataset.showQuantitySelectorOnCard !== 'false';
   const showQuantitySelectorOnCard = parseControlBoolean(

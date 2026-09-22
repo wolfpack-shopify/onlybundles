@@ -9,14 +9,16 @@ interface DeploymentGeneralSyncOptions {
 }
 
 interface DeploymentGeneralSyncSummary {
+  metafieldDefinitionShopsSynced: number;
   mode: "disabled" | "apply";
   scannedShops: number;
   scannedBundles: number;
   syncedBundles: number;
   failedBundles: number;
   failedShops: number;
-  metafieldDefinitionShopsSynced: number;
   ppbRuntimeShopsSynced: number;
+  fpbRuntimeShopsSynced: number;
+  storefrontControlsRuntimeShopsSynced: number;
   addonDiscountShopsSynced: number;
   subscriptionDiscountShopsSynced: number;
   variantRemediation: {
@@ -72,10 +74,12 @@ interface GeneralSyncPrisma {
 }
 
 interface DeploymentGeneralSyncDependencies {
+  ensureMetafieldDefinitions: (admin: unknown) => Promise<unknown>;
   prisma: GeneralSyncPrisma;
   getAdmin: (shopDomain: string) => Promise<unknown>;
-  ensureMetafieldDefinitions: (admin: unknown) => Promise<unknown>;
   syncPpbRuntime: (admin: unknown, shopDomain: string) => Promise<unknown>;
+  syncFpbRuntime: (admin: unknown, shopDomain: string) => Promise<unknown>;
+  syncStorefrontControlsRuntime: (admin: unknown, shopDomain: string) => Promise<unknown>;
   syncBundle: (input: {
     admin: unknown;
     shopDomain: string;
@@ -203,6 +207,8 @@ function emptySummary(mode: "disabled" | "apply"): DeploymentGeneralSyncSummary 
     failedShops: 0,
     metafieldDefinitionShopsSynced: 0,
     ppbRuntimeShopsSynced: 0,
+    fpbRuntimeShopsSynced: 0,
+    storefrontControlsRuntimeShopsSynced: 0,
     addonDiscountShopsSynced: 0,
     subscriptionDiscountShopsSynced: 0,
     variantRemediation: {
@@ -436,11 +442,17 @@ export async function runDeploymentGeneralSync(
   for (const shopDomain of shopDomains) {
     try {
       const admin = await deps.getAdmin(shopDomain);
-      if (await deps.ensureMetafieldDefinitions(admin) === false) throw new Error("Bundle metafield definition provisioning failed");
+      if (await deps.ensureMetafieldDefinitions(admin) === false) {
+        throw new Error("Variant metafield definition provisioning failed");
+      }
       await deps.syncPpbRuntime(admin, shopDomain);
+      await deps.syncFpbRuntime(admin, shopDomain);
+      await deps.syncStorefrontControlsRuntime(admin, shopDomain);
       adminByShop.set(shopDomain, admin);
       summary.metafieldDefinitionShopsSynced += 1;
       summary.ppbRuntimeShopsSynced += 1;
+      summary.fpbRuntimeShopsSynced += 1;
+      summary.storefrontControlsRuntimeShopsSynced += 1;
     } catch (error: any) {
       const message = errorMessage(error);
       failedShops.add(shopDomain);

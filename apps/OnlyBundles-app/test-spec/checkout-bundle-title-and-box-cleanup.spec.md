@@ -1,3 +1,31 @@
+---
+schema_version: 1
+id: checkout-bundle-title-and-box-cleanup
+title: Checkout Bundle Title and Box Property Cleanup Test Spec
+type: test-spec
+status: active
+summary: Verifies native cart lines omit public Box properties and Cart Transform preserves canonical bundle titles.
+last_audited: 2026-09-22
+owners:
+  - engineering
+domains:
+  - testing
+systems:
+  - storefront-cart
+source_paths:
+  - apps/OnlyBundles-app/app/assets/widgets/product-page/methods/cart-methods.ts
+  - apps/OnlyBundles-app/app/assets/widgets/full-page/methods/step-footer-methods.ts
+  - apps/OnlyBundles-app/app/assets/sdk/cart.ts
+related_docs:
+  - internal docs/Architecture/Shopify Native Audit.md
+tags:
+  - tdd
+  - cart
+keywords:
+  - Shopify actions
+  - line properties
+---
+
 # Test Spec: Checkout Bundle Title and Box Property Cleanup
 **Spec ID:** checkout-bundle-title-and-box-cleanup  **Created:** 2026-09-17
 
@@ -11,7 +39,7 @@ Ensure that:
 ### CheckoutBundleTitleAndBoxCleanup
 | # | Scenario | Input | Expected Output | Notes |
 |---|---|---|---|---|
-| 1 | PPB cart submit does not append public `Box` property | Product page cart items submitted to `buildProductPageCartFormData` | `formData` has no `Box` property on any line | Prevents "Box: 1" label in checkout |
+| 1 | PPB cart submit does not append public `Box` property | Product Page selection submitted through `Shopify.actions.updateCart` | Native line attributes contain no `Box` property | Prevents "Box: 1" label in checkout |
 | 2 | SDK cart items do not include `Box` property | Selections passed to `buildCartItems` in SDK | Output item properties do not contain `Box` | Clean component attributes |
 | 3 | Full-page step footer items do not include `Box` property | Step selections processed in full-page cart add | Line properties do not contain `Box` | Clean component attributes |
 | 4 | Display properties preserve `bundleName` in PPB | `sourceProperties` with `_bundle_display_properties` containing `bundleName` | `buildBundleDetailsDisplayProperties` returns object with `bundleName` | Propagates to `$app:bundle_details` |
@@ -21,6 +49,6 @@ Ensure that:
 
 ## Acceptance Criteria
 - [ ] All listed test cases pass
-- [ ] No `Box` property appended on storefront `/cart/add`
+- [ ] No `Box` property appended to native Shopify cart lines
 - [ ] Cart transform does not override parent product title with `"Bundle"`
 - [ ] Zero ESLint errors

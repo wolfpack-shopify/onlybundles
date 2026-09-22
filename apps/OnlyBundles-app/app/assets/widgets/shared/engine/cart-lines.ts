@@ -96,10 +96,6 @@ export function extractTierProgressForBundle(bundle: any = {}) {
     || bundle?.messaging?.displayOptions?.progressBar
     || null;
 
-  if (progressBar?.enabled === false) {
-    return null;
-  }
-
   const normalizedRules = rules.map((r: any) => {
     const conditionType = r.conditionType || (r.minSubtotal !== undefined ? 'amount' : 'quantity');
     const isAmount = conditionType === 'amount';
@@ -116,10 +112,10 @@ export function extractTierProgressForBundle(bundle: any = {}) {
   return {
     rules: normalizedRules,
     progressBar: progressBar ? {
-      enabled: progressBar.enabled !== false,
+      enabled: progressBar.enabled === true,
       type: progressBar.type || 'simple',
       progressText: progressBar.progressText,
       successText: progressBar.successText,
-    } : { enabled: true, type: 'simple' },
+    } : { enabled: false, type: 'simple' },
   };
 }

@@ -10,11 +10,16 @@
 
 {% schema %}
 {
-  "name": "Bundle Builder placement",
+  "name": "t:theme_resources.product_page_placement.name",
   "target": "section",
   "enabled_on": {
     "templates": ["product"]
   },
-  "settings": []
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "t:theme_resources.product_page_placement.description"
+    }
+  ]
 }
 {% endschema %}

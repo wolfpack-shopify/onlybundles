@@ -86,8 +86,59 @@ describe("storefront sync runtime token contract", () => {
   });
 
   it("does not write component_parents from direct storefront sync", async () => {
+    const graphql = jest.fn(async (query: string) => {
+      if (query.includes("GetBundleParentProduct")) {
+        return {
+          json: async () => ({
+            data: {
+              product: {
+                id: "gid://shopify/Product/PARENT",
+                handle: "bundle-handle",
+                status: "ACTIVE",
+                media: { nodes: [{ status: "READY" }] },
+                variants: { nodes: [{ id: "gid://shopify/ProductVariant/PARENT" }] },
+              },
+            },
+          }),
+        };
+      }
+      if (query.includes("AddOnlyBundlesParentTags")) {
+        return {
+          json: async () => ({
+            data: { tagsAdd: { node: { id: "gid://shopify/Product/PARENT" }, userErrors: [] } },
+          }),
+        };
+      }
+      if (query.includes("ConfigureBundleParentVariant")) {
+        return {
+          json: async () => ({
+            data: { productVariantsBulkUpdate: { productVariants: [], userErrors: [] } },
+          }),
+        };
+      }
+      if (query.includes("GetOnlineStorePublication")) {
+        return {
+          json: async () => ({
+            data: {
+              publications: {
+                nodes: [{ id: "gid://shopify/Publication/1", name: "Online Store" }],
+              },
+            },
+          }),
+        };
+      }
+      if (query.includes("PublishBundleParentProduct")) {
+        return {
+          json: async () => ({
+            data: { publishablePublish: { userErrors: [] } },
+          }),
+        };
+      }
+      throw new Error(`Unexpected GraphQL operation: ${query}`);
+    });
+
     await syncBundleStorefrontNow({
-      admin: { graphql: jest.fn() } as any,
+      admin: { graphql } as any,
       shopDomain: "test-shop.myshopify.com",
       bundleId: "bundle-1",
       bundleType: "product_page",

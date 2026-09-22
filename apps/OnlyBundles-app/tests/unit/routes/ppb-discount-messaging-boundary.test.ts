@@ -51,6 +51,8 @@ describe("PPB discount messaging boundary", () => {
       view,
       (element) => element.type === "s-switch",
     );
+    expect(enabledSwitch!.props.accessibilityLabel).toEqual(expect.any(String));
+    expect(enabledSwitch!.props.accessibilityLabel).not.toHaveLength(0);
     enabledSwitch!.props.onChange({ target: { checked: true } });
 
     expect(setDiscountMessagingEnabled).toHaveBeenCalledWith(true);

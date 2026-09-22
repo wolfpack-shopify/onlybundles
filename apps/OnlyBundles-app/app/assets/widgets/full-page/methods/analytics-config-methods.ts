@@ -7,10 +7,22 @@ import {
   invokeCheckoutIntegrationProvider,
   waitForCheckoutIntegrationCapability,
 } from '../../shared/checkout-integration-adapters.js';
+import { openShopifyCart } from '../../shared/shopify-cart-actions.js';
 import { buildStorefrontApiPath } from '../../../../config/storefront-proxy-routes.js';
 import { localizeBundleConfig } from '../../shared/localized-bundle-config.js';
 import { replaceManagedStyle } from '../../shared/managed-style.js';
 import { captureDiscountTierState } from '../../shared/discount-tier-feedback.js';
+import { storefrontPath } from '../../shared/storefront-path.js';
+
+function parseJsonObject(value: string | undefined) {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
 
 export const fullPageAnalyticsConfigMethods: Record<string, any> & ThisType<any> = {
 _ensureWpbSessionId() {
@@ -86,36 +98,29 @@ _sendEngagementBeacon(eventName: any) {
 },
 
 async loadLanguageSettings() {
-  try {
-    const locale = window.Shopify?.locale || 'en';
-    const endpoint = buildStorefrontApiPath(
-      `language-settings?bundleType=full_page&locale=${encodeURIComponent(locale)}`,
-    );
-    const response = await fetch(endpoint, { credentials: 'same-origin' });
-    if (!response.ok) return;
-
-    const languageSettings = await response.json();
-    this.config.languageSettings = languageSettings;
-    this.config.languageData = languageSettings.activeLanguageData || null;
-    this.config.sharedCartLabels = languageSettings.sharedCartLabels || null;
-    this.config.textOverrides = {
-      ...(this.config.textOverrides || {}),
-      ...(languageSettings.textOverrides || {})
-    };
-  } catch (_: any) {
-    // Non-critical: default and bundle-level text still render.
-  }
+  const runtime = parseJsonObject(this.container.dataset.fpbRuntime);
+  if (runtime?.schemaVersion !== 1 || !runtime.languages) return;
+  const locale = String(window.Shopify?.locale || 'en').toLowerCase();
+  const localeKeys = Object.keys(runtime.languages);
+  const exact = localeKeys.find((key) => key.toLowerCase() === locale);
+  const baseLocale = locale.split('-')[0];
+  const base = localeKeys.find((key) => key.toLowerCase() === baseLocale);
+  const languageSettings = runtime.languages[exact || base || 'en'];
+  if (!languageSettings) return;
+  this.config.languageSettings = languageSettings;
+  this.config.languageData = languageSettings.activeLanguageData || null;
+  this.config.sharedCartLabels = languageSettings.sharedCartLabels || null;
+  this.config.textOverrides = {
+    ...(this.config.textOverrides || {}),
+    ...(languageSettings.textOverrides || {})
+  };
 },
 
 async loadControlsSettings() {
   try {
-    const endpoint = buildStorefrontApiPath(
-      'controls-settings?bundleType=full_page',
-    );
-    const response = await fetch(endpoint, { credentials: 'same-origin' });
-    if (!response.ok) return;
-
-    this.config.controlsSettings = await response.json();
+    const runtime = (window as Window & Record<string, any>).__WOLFPACK_SETTINGS_CONTROLS_RUNTIME__;
+    if (!runtime?.landingPage) return;
+    this.config.controlsSettings = { activeControls: runtime.landingPage };
     const controls = this._getLandingPageControls();
     const builderCss = String(controls?.css?.bundleBuilderPages || '').trim();
     const runtimeDocument = typeof document === 'undefined' ? null : document;
@@ -163,53 +168,12 @@ _isCheckoutIntegrationProvider(providerId: any) {
 },
 
 _getCheckoutIntegrationFallbackTarget(provider: any) {
-  return provider.fallbackAction === 'checkout' ? '/checkout' : '/cart';
+  return storefrontPath(provider.fallbackAction === 'checkout' ? '/checkout' : '/cart', window);
 },
 
 async _openThemeCartDrawer() {
-  let cart: any = null;
-  try {
-    const response = await fetch('/cart.js', {
-      credentials: 'same-origin',
-      cache: 'no-store',
-    });
-    if (response.ok) {
-      cart = await response.json();
-    }
-  } catch (_: any) {
-    // Cart drawer refresh is best-effort.
-  }
-
-  const detail: any = { cart };
-  [
-    'cart:refresh',
-    'cart:updated',
-    'cart:open',
-    'theme:cart:open',
-  ].forEach((eventName) => {
-    try {
-      document.dispatchEvent(new CustomEvent(eventName, { detail, bubbles: true }));
-      window.dispatchEvent(new CustomEvent(eventName, { detail }));
-    } catch (_: any) {
-      // Keep trying the remaining event contracts.
-    }
-  });
-
-  const drawer: any = document.querySelector('cart-drawer, cart-notification');
-  if (drawer && typeof drawer.open === 'function') {
-    drawer.open();
-    return true;
-  }
-
-  const trigger = document.querySelector<HTMLElement>(
-    '[aria-controls="CartDrawer"], [data-cart-drawer-open], [data-cart-open], [href="/cart"]',
-  );
-  if (trigger && typeof trigger.click === 'function') {
-    trigger.click();
-    return true;
-  }
-
-  return cart !== null;
+  await openShopifyCart(window);
+  return true;
 },
 
 _openGokwikCheckout(checkoutUrl: any) {
@@ -265,7 +229,7 @@ async _createCheckoutIntegrationDiscountCode(providerId: any) {
 
 async _applyCheckoutIntegrationDiscountCode(code: string|number|boolean) {
   if (!code) return false;
-  const discountUrl = `/discount/${encodeURIComponent(code)}?redirect=/cart`;
+  const discountUrl = `${storefrontPath(`/discount/${encodeURIComponent(code)}`, window)}?redirect=${encodeURIComponent(storefrontPath('/cart', window))}`;
   const response = await fetch(discountUrl, {
     method: 'GET',
     credentials: 'same-origin',
@@ -309,7 +273,7 @@ async _handleCheckoutIntegrationProvider(checkout: any) {
     const applied = await this._applyCheckoutIntegrationDiscountCode(payload.code);
 
     if (!applied) {
-      window.location.href = `/discount/${encodeURIComponent(payload.code)}?redirect=/checkout`;
+      window.location.href = `${storefrontPath(`/discount/${encodeURIComponent(payload.code)}`, window)}?redirect=${encodeURIComponent(storefrontPath('/checkout', window))}`;
       return;
     }
 
@@ -334,7 +298,7 @@ async _handleCheckoutIntegrationProvider(checkout: any) {
     phase: invocation.phase,
   });
   if (payload?.code) {
-    window.location.href = `/discount/${encodeURIComponent(payload.code)}?redirect=/checkout`;
+    window.location.href = `${storefrontPath(`/discount/${encodeURIComponent(payload.code)}`, window)}?redirect=${encodeURIComponent(storefrontPath('/checkout', window))}`;
     return;
   }
   window.location.href = this._getCheckoutIntegrationFallbackTarget(provider);
@@ -354,7 +318,7 @@ async _handlePostAddToCartAction(actionConfig: any, lifecycleKey: any) {
   if (provider.id !== 'custom_script') {
     this._runControlsScript(checkout.executeScript);
   }
-  const target = checkout.action === 'checkout' ? '/checkout' : '/cart';
+  const target = storefrontPath(checkout.action === 'checkout' ? '/checkout' : '/cart');
   const providerId = provider.id;
   this._emitStorefrontEvent('checkout-clicked', { target, providerId });
 
@@ -451,102 +415,23 @@ _isBundleConfigBootstrapPayload(payload: any) {
 },
 
 async loadBundleData() {
-  let bundleData: any = null;
-
   const bundleId = this.container.dataset.bundleId;
 
   if (!bundleId) {
     throw new Error('Full-page bundle ID is required');
   }
 
-  {
-    // Only a source-marked, bundle-ID-matched app-proxy payload is authoritative.
-    const cachedConfig = this.container.dataset.bundleConfig;
-    const cachedPayload = this._parseBundleConfigPayload(cachedConfig);
-    if (cachedPayload) {
-      const isCurrentAppProxyDocumentPayload =
-        this.container.dataset.bundleConfigSource === 'app_proxy' &&
-        cachedPayload.id === bundleId &&
-        cachedPayload.bundleType === 'full_page' &&
-        Array.isArray(cachedPayload.steps);
-
-      if (isCurrentAppProxyDocumentPayload) {
-        bundleData = { [cachedPayload.id]: cachedPayload };
-        this._bundleConfigCacheMode = 'app-proxy-inline';
-      } else if (this._isBundleConfigBootstrapPayload(cachedPayload)) {
-        this._bundleConfigCacheMode = 'bootstrap';
-      }
-    }
-
-    // Hydrate through the app proxy when the authoritative payload is unavailable.
-    if (!bundleData) {
-      this._bundleConfigCacheMode = 'proxy';
-
-      // Retry once after a short delay for transient server errors (504/503).
-      // This handles Render cold-start: the first request times out while the
-      // server is warming up; the retry ~3 s later succeeds.
-      const RETRY_DELAY_MS = 3000;
-      const RETRYABLE_STATUSES = new Set([503, 504]);
-
-      const fetchBundleData = async () => {
-        // Use Shopify app proxy path - Shopify automatically adds signature and auth params
-        // App proxy config: /apps/product-bundles -> https://wolfpack-product-bundle-app.onrender.com
-        // CRITICAL: URL-encode bundle ID to handle special characters in cuid() format
-        const apiPath = buildStorefrontApiPath(
-          `bundle/${encodeURIComponent(bundleId)}.json`,
-        );
-        const countryCode = String(
-          this.container.dataset.countryCode
-          || (window as Window & { currentCountryCode?: string }).currentCountryCode
-          || '',
-        ).trim().toUpperCase();
-        const apiUrl = countryCode
-          ? `${apiPath}?country=${encodeURIComponent(countryCode)}`
-          : apiPath;
-
-        const response = await fetch(apiUrl);
-
-        if (!response.ok) {
-          // Try to get error details from response body
-          let errorDetails = `${response.status} ${response.statusText}`;
-          try {
-            const errorData = await response.json();
-            errorDetails = JSON.stringify(errorData);
-          } catch (e: any) {
-          }
-          const err = new Error(`API request failed: ${errorDetails}`) as Error & { status?: number };
-          err.status = response.status;
-          throw err;
-        }
-
-        const data = await response.json();
-
-        if (data.success && data.bundle) {
-          return { [data.bundle.id]: data.bundle };
-        } else {
-          throw new Error('Invalid API response structure');
-        }
-      };
-
-      try {
-        try {
-          bundleData = await fetchBundleData();
-        } catch (firstErr: any) {
-          // Retry once for 504/503 (server cold-start)
-          if (RETRYABLE_STATUSES.has(firstErr.status)) {
-            await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
-            bundleData = await fetchBundleData();
-          } else {
-            throw firstErr;
-          }
-        }
-      } catch (error: any) {
-        throw error;
-      }
-    }
+  const cachedPayload = this._parseBundleConfigPayload(this.container.dataset.bundleConfig);
+  const isAuthoritativeSnapshot =
+    this.container.dataset.bundleConfigSource === 'shopify_storefront' &&
+    cachedPayload?.id === bundleId &&
+    cachedPayload?.bundleType === 'full_page' &&
+    Array.isArray(cachedPayload?.steps);
+  if (!isAuthoritativeSnapshot) {
+    throw new Error('Full-page bundle requires an authoritative Shopify snapshot');
   }
-
-  this.bundleData = bundleData;
+  this.bundleData = { [cachedPayload.id]: cachedPayload };
+  this._bundleConfigCacheMode = 'shopify-storefront-inline';
 },
 
 selectBundle() {

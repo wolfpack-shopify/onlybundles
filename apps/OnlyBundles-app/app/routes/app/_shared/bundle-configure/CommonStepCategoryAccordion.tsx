@@ -121,7 +121,18 @@ export function CommonStepCategoryAccordion({
     const picked = await (shopify as any).resourcePicker({
       type: "product",
       multiple: true,
-      selectionIds: catProducts.map((product: any) => ({ id: product.id })),
+      selectionIds: catProducts.map(
+        (product: { id: string; variants?: Array<{ id: string }> }) => ({
+          id: product.id,
+          ...(product.variants?.length
+            ? {
+                variants: product.variants.map((variant) => ({
+                  id: variant.id,
+                })),
+              }
+            : {}),
+        })
+      ),
     });
     if (!picked) return;
 

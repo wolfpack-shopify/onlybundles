@@ -640,7 +640,8 @@ Minified output (deploy target):
 | Both CSS and JS | `npm run build:widgets && npm run minify:assets css` |
 | All assets | `npm run minify:assets` |
 
-Script exits non-zero if any CSS file exceeds Shopify's **100,000 B** app-block asset limit.
+Shopify's CDN minifies and compresses valid CSS at delivery time. The repository
+build only resolves imports into readable extension assets; it does not maintain minified CSS files.
 
 ---
 

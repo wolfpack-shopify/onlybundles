@@ -29,8 +29,10 @@ const GENERATED_OUTPUTS = {
 };
 
 const CSS_OUTPUTS = [
+  appPath("extensions/bundle-builder/assets/bundle-widget-bootstrap.css"),
   appPath("extensions/bundle-builder/assets/bundle-widget-full-page.css"),
   appPath("extensions/bundle-builder/assets/bundle-widget-full-page-mobile-summary.css"),
+  appPath("extensions/bundle-builder/assets/bundle-widget-full-page-responsive.css"),
   appPath("extensions/bundle-builder/assets/bundle-widget-full-page-standard.css"),
   appPath("extensions/bundle-builder/assets/bundle-widget-full-page-classic.css"),
   appPath("extensions/bundle-builder/assets/bundle-widget-full-page-compact.css"),
@@ -194,8 +196,8 @@ function main() {
     runWidgetBuilds(plan.widgetBuildTargets);
   }
 
-  if (plan.shouldMinifyCss) {
-    mustRun("npm", ["run", "minify:assets", "--", "css"]);
+  if (plan.shouldBuildCss) {
+    mustRun("npm", ["run", "build:css"]);
     stageFiles(CSS_OUTPUTS.filter((file) => GENERATED_FILES.has(file)));
   }
 

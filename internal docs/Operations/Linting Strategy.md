@@ -5,7 +5,7 @@ title: Linting Strategy
 type: operations
 status: active
 summary: Defines fast local linting, repository-wide CI gates, and incremental debt reduction for each source surface.
-last_audited: 2026-09-07
+last_audited: 2026-09-24
 owners:
   - engineering
 domains:
@@ -100,7 +100,7 @@ The remaining gaps are:
 |---|---|---|---|
 | Admin/server TypeScript and tests | Scoped type-aware ESLint on changed files | Full application ESLint plus typecheck | Zero errors; new files zero warnings |
 | Storefront source under `app/storefront/` and `app/assets/` | Dedicated source ESLint lane, raw JS `node --check`, and affected widget build | Full storefront lint and widget build | Do not lint generated extension bundles |
-| Admin and storefront CSS | Affected build or CSS minifier and Shopify 100,000 B asset limit | Production build and CSS minification | Add Stylelint only after a recurring defect class justifies it |
+| Admin and storefront CSS | Affected build; import assembly for theme-extension CSS | Production build and Shopify-native validation | Add Stylelint only after a recurring defect class justifies it |
 | Astro website | `astro check` for touched work | Existing `website:verify` workflow | Astro owns `.astro` and website TypeScript validation |
 | Shopify TOML and extensions | Shopify CLI configuration validation | `shopify app config validate --json` for PROD and SIT configs, then app build | Shopify schemas are authoritative |
 | Prisma schema | `prisma validate` after schema changes | `prisma validate` and client generation | Do not use ESLint for Prisma |
@@ -116,7 +116,7 @@ During development, use the smallest relevant command:
 npx eslint --max-warnings 9999 <changed-ts-or-js-files>
 node --check <changed-raw-js-file>
 npm run build:widgets
-npm run minify:assets -- css
+npm run build:css
 npm run website:check
 ```
 

@@ -5,7 +5,7 @@ title: CircleCI Shopify CI/CD Pipeline Plan
 type: plan
 status: planned
 summary: Planned CircleCI deployment pipeline for Render and Shopify app releases.
-last_audited: 2026-07-31
+last_audited: 2026-09-24
 owners:
   - engineering
 domains:
@@ -88,7 +88,7 @@ Run only after merge to `STAGING`:
 3. Build deploy assets:
    ```bash
    npm run build:widgets
-   npm run minify:assets css
+   npm run build:css
    ```
 4. Build Rust Shopify Functions:
    ```bash
@@ -115,7 +115,7 @@ Run only after merge to `PROD`:
 3. Build deploy assets:
    ```bash
    npm run build:widgets
-   npm run minify:assets css
+   npm run build:css
    ```
 4. Build Rust Shopify Functions.
 5. Trigger production Render web deploy hook.
@@ -246,7 +246,7 @@ Read `expires_at` from 1Password and fail when the token is within the configure
   "ci:lint": "eslint --max-warnings 9999 .",
   "ci:test:stable": "jest --selectProjects unit --testPathPattern='tests/unit/(services|extensions)' --runInBand",
   "ci:build": "npm run build",
-  "ci:deploy-assets": "npm run build:widgets && npm run minify:assets css"
+  "ci:deploy-assets": "npm run build:widgets && npm run build:css"
 }
 ```
 

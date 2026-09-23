@@ -222,7 +222,7 @@
 
   .vs-mobile-drawer--standard .vs-mobile-drawer-header {
     display: grid;
-    grid-template-columns: 7.25rem minmax(0, 1fr);
+    grid-template-columns: 116px minmax(0, 1fr);
     gap: 0.625rem;
     padding: 0.625rem;
     background: #fff;
@@ -230,8 +230,8 @@
   }
 
   .vs-mobile-drawer--standard .vs-mobile-drawer-product-image {
-    width: 7.25rem;
-    height: 7.25rem;
+    width: 116px;
+    height: 116px;
     object-fit: cover;
   }
 
@@ -263,13 +263,13 @@
 
   .vs-mobile-drawer--standard .vs-mobile-options {
     display: grid;
-    max-height: calc(80vh - 12.25rem);
+    max-height: calc(80vh - 196px);
     overflow-y: auto;
   }
 
   .vs-mobile-drawer--standard .vs-mobile-option {
     display: grid;
-    grid-template-columns: 3.125rem minmax(0, 1fr) auto;
+    grid-template-columns: 50px minmax(0, 1fr) auto;
     align-items: center;
     gap: 0.5rem;
     min-height: 3.4375rem;
@@ -288,8 +288,8 @@
   }
 
   .vs-mobile-drawer--standard .vs-mobile-option-image {
-    width: 3.125rem;
-    height: 2.8125rem;
+    width: 50px;
+    height: 45px;
     object-fit: cover;
   }
 

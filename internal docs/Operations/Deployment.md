@@ -5,7 +5,7 @@ title: Deployment
 type: operations
 status: active
 summary: Deployment commands, environment configuration, Shopify-managed installation rules, and SDK release ordering.
-last_audited: 2026-09-03
+last_audited: 2026-09-24
 owners:
   - engineering
 domains:
@@ -68,10 +68,16 @@ install will reject that lockfile with `EUSAGE` before the build begins.
 
 1. Increment `widgetVersion` in `apps/OnlyBundles-app/scripts/build-storefront.mjs`
 2. Run `npm run build:widgets`
-3. Check CSS file sizes: `wc -c apps/OnlyBundles-app/extensions/bundle-builder/assets/*.css` (must be < 100,000 B)
+3. Run `npm run build:css` when storefront CSS changed
 4. Run `npm run deploy:prod` or `npm run deploy:sit`
 5. Wait 2–10 min for Shopify CDN cache to propagate
 6. Verify: `console.log(window.__BUNDLE_WIDGET_VERSION__)` in storefront DevTools
+
+[Shopify automatically minifies valid CSS at delivery
+time](https://shopify.dev/docs/storefronts/themes/best-practices/performance/platform).
+[Theme app extension guidance](https://shopify.dev/docs/apps/build/online-store/theme-app-extensions/configuration)
+suggests keeping schema-referenced CSS under 100 KB compressed; the repository
+does not enforce an incorrect raw-file byte ceiling.
 
 For CSS changes, also verify the exact served CSS asset. `window.__BUNDLE_WIDGET_VERSION__` only proves the JS bundle is current. Product Page template styles are separate assets such as `bundle-widget-product-page-cascade.css`; Shopify CDN can serve an updated JS bundle while still serving an older CSS asset. Fetch the active CSS URL from the storefront and confirm the expected token or rule exists before accepting visual proof.
 

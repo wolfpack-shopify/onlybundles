@@ -81,7 +81,7 @@
   padding: 28px 0 20px;
 }
 
-@container ppb-grid-step (max-width: 45rem) {
+@container ppb-grid-step (max-width: 720px) {
   .bw-ppb-grid-product-grid:has(
       .ppb-variant-selector-wrapper[data-option-dimension-count="2"]
     ) {

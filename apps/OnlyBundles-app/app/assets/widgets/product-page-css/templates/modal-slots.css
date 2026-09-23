@@ -7,8 +7,8 @@
   --bw-ppb-slot-radius: 10px;
   --bw-ppb-slot-hairline: 1px;
   --bw-ppb-slot-target: 44px;
-  --bw-ppb-slot-tile-min-inline: 8.5rem;
-  --bw-ppb-slot-tile-min-block: clamp(11rem, 48cqi, 13rem);
+  --bw-ppb-slot-tile-min-inline: 136px;
+  --bw-ppb-slot-tile-min-block: clamp(176px, 48cqi, 208px);
   --bw-ppb-slot-row-min-block: 4rem;
   --bw-ppb-slot-row-max-block: var(--bw-ppb-slot-row-min-block);
   --bw-ppb-slot-empty-row-min-block: 3.75rem;

@@ -5,7 +5,7 @@ title: Widget Architecture
 type: architecture
 status: authoritative
 summary: FPB and PPB bootstrap, Shopify-hosted settings, feature-gated app embeds, market pricing, and fail-closed hydration architecture.
-last_audited: 2026-09-23
+last_audited: 2026-09-24
 owners:
   - engineering
 domains:
@@ -79,7 +79,7 @@ source_paths:
   - apps/OnlyBundles-app/extensions/bundle-builder/blocks/bundle-page-builder-embed.liquid
   - apps/OnlyBundles-app/extensions/bundle-builder/blocks/bundle-upsell.liquid
   - apps/OnlyBundles-app/scripts/build-storefront.mjs
-  - apps/OnlyBundles-app/scripts/minify-assets/targets.js
+  - apps/OnlyBundles-app/scripts/build-css-assets/targets.js
 related_docs:
   - Architecture/FPB Host Evaluation.md
 tags:
@@ -773,25 +773,23 @@ Version bump rules:
 
 **Mandatory before every deploy**: increment version → build → check CSS file sizes → deploy.
 
-### CSS Size Limit
+### CSS Asset Delivery
 
-Shopify enforces **100,000 B** on app block CSS assets.
+Shopify's storefront platform automatically minifies valid CSS. The repository
+therefore keeps generated extension CSS readable and uses `npm run build:css`
+only to resolve local source imports. Shopify suggests that CSS referenced
+directly by a theme app extension schema remain under 100 KB compressed; the
+current generated assets are below that guidance.
 
-```bash
-wc -c extensions/bundle-builder/assets/*.css
-```
-
-Keep base CSS below the limit by moving template-specific rules into separate extension assets:
+Keep base CSS focused by moving template-specific rules into separate extension assets:
 
 - FPB base: `bundle-widget-full-page.css`
 - FPB templates: `bundle-widget-full-page-{standard,classic,compact,horizontal}.css`
 - PPB base: `bundle-widget.css`
 - PPB templates: `bundle-widget-product-page-{cascade,cognive,modal}.css`
 
-The current CSS minifier does not preserve the descendant combinator before a
-leading `:is(...)` selector. Write those rules as explicit comma-separated
-selectors and verify the generated asset; otherwise `.parent :is(.child-a,
-.child-b)` can be emitted as `.parent:is(...)` and silently stop matching.
+The CSS builder preserves selectors, whitespace, and comments. Shopify owns
+delivery minification through its CDN.
 
 ## Placeholder Media Strategy
 

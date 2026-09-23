@@ -5,7 +5,7 @@ title: Shopify-Native Bundle Template Remediation Plan
 type: implementation-plan
 status: approved
 summary: Lean plan to correct native product selection and remediate responsive FPB and PPB template defects without replacing established render, preview, persistence, or synchronization architecture.
-last_audited: 2026-09-23
+last_audited: 2026-09-24
 owners:
   - engineering
 domains:
@@ -152,7 +152,7 @@ For the picker change:
 
 For CSS-only template changes:
 
-- Minify or rebuild the affected storefront CSS through the existing widget build command.
+- Assemble the affected readable extension CSS with `npm run build:css`; Shopify owns delivery minification.
 - Do not create unit tests or test-spec files for styling, class names, dimensions, or element placement.
 - Run `git diff --check`.
 

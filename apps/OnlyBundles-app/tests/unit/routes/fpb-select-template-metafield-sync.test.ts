@@ -1,52 +1,63 @@
 import { handleUpdateBundleDesignTemplate } from "../../../app/routes/app/app.bundles.full-page-bundle.configure.$bundleId/handlers/page-handlers.server";
-import { syncBundleStorefrontNow } from "../../../app/services/bundles/storefront-sync.server";
+import {
+  BundleTemplateSnapshotUnavailableError,
+  syncBundleTemplateSnapshot,
+} from "../../../app/services/bundles/metafield-sync/operations/bundle-template.server";
 
 jest.mock("../../../app/db.server", () => ({
   __esModule: true,
-  default: { bundle: { update: jest.fn() } },
+  default: { bundle: { findUnique: jest.fn(), update: jest.fn() } },
 }));
 
 jest.mock("../../../app/services/subscriptions/subscription-service.server", () => ({
-  resolveShopEntitlements: jest.fn().mockResolvedValue({ entitlements: {} }),
+  resolveShopEntitlements: jest.fn().mockResolvedValue({
+    entitlements: { capabilities: { premiumTemplates: true } },
+  }),
 }));
 
-jest.mock("../../../app/services/subscriptions/bundle-entitlement-gate.server", () => ({
-  assertTemplateSelectionAllowed: jest.fn(),
-}));
+jest.mock("../../../app/services/bundles/metafield-sync/operations/bundle-template.server", () => {
+  const actual = jest.requireActual(
+    "../../../app/services/bundles/metafield-sync/operations/bundle-template.server",
+  );
+  return { ...actual, syncBundleTemplateSnapshot: jest.fn() };
+});
 
-jest.mock("../../../app/services/bundles/storefront-sync.server", () => ({
-  syncBundleStorefrontNow: jest.fn(),
-}));
-
-const getDb = () => require("../../../app/db.server").default;
-const mockSync = syncBundleStorefrontNow as jest.MockedFunction<typeof syncBundleStorefrontNow>;
+const db = require("../../../app/db.server").default;
+const mockSync = syncBundleTemplateSnapshot as jest.MockedFunction<
+  typeof syncBundleTemplateSnapshot
+>;
 const admin = { graphql: jest.fn() } as any;
 const session = { shop: "test-shop.myshopify.com" } as any;
 
-function standardTemplateForm() {
-  const formData = new FormData();
-  formData.set("bundleDesignTemplate", "FBP_SIDE_FOOTER");
-  formData.set("bundleDesignPresetId", "STANDARD");
-  return formData;
+function form(preset: string) {
+  const data = new FormData();
+  data.set("bundleDesignTemplate", "FBP_SIDE_FOOTER");
+  data.set("bundleDesignPresetId", preset);
+  return data;
 }
 
-describe("FPB Select Template Shopify snapshot sync", () => {
+describe("FPB Select Template targeted snapshot sync", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    getDb().bundle.update.mockResolvedValue({ id: "bundle-1" });
-    mockSync.mockResolvedValue({ skipped: false, synced: true } as any);
+    db.bundle.findUnique.mockResolvedValue({
+      bundleDesignTemplate: "FBP_SIDE_FOOTER",
+      bundleDesignPresetId: "CLASSIC",
+      shopifyProductId: "gid://shopify/Product/123",
+    });
+    db.bundle.update.mockResolvedValue({ id: "bundle-1" });
+    mockSync.mockResolvedValue({ updated: true });
   });
 
-  it("synchronizes the saved template through the shared storefront owner", async () => {
+  it("updates only the template columns and targeted storefront snapshot", async () => {
     const response = await handleUpdateBundleDesignTemplate(
       admin,
       session,
       "bundle-1",
-      standardTemplateForm(),
+      form("STANDARD"),
     );
 
-    expect(getDb().bundle.update).toHaveBeenCalledWith({
-      where: { id: "bundle-1", shopId: "test-shop.myshopify.com" },
+    expect(db.bundle.update).toHaveBeenCalledWith({
+      where: { id: "bundle-1", shopId: session.shop },
       data: {
         bundleDesignTemplate: "FBP_SIDE_FOOTER",
         bundleDesignPresetId: "STANDARD",
@@ -54,22 +65,30 @@ describe("FPB Select Template Shopify snapshot sync", () => {
     });
     expect(mockSync).toHaveBeenCalledWith({
       admin,
-      shopDomain: "test-shop.myshopify.com",
+      bundleProductId: "gid://shopify/Product/123",
       bundleId: "bundle-1",
       bundleType: "full_page",
-      reason: "save",
+      bundleDesignTemplate: "FBP_SIDE_FOOTER",
+      bundleDesignPresetId: "STANDARD",
     });
     await expect(response.json()).resolves.toEqual({ success: true });
   });
 
-  it("does not report success when Shopify snapshot synchronization fails", async () => {
-    mockSync.mockRejectedValueOnce(new Error("Shopify metafield sync failed"));
+  it("returns explicit Sync Bundle recovery when the snapshot is unavailable", async () => {
+    mockSync.mockRejectedValueOnce(new BundleTemplateSnapshotUnavailableError());
 
-    await expect(handleUpdateBundleDesignTemplate(
+    const response = await handleUpdateBundleDesignTemplate(
       admin,
       session,
       "bundle-1",
-      standardTemplateForm(),
-    )).rejects.toThrow("Shopify metafield sync failed");
+      form("COMPACT"),
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({
+      success: false,
+      syncRequired: true,
+      templatePersisted: true,
+    }));
   });
 });

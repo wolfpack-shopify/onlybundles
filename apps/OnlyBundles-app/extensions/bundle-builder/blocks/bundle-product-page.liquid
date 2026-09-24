@@ -78,7 +78,13 @@
     style="--wpb-loading-screen-bg: {{ ppb_loading_background | escape }}"
   >
     {% if ppb_loading_gif != blank %}
-      <img class="bundle-loading-overlay__gif" src="{{ ppb_loading_gif | escape }}" alt="">
+      <img
+        class="bundle-loading-overlay__gif"
+        src="{{ ppb_loading_gif | escape }}"
+        alt=""
+        width="150"
+        height="150"
+      >
     {% else %}
       <div
         class="bundle-loading-overlay__spinner"

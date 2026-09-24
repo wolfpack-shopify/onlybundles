@@ -5,7 +5,7 @@ title: Admin Configure Page
 type: architecture
 status: authoritative
 summary: Defines the shared FPB and PPB configure-page boundary and direct create, clone, edit, and save flows.
-last_audited: 2026-09-14
+last_audited: 2026-09-25
 owners:
   - engineering
 domains:
@@ -24,6 +24,7 @@ source_paths:
   - app/constants/help-tooltips.ts
   - public/tooltip-*.png
   - app/lib/bundle-configure-loader.server.ts
+  - app/services/bundles/metafield-sync/operations/bundle-template.server.ts
   - app/hooks/useBundleConfigurationState.ts
   - app/hooks/configure-route-state.ts
 related_docs:
@@ -513,6 +514,15 @@ The projected workflow fills the host modal viewport, keeps the template grid
 as its only vertical scroll region, and pins both the customization header and
 action footer so the title, customization action, and `Next` stay available
 while merchants review every template.
+
+`Next` persists only the two template-selection columns and, for a published
+bundle product, compare-and-sets those same values into the existing
+`$app.bundle_ui_config` snapshot. It does not run the full bundle save or
+storefront publication pipeline. An unchanged selection advances locally
+without a request. A missing, malformed, or incompatible storefront snapshot
+is not reconstructed from partial data; the workflow preserves the database
+selection and presents the existing Sync Bundle action, whose normal owner can
+republish the complete canonical snapshot.
 
 The PPB Place Widget product-template chooser uses a Polaris `s-modal`. Its
 projected Cancel action targets the modal with the native `--hide` command so

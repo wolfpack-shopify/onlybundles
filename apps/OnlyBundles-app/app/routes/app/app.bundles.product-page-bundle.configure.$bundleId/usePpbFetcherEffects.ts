@@ -72,6 +72,7 @@ export function usePpbFetcherEffects({
     | "setBundleDesignPresetId" | "setBundleDesignTemplate"
     | "setIsPreparingPlacementTemplates" | "setTemplateModalStep" | "setTemplateSaveError"
     | "templateFetcher" | "templateSubmissionStartedRef" | "setIsSelectTemplateModalOpen"
+    | "setTemplateSyncRequired"
   >;
   sharedHandlers: Pick<ReturnType<typeof useSharedBundleHandlers>,
     "enhanceTemplateListWithUserSelection"
@@ -264,6 +265,7 @@ export function usePpbFetcherEffects({
       templateState.setTemplateSaveError(
         "Unable to save template. Please try again.",
       );
+      templateState.setTemplateSyncRequired(false);
       templateState.setTemplateModalStep("templates");
       lastTemplateRequestRef.current = null;
       templateSubmissionStartedRef.current = false;
@@ -276,6 +278,8 @@ export function usePpbFetcherEffects({
     const response = templateFetcher.data as {
       success?: boolean;
       error?: string;
+      syncRequired?: boolean;
+      templatePersisted?: boolean;
     };
     const request = lastTemplateRequestRef.current;
     if (response.success) {
@@ -287,6 +291,7 @@ export function usePpbFetcherEffects({
         );
       }
       templateState.setTemplateSaveError(null);
+      templateState.setTemplateSyncRequired(false);
       lastTemplateRequestRef.current = null;
       templateSubmissionStartedRef.current = false;
       return;
@@ -294,6 +299,7 @@ export function usePpbFetcherEffects({
     const entitlementFailure = (response as any).entitlementFailure;
     if (entitlementFailure || response.error === "ENTITLEMENT_REQUIRED") {
       templateState.setTemplateSaveError(null);
+      templateState.setTemplateSyncRequired(false);
       templateState.setIsSelectTemplateModalOpen(false);
       base.setEntitlementFailure(
         entitlementFailure || {
@@ -307,9 +313,14 @@ export function usePpbFetcherEffects({
       templateSubmissionStartedRef.current = false;
       return;
     }
-    const errorMessage = response.error || "Failed to save template settings.";
+    const errorMessage = response.error ?? "Failed to save template settings.";
+    if (response.syncRequired && response.templatePersisted && request) {
+      templateState.setBundleDesignTemplate(request.template);
+      templateState.setBundleDesignPresetId(request.presetId);
+    }
     templateState.setTemplateModalStep("templates");
     templateState.setTemplateSaveError(errorMessage);
+    templateState.setTemplateSyncRequired(response.syncRequired === true);
     lastTemplateRequestRef.current = null;
     templateSubmissionStartedRef.current = false;
   }, [

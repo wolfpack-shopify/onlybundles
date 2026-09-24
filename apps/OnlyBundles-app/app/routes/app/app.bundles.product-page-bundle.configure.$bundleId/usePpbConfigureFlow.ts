@@ -352,6 +352,7 @@ export function usePpbConfigureFlow() {
       setIsPreparingPlacementTemplates: templateState.setIsPreparingPlacementTemplates,
       setTemplateModalStep: templateState.setTemplateModalStep,
       setTemplateSaveError: templateState.setTemplateSaveError,
+      setTemplateSyncRequired: templateState.setTemplateSyncRequired,
       templateFetcher: templateState.templateFetcher,
       templateSubmissionStartedRef: templateState.templateSubmissionStartedRef,
       setIsSelectTemplateModalOpen: templateState.setIsSelectTemplateModalOpen,
@@ -448,6 +449,7 @@ export function usePpbConfigureFlow() {
   });
   const modalAndTemplate = usePpbModalAndTemplateController({
     base: {
+      appEmbedEnabled: base.appEmbedEnabled,
       isCollectionsModalOpen: base.isCollectionsModalOpen,
       isProductsModalOpen: base.isProductsModalOpen,
       navigate: base.navigate,
@@ -475,6 +477,7 @@ export function usePpbConfigureFlow() {
       setPendingDesignTemplate: templateState.setPendingDesignTemplate,
       setTemplateModalStep: templateState.setTemplateModalStep,
       setTemplateSaveError: templateState.setTemplateSaveError,
+      setTemplateSyncRequired: templateState.setTemplateSyncRequired,
       templateFetcher: templateState.templateFetcher,
       templateSubmissionStartedRef: templateState.templateSubmissionStartedRef,
     },

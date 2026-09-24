@@ -139,7 +139,121 @@ For each template:
 
 The Agent theme is regression evidence, not a source of fixed geometry. Translate any measured failure into content- and container-responsive rules rather than copying captured pixel dimensions.
 
-## 6. Verification matrix
+## 6. Phase 4 — Bundle template CSS simplification
+
+Retain all eight public templates and their current renderers while simplifying
+the Chrome-verified CSS ownership boundaries. This phase does not change routes,
+Shopify blocks, Prisma, metafields, synchronization contracts, merchant settings,
+or app-proxy behavior.
+
+### Product-card divider contract
+
+- The shared product-card renderer is the sole owner of the conditional variant
+  row and its existing data marker.
+- Render the row only for meaningful, non-default variant text in both selected
+  and unselected cards. Do not render a divider element, pseudo-element, or empty
+  divider band.
+- The variant row owns its logical `1px` start border through
+  `--bundle-product-card-variant-divider`, plus the existing bounded margin,
+  padding, and single-line truncation.
+- Remove the redundant FPB Standard post-processing path and its obsolete
+  expanded-variant selectors. Keep FPB and PPB card CSS in their separate surface
+  owners; do not add a generic cross-surface product-card stylesheet.
+
+### PPB container-responsive geometry
+
+- The PPB in-page root is a named inline-size container.
+- Product List uses an intrinsic bounded action track based on the PPB container,
+  `clamp(90px, 28cqi, 112px)`, instead of viewport-switched `90px` and
+  `112px` widths.
+- Product List typography and internal spacing respond to container width.
+- Viewport-owned sticky-footer activation, safe-area padding, and mobile drawer
+  height retain the runtime's `max-width: 767px` boundary. Modal, pointer, and
+  accessibility media queries remain unchanged without a separately reproduced
+  defect.
+
+### FPB cascade ownership
+
+- The FPB base card stylesheet retains one selected, unselected, and hover card
+  geometry rule. Remove later identical blocks and repeated selectors in that
+  same file.
+- Retain the final Standard and Classic resets required by preset asset load
+  order. Do not replace them with `!important` or higher-specificity selectors.
+- Scope the Standard token declaration to the FPB root while retaining the nested
+  preset attribute used by template selectors.
+- Where `text-align: start` immediately owns the same declaration, remove the
+  redundant preceding `text-align: left`.
+
+### Shared loading primitive
+
+- One shared source partial owns loading visibility, GIF sizing, spinner styling,
+  and spinner keyframes. Import it into the FPB and PPB CSS entrypoints.
+- Overlay shells remain surface-owned: FPB is viewport-fixed and PPB is
+  component-absolute.
+- Continue emitting readable CSS with `npm run build:css`; do not add another
+  minification layer.
+
+### Host-theme-independent FPB geometry and typography
+
+- Treat the current 16px-root Design Control Panel geometry as the explicit
+  numeric component contract without making Horizon's unrelated theme styling
+  canonical. Dawn's 10px document root and Horizon's 16px document root remain
+  untouched.
+- Use a `44px` shared interaction target for product, quantity, variant, Back,
+  and primary actions. Standard icon CTA mode keeps its `35px` visual treatment
+  inside that `44px` interactive box; the compact Clear action remains `30px`.
+- Express fixed card tracks, summary rows, gaps, thumbnails, action widths, and
+  pixel-bounded container clamps without root-relative units. Preserve `cqi`,
+  intrinsic tracks, percentages, and the existing named containers where they
+  own responsiveness.
+- Normalize only the active FPB catalog cards, variant and quantity controls,
+  desktop sidebar, and mobile tray or sheet. Do not blanket-convert product
+  modals, toasts, animation, pointer, or unrelated decorative rules without a
+  separately reproduced defect.
+- Keep merchant font sizes and weights authoritative. Use the configured
+  `--wpb-controls-font-family` when present; otherwise inherit the host theme's
+  font family consistently across FPB cards, summaries, buttons, and selects.
+  FPB continues to own font sizes, weights, line heights, and layout geometry.
+- Use unitless line heights for text that follows merchant font-size tokens and
+  explicit pixel letter spacing where required. Native form controls must not
+  fall back to the browser-default Arial family.
+
+### Phase 4 verification
+
+Use two unpublished SIT-only themes: a fresh Dawn installation and an unpublished
+duplicate of the current Horizon theme. Enable only the SIT embed and relevant
+SIT product block; never publish either theme or enable PROD resources.
+
+After each implementation slice, run the affected focused checks and CSS build,
+then use a fresh Shopify preview handle before accepting live evidence. Confirm
+the Dev Console is connected, affected assets return `200`, the served widget
+version matches the completed build, the SIT proxy root is active, and no PROD
+embed owns the document.
+
+Divider QA covers FPB Standard, Classic, Compact, and Horizontal; PPB Product
+List and Product Grid; and regression smoke coverage for both slot templates.
+Exercise real, default, and missing variants; selected and unselected states;
+variant selectors enabled and disabled; and long titles and variant labels. Card
+height may change by no more than `1px` on selection, with price/action baselines
+aligned and no clipping, orphan divider, duplicate row, or horizontal overflow.
+
+Responsive QA uses actual Chrome device emulation at `390`, `768`, `1024`, and
+`1440` viewport widths while recording the widget container width. Explicitly
+test the `767/768px` viewport boundary plus narrow and wide PPB containers.
+
+Automated gates are the focused shared-card Jest tests, `npm run typecheck`,
+modified-file ESLint, `npm run build:css` after each CSS slice, and
+`npm run build:widgets` after removing the FPB post-processing path. Bump the
+widget version once for the completed phase, run `node --check` on every rebuilt
+storefront JavaScript asset, verify compressed CSS remains below Shopify's
+guidance, and finish with `git diff --check`.
+
+Final completion requires all eight templates to pass desktop and mobile smoke
+checks in both QA themes, including selection, variant changes, quantity controls,
+summaries or drawers, keyboard focus, console checks, and network checks. Keep
+screenshots outside the repository.
+
+## 7. Verification matrix
 
 ### Automated verification
 
@@ -165,10 +279,10 @@ For storefront JavaScript or TypeScript changes:
 
 ### Browser verification
 
-Use two isolated SIT theme contexts:
+Use two unpublished SIT-only theme contexts:
 
-- The current Agent theme.
-- A clean Dawn-like theme with only the SIT app embed and relevant SIT block enabled.
+- A fresh Shopify Dawn installation.
+- An unpublished duplicate of the current Horizon theme.
 
 Smoke all eight templates at desktop and mobile widths in both themes. Exercise the complete shared behavior once for each distinct surface:
 
@@ -189,7 +303,7 @@ For each affected surface, verify:
 
 If the storefront is attached to an obsolete Shopify development preview handle, reopen it from the active Admin or CLI preview before evaluating application behavior. Treat stale preview delivery as environment evidence, not as a reason to add application fallbacks.
 
-## 7. Synchronization and persisted contracts
+## 8. Synchronization and persisted contracts
 
 No Prisma, metafield definition, metaobject definition, snapshot schema, app-proxy contract, or storefront value-writing change is planned.
 
@@ -202,7 +316,7 @@ Therefore:
 
 If implementation reveals that a persisted or storefront-writing contract must change, pause this plan and document the evidence. Replan that contract change separately, including the smallest required update to the existing general sync service and its focused behavior tests.
 
-## 8. Public contract changes
+## 9. Public contract changes
 
 - Public template identifiers: unchanged.
 - `StorefrontSyncReason`: unchanged.
@@ -212,7 +326,7 @@ If implementation reveals that a persisted or storefront-writing contract must c
 - Settings Design preview architecture: unchanged.
 - Product Resource Picker input: corrected to include exact saved variant-level `selectionIds`.
 
-## 9. Commit and release approach
+## 10. Commit and release approach
 
 Keep commits cohesive and limited to verified ownership boundaries:
 
@@ -223,12 +337,12 @@ Keep commits cohesive and limited to verified ownership boundaries:
 
 Preserve unrelated worktree changes and inspect generated output before staging. Production and SIT deployment remain manual. After the user deploys to SIT, verify the released asset version and representative FPB, PPB in-page, and PPB modal flows before production handoff.
 
-## 10. Completion criteria
+## 11. Completion criteria
 
 - Reopening Shopify's Product Resource Picker selects exactly the saved variants.
 - Preview Bundle remains a read-only, authenticated URL-preparation flow and requires no new pre-preview sync.
 - FPB Standard and any other affected template respond to their available container instead of the host theme's root font size.
-- All eight templates pass desktop and mobile smoke checks in the Agent and clean Dawn-like SIT themes.
+- All eight templates pass desktop and mobile smoke checks in the fresh Dawn and unpublished Horizon-copy SIT themes.
 - FPB, PPB in-page, and PPB modal each pass one complete shared behavior check.
 - Settings Design preview reflects the production renderer and CSS without a new preview implementation.
 - No compatibility shim, parallel renderer, speculative abstraction, new sync path, or unnecessary persisted-contract change is introduced.

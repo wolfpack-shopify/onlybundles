@@ -1,5 +1,37 @@
-# Test Spec: Shared Product Card Contract
-**Spec ID:** shared-product-card  **Issue:** none  **Created:** 2026-06-11
+---
+schema_version: 1
+id: shared-product-card
+title: Shared Product Card Contract Test Spec
+type: test-spec
+status: active
+summary: Behavior coverage for the shared FPB and PPB product-card renderer, including conditional variant rows and stable actions.
+last_audited: 2026-09-24
+owners:
+  - engineering
+domains:
+  - storefront
+  - testing
+systems:
+  - only-bundles
+  - shopify
+source_paths:
+  - apps/OnlyBundles-app/app/assets/widgets/shared/components/product-card.ts
+  - apps/OnlyBundles-app/tests/unit/assets/shared-product-card.test.ts
+related_docs:
+  - internal docs/Architecture/Product Card Layout Contract.md
+  - docs/plans/shopify-native-bundle-template-remediation-plan.md
+tags:
+  - product-card
+  - storefront
+  - unit-tests
+keywords:
+  - FPB
+  - PPB
+  - variant-row
+  - selection-state
+---
+
+# Shared Product Card Contract Test Spec
 
 ## Purpose
 
@@ -26,15 +58,10 @@ Create the Loop 4 shared product-card primitive before migrating templates.
 |---|---|---|---|---|
 | 1 | Build script inlines shared product-card modules | `scripts/build-widget-bundles.js` | `quantity-control.js` before `product-card.js` in widget shared modules | Product card imports quantity control |
 
-### CSSContract
-| # | Scenario | Input | Expected Output | Notes |
-|---|---|---|---|---|
-| 1 | FPB and PPB base CSS reserve product-card action area | raw CSS files | `.bw-product-card__action` with stable min-height | Prevent selected-state height jumps |
-| 2 | FPB and PPB base CSS style the shared variant row | raw CSS files | divider row has spacing/truncation support | Manual visual parity, not unit-tested through source grep |
-
 ## Acceptance Criteria
 
 - [x] Product card and quantity control tests pass.
 - [x] Build module inclusion test passes.
-- [x] FPB and PPB raw CSS include the shared card action contract.
-- [x] Shared product-card tests cover variant row rendering without CSS/source layout assertions.
+- [x] Shared product-card tests cover one meaningful variant row in selected and unselected cards.
+- [x] Shared product-card tests prove default and missing variants render no variant row.
+- [ ] Browser QA confirms the conditional row owns its divider without changing card height or alignment.

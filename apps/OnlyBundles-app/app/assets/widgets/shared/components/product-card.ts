@@ -284,13 +284,15 @@ function getVariantDisplayText(product: any) {
   if (parentTitle) {
     const parentPrefix = `${parentTitle} - `;
     if (rawTitle.startsWith(parentPrefix)) {
-      return rawTitle.slice(parentPrefix.length).trim();
+      const inferredVariant = rawTitle.slice(parentPrefix.length).trim();
+      return inferredVariant === 'Default Title' ? '' : inferredVariant;
     }
   }
 
   const separatorIndex = rawTitle.indexOf(' - ');
   if (canInferExpandedVariant && separatorIndex > 0) {
-    return rawTitle.slice(separatorIndex + 3).trim();
+    const inferredVariant = rawTitle.slice(separatorIndex + 3).trim();
+    return inferredVariant === 'Default Title' ? '' : inferredVariant;
   }
 
   return '';

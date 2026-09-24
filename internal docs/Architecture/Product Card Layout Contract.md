@@ -5,7 +5,7 @@ title: Product Card Layout Contract
 type: architecture
 status: authoritative
 summary: Defines stable and display-safe storefront product-card layout and content boundaries.
-last_audited: 2026-09-12
+last_audited: 2026-09-24
 owners:
   - engineering
 domains:
@@ -24,6 +24,7 @@ source_paths:
   - app/storefront/app-embed.ts
   - app/assets/widgets/product-page
   - app/assets/widgets/product-page-css/base/mobile-drawers.css
+  - app/assets/widgets/shared/components/product-card.ts
 related_docs:
   - Architecture/Bundle Parent Product.md
 tags:
@@ -79,11 +80,20 @@ This is a hard requirement:
 - Standard FPB cards use the same card, media, title, selector, price, and sizing rules in text and icon CTA modes. Icon mode may override only the compact action geometry; it must not move the action ahead of the selector.
 - Every FPB card owns independent media, identity, price, selector, and action regions. When any card in an FPB product-grid row renders a configured selector, sibling cards reserve the same selector region so a no-variant card beside a two-dimensional card keeps its title, price, and action positions.
 - Product cards use one canonical content hierarchy in both rendered DOM and visual layout: identity, variant selectors, price, then the Add or quantity action. Pricing and primary actions never precede variant selection because the shopper must understand or choose the purchasable variant before evaluating and committing to its price.
+- The shared product-card renderer is the sole owner of the conditional variant
+  row. It emits exactly one row with the stable `data-bw-card-variant-row`
+  marker for meaningful non-default variant text in selected and unselected
+  cards, and emits no row for default or missing variants. The row itself owns
+  the logical start divider through `--bundle-product-card-variant-divider`;
+  render no separate divider element, pseudo-element, or empty divider band.
+- FPB and PPB retain separate stylesheet ownership for the shared DOM contract.
+  Do not introduce a generic cross-surface product-card stylesheet merely to
+  share visual rules.
 - Standard, Classic, and Compact use one shared vertical-card track contract for those mixed rows: a bounded two-line identity track, followed by selector, pricing, and action tracks. Horizontal keeps its native media/content split but uses the same stable region ownership and ordering inside the content track.
 - Variant selectors use the Direction A adaptive intrinsic matrix contract. Every Shopify option value remains directly present in source order; inline groups wrap in normal flow and never hide values behind `+N`, use a horizontal rail, or own a nested scroller.
 - Every dimension presented as a non-dropdown control is a separately labeled native radio group. Repeated cards, details surfaces, and picker copies receive instance-scoped control IDs and group names so selecting one copy cannot affect another.
 - Unavailable values remain visible with native disabled semantics and unchanged target geometry. They are not filtered to make a card fit, and they cannot invoke the existing variant-change owner.
-- Selector targets retain a minimum `2.75rem` interaction size. Long labels wrap within their intrinsic control, while dropdowns fill the available details width. Selection, focus, and unavailable treatments may not change control geometry.
+- Selector targets retain a minimum `44px` interaction size. Long labels wrap within their intrinsic control, while dropdowns fill the available details width. Selection, focus, and unavailable treatments may not change control geometry.
 - FPB and PPB use the same persisted category modes: Dropdown, Pills, Color swatches, and Image swatches. In a two-dimensional FPB pill mode, an explicitly configured primary dimension remains the visible radio group; when the merchant has not configured one, the dimension with the fewest distinct values becomes visible and ties retain Shopify option order. Swatch modes keep the canonically mapped Shopify dimension visible. Every additional dimension uses a labeled native select. Dropdown mode remains one complete-variant selector. This bounds selector height without hiding Shopify values or adding another state engine.
 - Across all FPB templates, each configured option dimension owns a separate full-width row. Pill dimensions distribute their controls across that row and wrap only when the card can no longer preserve the minimum interaction target; a secondary select must never compete with the primary pill or swatch group in a parallel column.
 - On mobile FPB cards, every option group fills the shared selector region and begins at the same inline edge. Compact secondary selects must not add an indent relative to the primary pill or swatch group.
@@ -202,9 +212,21 @@ from 59/41 toward 69/31 on wide hosts, Compact uses 60/40, and Horizontal uses
 65/35. Only the selected-products region inside the sidebar scrolls.
 
 Every FPB desktop summary reserves the same three-row product viewport. Each row
-is `4.6875rem` with a `0.9375rem` gap, and the products region begins vertical
+is `75px` with a `15px` gap, and the products region begins vertical
 scrolling when a fourth line item is present. This capacity rule does not apply
 to inline slots or the mobile summary tray.
+
+FPB component geometry is independent of the host theme's document root font
+size. Fixed interaction targets, card tracks, summary rows, and bounded clamp
+limits use explicit component tokens; container-owned responsiveness continues
+to use intrinsic layout and container-relative units. The widget never changes
+the storefront `html` or `body` font size.
+
+Typography precedence is merchant custom font first through
+`--wpb-controls-font-family`, then the host theme's inherited family. FPB owns
+font sizes, weights, line heights, and layout geometry, so a theme may change the
+typeface without scaling cards, summaries, or controls. Native form controls
+inherit this family instead of falling back to the browser default.
 
 When Product Slots is disabled, Standard, Classic, Compact, and Horizontal route
 desktop selected-product line items through the same shared row renderer. Preset
@@ -253,9 +275,10 @@ layout declarations or maintain a second stylesheet-switching path.
 
 ### Standard card rows
 
-The Standard FPB card uses one explicit grid for media, title, reserved variant,
-price, and action rows. The variant track remains present when a product has no
-selector so titles, prices, and actions align across the catalog row. Outer
+The Standard FPB card uses one explicit grid for media, title, optional variant,
+selector, price, and action rows. A product without meaningful variant text has
+no variant row or empty divider band, while the selector, price, and action
+tracks retain their stable row alignment across the catalog. Outer
 content transitions use the shared card gap, while the price-to-action gap is a
 smaller dedicated token. Media height remains fluid and catalog-container
 driven. The action row retains the shared accessible control hit target even

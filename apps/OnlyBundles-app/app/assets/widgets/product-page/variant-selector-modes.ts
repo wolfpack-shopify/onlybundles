@@ -143,35 +143,46 @@ function getOptionDimensions(product: any, variants: any[], fallbackLabel: strin
   }];
 }
 
-function findVariantForOptionValue({
-  variants,
-  dimensions,
-  selectedVariant,
-  dimension,
-  value,
-  isUnavailable,
-}: any) {
-  const candidates = variants.filter((variant: any) => (
-    getVariantOptionValue(variant, dimension.name, dimension.optionIndex) === String(value)
+function normalizeSelectedOptionValues(value: any) {
+  if (Array.isArray(value)) {
+    return Object.fromEntries(value
+      .map((option: any) => [String(option?.name ?? ""), String(option?.value ?? "")])
+      .filter(([name, optionValue]) => Boolean(name && optionValue)));
+  }
+  if (!value || typeof value !== "object") return {};
+  return Object.fromEntries(Object.entries(value)
+    .map(([name, optionValue]) => [String(name), String(optionValue ?? "")])
+    .filter(([name, optionValue]) => Boolean(name && optionValue)));
+}
+
+export function resolvePpbExactVariantSelection({
+  product,
+  selectedOptions,
+  isUnavailable = (variant: any) => variant?.available === false,
+}: any = {}) {
+  const variants = Array.isArray(product?.variants) ? product.variants : [];
+  const dimensions = getOptionDimensions(product, variants, "Variant");
+  const selected = normalizeSelectedOptionValues(selectedOptions);
+  const complete = dimensions.length > 0 && dimensions.every((dimension: any) => (
+    Boolean(selected[dimension.name])
   ));
-  const availableCandidates = candidates.filter((variant: any) => !isUnavailable(variant));
-  const preservingCandidate = availableCandidates.find((variant: any) => (
-    dimensions.every((candidateDimension: any) => (
-      candidateDimension.optionIndex === dimension.optionIndex
-      || getVariantOptionValue(
-        variant,
-        candidateDimension.name,
-        candidateDimension.optionIndex,
-      ) === getVariantOptionValue(
-        selectedVariant,
-        candidateDimension.name,
-        candidateDimension.optionIndex,
-      )
-    ))
-  ));
+  const variant = complete
+    ? variants.find((candidate: any) => dimensions.every((dimension: any) => (
+        getVariantOptionValue(candidate, dimension.name, dimension.optionIndex)
+        === selected[dimension.name]
+      ))) || null
+    : null;
+
   return {
-    candidate: preservingCandidate || availableCandidates[0] || candidates[0] || null,
-    unavailable: availableCandidates.length === 0,
+    complete,
+    unavailable: complete && (!variant || isUnavailable(variant)),
+    variant,
+    selectedOptions: dimensions
+      .filter((dimension: any) => Boolean(selected[dimension.name]))
+      .map((dimension: any) => ({
+        name: dimension.name,
+        value: selected[dimension.name],
+      })),
   };
 }
 
@@ -199,7 +210,7 @@ function resolveCompactVisualDimensionIndex({
   const candidates = dimensions.filter((dimension: any) => {
     if (configuredMode === "pill") return true;
     if (!requestedSwatchKey) return false;
-    return dimension.values.some((value: string) => {
+    return dimension.values.every((value: string) => {
       const swatch = resolveCanonicalOptionValueSwatch(
         product,
         dimension.name,
@@ -210,7 +221,7 @@ function resolveCompactVisualDimensionIndex({
         : Boolean(swatch?.image?.src || swatch?.image?.url);
     });
   });
-  if (candidates.length === 0) return null;
+  if (candidates.length === 0) return dimensions[0]?.optionIndex ?? null;
 
   return candidates.reduce((compactest: any, dimension: any) => (
     dimension.values.length < compactest.values.length ? dimension : compactest
@@ -231,11 +242,10 @@ export function resolvePpbOptionDimensionPresentation({
     return configuredMode;
   }
 
-  if (
-    typeof visualDimensionIndex === "number"
-    && dimension.optionIndex !== visualDimensionIndex
-  ) {
-    return "dropdown";
+  if (typeof visualDimensionIndex === "number") {
+    return dimension.optionIndex === visualDimensionIndex
+      ? configuredMode
+      : "dropdown";
   }
   if (configuredMode === "pill") return configuredMode;
 
@@ -246,7 +256,7 @@ export function resolvePpbOptionDimensionPresentation({
       : null;
   if (!requestedSwatchKey) return configuredMode;
 
-  const hasRequestedSwatch = dimension.values.some((value: string) => {
+  const hasRequestedSwatch = dimension.values.every((value: string) => {
     const swatch = resolveCanonicalOptionValueSwatch(
       product,
       dimension.name,
@@ -267,6 +277,8 @@ export function createPpbVariantSelectorElement({
   label,
   document: runtimeDocument = document,
   isUnavailable = (variant: any) => variant?.available === false,
+  initialSelectedOptions = [],
+  onSelectionChange,
   onVariantChange,
 }: any) {
   const variants = Array.isArray(product?.variants) ? product.variants : [];
@@ -274,10 +286,8 @@ export function createPpbVariantSelectorElement({
   const config = normalizeConfiguration(configuration);
   const productId = String(product?.id || product?.productId || product?.variantId || "product");
   const instanceId = nextSelectorInstanceId(runtimeDocument, productId);
-  let currentVariant = variants.find(
-    (variant: any) => String(variant.id) === String(product.variantId),
-  ) || variants[0];
   const dimensions = getOptionDimensions(product, variants, String(label || "Select variant"));
+  const selectedValues = normalizeSelectedOptionValues(initialSelectedOptions);
   const visualDimensionIndex = resolveCompactVisualDimensionIndex({
     configuredMode: config.variantSelectorMode,
     dimensions,
@@ -288,6 +298,16 @@ export function createPpbVariantSelectorElement({
   wrapper.className = "variant-selector-wrapper ppb-variant-selector-wrapper";
   wrapper.dataset.variantSelectorMode = config.variantSelectorMode;
   wrapper.dataset.optionDimensionCount = String(dimensions.length);
+  const initialResolution = resolvePpbExactVariantSelection({
+    product,
+    selectedOptions: selectedValues,
+    isUnavailable,
+  });
+  wrapper.dataset.selectionState = !initialResolution.complete
+    ? "incomplete"
+    : initialResolution.unavailable
+      ? "unavailable"
+      : "available";
 
   dimensions.forEach((dimension: any, dimensionIndex: number) => {
     const presentationMode = resolvePpbOptionDimensionPresentation({
@@ -309,35 +329,27 @@ export function createPpbVariantSelectorElement({
       const selectId = `${groupId}-select`;
       selectLabel.htmlFor = selectId;
       selectLabel.textContent = groupLabelText;
+      selectLabel.className = "ppb-visually-hidden";
       const select = runtimeDocument.createElement("select");
       select.id = selectId;
       select.className = "variant-selector";
       select.dataset.baseProductId = productId;
       select.dataset.optionIndex = String(dimension.optionIndex);
       select.setAttribute("aria-label", groupLabelText);
+      const prompt = runtimeDocument.createElement("option");
+      prompt.value = "";
+      prompt.textContent = `Select ${groupLabelText}`;
+      prompt.disabled = true;
+      prompt.selected = !selectedValues[dimension.name];
+      prompt.defaultSelected = prompt.selected;
+      select.append(prompt);
       dimension.values.forEach((optionValue: string) => {
-        const resolved = findVariantForOptionValue({
-          variants,
-          dimensions,
-          selectedVariant: currentVariant,
-          dimension,
-          value: optionValue,
-          isUnavailable,
-        });
-        if (!resolved.candidate) return;
         const option = runtimeDocument.createElement("option");
-        option.value = String(resolved.candidate.id ?? "");
+        option.value = optionValue;
         option.dataset.optionValue = optionValue;
-        option.textContent = resolved.unavailable
-          ? `${optionValue} — out of stock`
-          : optionValue;
-        option.selected = getVariantOptionValue(
-          currentVariant,
-          dimension.name,
-          dimension.optionIndex,
-        ) === optionValue;
+        option.textContent = optionValue;
+        option.selected = selectedValues[dimension.name] === optionValue;
         option.defaultSelected = option.selected;
-        option.disabled = resolved.unavailable;
         select.append(option);
       });
       group.append(selectLabel, select);
@@ -356,46 +368,31 @@ export function createPpbVariantSelectorElement({
     options.className = "ppb-variant-selector-options";
 
     dimension.values.forEach((optionValue: string, valueIndex: number) => {
-      const resolved = findVariantForOptionValue({
-        variants,
-        dimensions,
-        selectedVariant: currentVariant,
-        dimension,
-        value: optionValue,
-        isUnavailable,
-      });
-      if (!resolved.candidate) return;
+      const representativeVariant = variants.find((variant: any) => (
+        getVariantOptionValue(variant, dimension.name, dimension.optionIndex) === optionValue
+      ));
       const swatch = resolveDimensionSwatch(
         dimension,
         optionValue,
         product,
-        resolved.candidate,
+        representativeVariant,
       );
       const optionLabel = swatch.label || optionValue;
       const control = runtimeDocument.createElement("label");
       control.className = `ppb-variant-selector-option ppb-variant-selector-option--${presentationMode}`;
-      control.dataset.unavailable = resolved.unavailable ? "true" : "false";
 
       const input = runtimeDocument.createElement("input");
       input.type = "radio";
       input.id = `${groupId}-value-${valueIndex + 1}`;
       input.name = groupId;
-      input.value = String(resolved.candidate.id ?? "");
+      input.value = optionValue;
       input.className = "ppb-variant-selector-input";
       input.dataset.baseProductId = productId;
       input.dataset.optionIndex = String(dimension.optionIndex);
       input.dataset.optionValue = optionValue;
-      input.checked = getVariantOptionValue(
-        currentVariant,
-        dimension.name,
-        dimension.optionIndex,
-      ) === optionValue;
+      input.checked = selectedValues[dimension.name] === optionValue;
       input.defaultChecked = input.checked;
-      input.disabled = resolved.unavailable;
-      input.setAttribute(
-        "aria-label",
-        resolved.unavailable ? `${optionLabel} — unavailable` : optionLabel,
-      );
+      input.setAttribute("aria-label", optionLabel);
 
       const visual = runtimeDocument.createElement("span");
       visual.className = "ppb-variant-selector-visual";
@@ -445,11 +442,7 @@ export function createPpbVariantSelectorElement({
     const selectedLabel = runtimeDocument.createElement("span");
     selectedLabel.className = "ppb-variant-selector-selected-label";
     selectedLabel.setAttribute("aria-live", "polite");
-    selectedLabel.textContent = getVariantOptionValue(
-      currentVariant,
-      dimension.name,
-      dimension.optionIndex,
-    );
+    selectedLabel.textContent = selectedValues[dimension.name] || "";
     group.append(visibleLabel, options, selectedLabel);
     wrapper.append(group);
   });
@@ -464,40 +457,46 @@ export function createPpbVariantSelectorElement({
       (dimension: any) => dimension.optionIndex === optionIndex,
     );
     const optionValue = input.tagName === "SELECT"
-      ? input.selectedOptions?.[0]?.dataset?.optionValue
+      ? input.value
       : input.dataset.optionValue;
     if (!changedDimension || !optionValue) return;
-    const resolved = findVariantForOptionValue({
-      variants,
-      dimensions,
-      selectedVariant: currentVariant,
-      dimension: changedDimension,
-      value: optionValue,
-      isUnavailable,
-    });
-    if (!resolved.candidate || resolved.unavailable) return;
-    const variant = resolved.candidate;
-    currentVariant = variant;
-    input.dataset.resolvedVariantId = String(variant.id);
+    selectedValues[changedDimension.name] = optionValue;
     dimensions.forEach((dimension: any) => {
-      const selectedValue = getVariantOptionValue(
-        variant,
-        dimension.name,
-        dimension.optionIndex,
-      );
+      const selectedValue = selectedValues[dimension.name] || "";
       const group = wrapper.querySelector(
         `.ppb-variant-selector-group[data-option-index="${dimension.optionIndex}"]`,
       );
       const selectedLabel = group?.querySelector(".ppb-variant-selector-selected-label");
       if (selectedLabel) selectedLabel.textContent = selectedValue;
       group?.querySelectorAll("option").forEach((option: any) => {
-        option.selected = String(option.dataset.optionValue) === selectedValue;
+        option.selected = String(option.value) === selectedValue;
       });
       group?.querySelectorAll(".ppb-variant-selector-input").forEach((radio: any) => {
         radio.checked = String(radio.dataset.optionValue) === selectedValue;
       });
     });
-    onVariantChange?.(String(variant.id));
+    const resolution = resolvePpbExactVariantSelection({
+      product,
+      selectedOptions: selectedValues,
+      isUnavailable,
+    });
+    wrapper.dataset.selectionState = !resolution.complete
+      ? "incomplete"
+      : resolution.unavailable
+        ? "unavailable"
+        : "available";
+    if (resolution.variant) {
+      input.dataset.resolvedVariantId = String(resolution.variant.id);
+    } else {
+      delete input.dataset.resolvedVariantId;
+    }
+    onSelectionChange?.(resolution, {
+      optionIndex,
+      optionValue,
+    });
+    if (resolution.variant && !resolution.unavailable) {
+      onVariantChange?.(String(resolution.variant.id));
+    }
   });
   wrapper.addEventListener("click", (event: Event) => {
     if ((event.target as Element | null)?.closest?.(".ppb-variant-selector-option")) {

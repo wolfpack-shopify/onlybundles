@@ -38,6 +38,7 @@ export function FpbStepCategoryAccordion({
       catIndex={catIndex}
       categoryControls={
         <ConfigureVariantSelectorControls
+          disabled={step.displayVariantsAsIndividual === true || step.displayVariantsAsIndividualProducts === true}
           mode={selectorMode}
           swatchTooltipEnabled={cat.swatchTooltipEnabled === true}
           error={adapter.validationErrors?.[`${categoryBase}.variantSelectorMode`]}

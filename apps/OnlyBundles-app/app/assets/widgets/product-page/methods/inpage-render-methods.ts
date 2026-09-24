@@ -3,9 +3,14 @@ import { CurrencyManager } from '../../shared/currency-manager.js';
 import { ToastManager } from '../../shared/toast-manager.js';
 import { ConditionValidator } from '../../shared/condition-validator.js';
 import { getDiscountProgressData } from '../../shared/engine/bundle-selectors.js';
-import { createSharedProductCardElement } from '../../shared/components/product-card.js';
+import { createSharedProductCardElement, getVariantSummary } from '../../shared/components/product-card.js';
 import { shouldRenderInlineVariantSelector } from '../../shared/variant-selector-policy.js';
-import { resolveProductPageCardButtonText, resolveProductPageInlineAddText } from './modal-methods.js';
+import {
+  resolveProductPageCardButtonText,
+  resolveProductPageInlineAddText,
+  resolveProductPageVariantCardState,
+  shouldDisableProductPageVariantOption,
+} from './modal-methods.js';
 import { getSubscriptionProductCardPrice } from '../../shared/subscription-storefront-methods.js';
 import { createGiftBadgeIcon } from '../../shared/svg-icons.js';
 import { resolveLowStockAlert } from '../../../../lib/low-stock-alert.js';
@@ -68,10 +73,8 @@ export function resolveSelectedSlotContent(
   product: any = {},
   currencyInfo = CurrencyManager.getCurrencyInfo(),
 ) {
-  const rawVariantTitle = String(product.variantTitle || '').trim();
-  const variantTitle = rawVariantTitle && rawVariantTitle !== 'Default Title'
-    ? rawVariantTitle
-    : '';
+  const variantSummary = getVariantSummary(product);
+  const variantTitle = variantSummary.visible;
   const rawTitle = String(product.parentTitle || product.title || '');
   const expandedVariantSuffix = variantTitle ? ` - ${variantTitle}` : '';
   const title = !product.parentTitle && expandedVariantSuffix && rawTitle.endsWith(expandedVariantSuffix)
@@ -91,6 +94,7 @@ export function resolveSelectedSlotContent(
   return {
     title,
     variantTitle,
+    variantAriaLabel: variantSummary.accessible,
     priceText: hasPrice ? CurrencyManager.convertAndFormat(price, currencyInfo) : '',
     compareAtPriceText: hasCompareAtPrice
       ? CurrencyManager.convertAndFormat(compareAtPrice, currencyInfo)
@@ -278,9 +282,33 @@ _renderInpageStepProducts(stepIndex: string|number, target: any) {
   );
   const currencyInfo = CurrencyManager.getCurrencyInfo();
   const inlineAddText = resolveProductPageInlineAddText(this._resolveText?.bind(this));
+  const trackInventoryOnAddToCart = this.isInventoryTrackingOnAddToCartEnabled?.() === true;
 
   const cards = products.map((product: any)  => {
-    const directSelectionKey = product.selectionId || product.variantId || product.id;
+    const baseProductId = String(product.id || product.productId || 'product');
+    const draft = this._ppbVariantDrafts?.[stepIndex]?.[baseProductId] || null;
+    const variantState = Array.isArray(product.variants) && product.variants.length > 1
+      ? resolveProductPageVariantCardState({
+          product,
+          stepSelections: this.selectedProducts?.[stepIndex] || {},
+          draft,
+          replacementSelectionId: this._modalSlotReplacementTarget?.stepIndex === stepIndex
+            ? this._modalSlotReplacementTarget.selectionKey
+            : '',
+          normalizeSelectionKey: (value: any) => typeof this.normalizeSelectionKey === 'function'
+            ? this.normalizeSelectionKey(value)
+            : String(value || ''),
+          isUnavailable: (variant: any) => shouldDisableProductPageVariantOption(
+            variant,
+            trackInventoryOnAddToCart,
+          ),
+        })
+      : null;
+    const displayProduct = variantState?.cardProduct || product;
+    const directSelectionKey = variantState?.selectionId
+      || product.selectionId
+      || product.variantId
+      || product.id;
     const restoredGridSelection = usesGridCards
       ? resolveInpageProductSelection(
         product,
@@ -290,11 +318,20 @@ _renderInpageStepProducts(stepIndex: string|number, target: any) {
         this.activeInpageCategoryIndexes?.[stepIndex] ?? 0,
       )
       : null;
-    const selectionKey = restoredGridSelection?.selectionKey || directSelectionKey;
-    const productSelection: any = { ...product, selectionId: selectionKey };
-    const currentQuantity = restoredGridSelection?.quantity
+    const selectionKey = variantState?.selectionId
+      || restoredGridSelection?.selectionKey
+      || directSelectionKey;
+    const productSelection: any = { ...displayProduct, selectionId: selectionKey };
+    const currentQuantity = variantState?.committedQuantity
+      ?? restoredGridSelection?.quantity
       ?? this.getSelectedQuantity(stepIndex, selectionKey);
-    const { available, outOfStock } = this.getVariantAvailable(stepIndex, selectionKey);
+    const availability = this.getVariantAvailable(stepIndex, selectionKey);
+    const outOfStock = variantState?.complete
+      ? variantState.unavailable
+      : variantState
+        ? false
+        : availability.outOfStock;
+    const available = availability.available;
     const outOfStockText = this._resolveText('productCardOutOfStockButton', 'Out of Stock');
     const atMaxStock = available !== null && currentQuantity >= available;
     const atMaxProductQuantity = productQuantityLimit !== null && currentQuantity >= productQuantityLimit;
@@ -315,6 +352,23 @@ _renderInpageStepProducts(stepIndex: string|number, target: any) {
       stockBadgeElement.textContent = lowStockAlert?.message ?? '';
     }
     const variantSelectorElement = this.renderInlineCardVariantSelector(product, currentStep, stepIndex);
+    const selectorDisabled = Boolean(variantState && (!variantState.complete || variantState.unavailable));
+    const selectorButtonText = variantState && !variantState.complete
+      ? 'Select variant'
+      : variantState?.unavailable
+        ? outOfStockText
+        : variantState?.hasDraftDifference && currentQuantity > 0
+          ? 'Update'
+          : resolveProductPageCardButtonText({
+              currentQuantity,
+              currentStep,
+              outOfStock,
+              outOfStockText,
+              defaultAddText: inlineAddText,
+            });
+    const selectedAction = variantState?.requiresActionButton
+      ? 'button'
+      : undefined;
 
     if (usesCascadeCards) {
       const cascadeProduct = getCascadeSoleVariantDisplayProduct(productSelection);
@@ -336,8 +390,10 @@ _renderInpageStepProducts(stepIndex: string|number, target: any) {
           displaySeeMoreLink: false,
           expandProductCardOnHover: false,
           variantSelectorElement,
-          addButtonText: resolveProductPageCardButtonText({ currentQuantity, currentStep, outOfStock, outOfStockText, defaultAddText: inlineAddText }),
-          addDisabled: outOfStock,
+          addButtonText: selectorButtonText,
+          selectedAction,
+          selectedButtonText: selectorButtonText,
+          addDisabled: selectorDisabled || outOfStock,
           increaseDisabled,
           stockBadgeElement,
           showCompareAtPrice: this._getProductPageControls?.()?.showCompareAtPrices !== false,
@@ -351,17 +407,17 @@ _renderInpageStepProducts(stepIndex: string|number, target: any) {
         currentQuantity,
         currencyInfo,
         {
-          displayPrice: getSubscriptionProductCardPrice(this, product.price),
+          displayPrice: getSubscriptionProductCardPrice(this, displayProduct.price),
           variantSelectorElement,
           description: '',
           displaySeeMoreLink: false,
           expandProductCardOnHover: false,
           mode: 'grid',
           className: `bw-ppb-grid-product-card ${outOfStock ? 'is-out-of-stock' : ''}`.trim(),
-          addButtonText: resolveProductPageCardButtonText({ currentQuantity, currentStep, outOfStock, outOfStockText, defaultAddText: inlineAddText }),
-          selectedAction: productQuantityLimit === 1 ? 'button' : undefined,
-          selectedButtonText: resolveProductPageCardButtonText({ currentQuantity, currentStep, outOfStock, outOfStockText, defaultAddText: inlineAddText }),
-          addDisabled: outOfStock,
+          addButtonText: selectorButtonText,
+          selectedAction: selectedAction || (productQuantityLimit === 1 ? 'button' : undefined),
+          selectedButtonText: selectorButtonText,
+          addDisabled: selectorDisabled || outOfStock,
           increaseDisabled,
           stockBadgeElement,
           showCompareAtPrice: this._getProductPageControls?.()?.showCompareAtPrices !== false,
@@ -374,17 +430,17 @@ _renderInpageStepProducts(stepIndex: string|number, target: any) {
       currentQuantity,
       currencyInfo,
       {
-        displayPrice: getSubscriptionProductCardPrice(this, product.price),
+        displayPrice: getSubscriptionProductCardPrice(this, displayProduct.price),
         variantSelectorElement,
         className: `bw-product-card--legacy ${usesGridCards ? 'bw-ppb-grid-product-card' : ''} ${outOfStock ? 'is-out-of-stock' : ''}`.trim(),
         description: '',
         displaySeeMoreLink: false,
         expandProductCardOnHover: false,
         mode: usesGridCards ? 'grid' : 'row',
-        addButtonText: resolveProductPageCardButtonText({ currentQuantity, currentStep, outOfStock, outOfStockText, defaultAddText: inlineAddText }),
-        selectedAction: productQuantityLimit === 1 ? 'button' : undefined,
-        selectedButtonText: resolveProductPageCardButtonText({ currentQuantity, currentStep, outOfStock, outOfStockText, defaultAddText: inlineAddText }),
-        addDisabled: outOfStock,
+        addButtonText: selectorButtonText,
+        selectedAction: selectedAction || (productQuantityLimit === 1 ? 'button' : undefined),
+        selectedButtonText: selectorButtonText,
+        addDisabled: selectorDisabled || outOfStock,
         increaseDisabled,
         stockBadgeElement,
         showCompareAtPrice: this._getProductPageControls?.()?.showCompareAtPrices !== false,
@@ -511,6 +567,9 @@ createSelectedProductCard(item: any, cardIndex: string|undefined) {
     const variantTitle = document.createElement('p');
     variantTitle.className = 'bw-slot-card__variant';
     variantTitle.textContent = content.variantTitle;
+    if (content.variantAriaLabel) {
+      variantTitle.setAttribute('aria-label', content.variantAriaLabel);
+    }
     identity.appendChild(variantTitle);
   }
 
@@ -534,6 +593,25 @@ createSelectedProductCard(item: any, cardIndex: string|undefined) {
   }
 
   stepBox.appendChild(identity);
+
+  if (!isDefault && this._isProductPageModalSlotTemplate?.() === true) {
+    const editButton = document.createElement('button');
+    editButton.type = 'button';
+    editButton.className = 'bw-slot-card__edit';
+    editButton.setAttribute('aria-label', `Change ${content.title}`);
+    editButton.addEventListener('click', (event: any) => {
+      this._modalSlotReplacementTarget = {
+        stepIndex,
+        selectionKey: variantId,
+        quantity: 1,
+      };
+      if (this._ppbVariantDrafts?.[stepIndex]) {
+        delete this._ppbVariantDrafts[stepIndex];
+      }
+      this.openModal(stepIndex, event.currentTarget);
+    });
+    stepBox.appendChild(editButton);
+  }
 
   return stepBox;
 },

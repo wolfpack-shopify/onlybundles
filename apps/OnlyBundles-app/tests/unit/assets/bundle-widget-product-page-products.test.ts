@@ -148,7 +148,13 @@ describe('processProductPageProductsForStep', () => {
       currentlyNotInStock: false,
       sourceVariantCount: 2,
     });
-    expect(products[0].variants.map((variant: StorefrontVariant) => variant.id)).toEqual(['222']);
+    expect(products[0].variants.map((variant: StorefrontVariant) => ({
+      id: variant.id,
+      available: variant.available,
+    }))).toEqual([
+      { id: '111', available: false },
+      { id: '222', available: true },
+    ]);
   });
 
   it('preserves Shopify option-value swatches and variant selected options', () => {
@@ -179,7 +185,7 @@ describe('processProductPageProductsForStep', () => {
     expect(products[0].variants[0].selectedOptions).toEqual(selectedOptions);
   });
 
-  it('omits true unavailable variants from individual Product List rows without hiding sellable zero-quantity variants', () => {
+  it('keeps unavailable variants visible as individual Product List rows', () => {
     const products = processProductPageProductsForStep([
       {
         id: 'gid://shopify/Product/700',
@@ -206,13 +212,16 @@ describe('processProductPageProductsForStep', () => {
       },
     ], { displayVariantsAsIndividual: true }, false);
 
-    expect(products.map(product => product.variantId)).toEqual(['702']);
+    expect(products.map(product => product.variantId)).toEqual(['701', '702']);
     expect(products[0]).toEqual(expect.objectContaining({
-      variantId: '702',
-      price: 1100,
-      available: true,
+      title: 'Tracked Bundle Product',
+      variantTitle: 'Unavailable',
+      variantId: '701',
+      price: 1000,
+      available: false,
       quantityAvailable: 0,
       currentlyNotInStock: false,
+      variants: null,
     }));
   });
 

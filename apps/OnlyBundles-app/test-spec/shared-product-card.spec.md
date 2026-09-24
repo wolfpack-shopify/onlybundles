@@ -5,7 +5,7 @@ title: Shared Product Card Contract Test Spec
 type: test-spec
 status: active
 summary: Behavior coverage for the shared FPB and PPB product-card renderer, including conditional variant rows and stable actions.
-last_audited: 2026-09-24
+last_audited: 2026-09-25
 owners:
   - engineering
 domains:
@@ -35,7 +35,8 @@ keywords:
 
 ## Purpose
 
-Create the Loop 4 shared product-card primitive before migrating templates.
+Protect the shared FPB and PPB product-card behavior, including its conditional
+variant summary and stable action region.
 
 ## Test Cases
 
@@ -52,6 +53,12 @@ Create the Loop 4 shared product-card primitive before migrating templates.
 | 8 | Escapes merchant/product text | product title with HTML | escaped title and alt text | Prevents innerHTML injection |
 | 9 | Normalizes product image URLs | product with imageUrl, image, featuredImage, images array, and duplicates | ordered unique image URL list | Shared card and modal use the same multi-image data source |
 | 10 | Quantity control supports disabled increase | quantity input with `increaseDisabled` | plus button has `disabled aria-disabled="true"` | Stock/rule clamp compatibility |
+| 11 | Renders a multidimensional variant summary | `selectedOptions` with Color and Size | one visible `Navy / Large` row and accessible `Color: Navy, Size: Large` name | Individual-variant cards retain dimension meaning without repeating it visually |
+| 12 | Suppresses summary while a selector owns the choice | meaningful variant metadata plus a rendered selector | selector is rendered and no duplicate summary row is emitted | Grouped products have one variant-selection owner |
+| 13 | Preserves the committed selection during an invalid draft | selected card plus incomplete or unavailable draft | previous variant quantity remains authoritative and the draft action is disabled | Prevents silent variant migration |
+| 14 | Adds a selected sibling variant independently | one grouped product with an existing selected variant and a different complete available draft | drafted variant receives its own quantity and the existing sibling quantity is unchanged | Shopify variants remain distinct cart selections |
+| 15 | Replaces only an explicitly edited slot | filled slot opened through its Change action, then changed to another available variant | original variant decrements by one and target variant increments by one atomically | No implicit sibling replacement from ordinary browsing |
+| 16 | Restores multiple sibling variants | session payload contains two positive variant quantities for the same parent product | both variant selections and quantities survive normalization | Variant-keyed selection contract |
 
 ### WidgetBuildSharedModules
 | # | Scenario | Input | Expected Output | Notes |

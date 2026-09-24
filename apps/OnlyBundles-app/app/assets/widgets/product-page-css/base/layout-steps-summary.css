@@ -1,5 +1,6 @@
 #bundle-builder-app {
   font-family: var(--bundle-font-family, inherit);
+  font-size: 16px;
   margin: var(--container-spacing, 0) auto;
   padding: var(--container-spacing, 0);
   box-sizing: border-box;
@@ -11,6 +12,11 @@
   outline: none;
   box-shadow: none;
   position: relative;
+}
+
+#bundle-builder-modal {
+  font-family: var(--bundle-font-family, inherit);
+  font-size: 16px;
 }
 
 #bundle-builder-app[data-ppb-template-type="PDP_INPAGE"] {

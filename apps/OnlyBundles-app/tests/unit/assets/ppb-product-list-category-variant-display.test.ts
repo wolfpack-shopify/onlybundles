@@ -39,6 +39,12 @@ const multiVariantProduct = {
       price: 1200,
       available: true,
     },
+    {
+      id: 'gid://shopify/ProductVariant/1003',
+      title: 'Sold out',
+      price: 1200,
+      available: false,
+    },
   ],
 };
 
@@ -124,16 +130,17 @@ describe('PPB Product List category variant display', () => {
     expect(target.innerHTML).not.toContain('Variant Product - Large');
   });
 
-  it('expands available variants when the active category flag is true', () => {
+  it('expands available and unavailable variants when the active category flag is true', () => {
     const target = document.createElement('div');
     const context = createContext(true);
 
     ProductPageInpageRenderMethods._renderInpageStepProducts.call(context, 0, target);
 
-    expect(context.renderInlineCardVariantSelector).toHaveBeenCalledTimes(2);
+    expect(context.renderInlineCardVariantSelector).toHaveBeenCalledTimes(3);
     expect(target.innerHTML).toContain('Variant Product');
     expect(target.innerHTML).toContain('Small');
     expect(target.innerHTML).toContain('Large');
+    expect(target.innerHTML).toContain('Sold out');
     expect(target.innerHTML).not.toContain('data-grouped-product="Variant Product"');
   });
 

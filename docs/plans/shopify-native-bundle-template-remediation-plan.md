@@ -5,7 +5,7 @@ title: Shopify-Native Bundle Template Remediation Plan
 type: implementation-plan
 status: approved
 summary: Lean plan to correct native product selection and remediate responsive FPB and PPB template defects without replacing established render, preview, persistence, or synchronization architecture.
-last_audited: 2026-09-24
+last_audited: 2026-09-25
 owners:
   - engineering
 domains:
@@ -187,9 +187,19 @@ or app-proxy behavior.
 ### Shared loading primitive
 
 - One shared source partial owns loading visibility, GIF sizing, spinner styling,
-  and spinner keyframes. Import it into the FPB and PPB CSS entrypoints.
+  and spinner keyframes. Import it into the FPB, PPB, and app-embed bootstrap CSS
+  entrypoints so the fallback is styled before either widget runtime downloads.
 - Overlay shells remain surface-owned: FPB is viewport-fixed and PPB is
   component-absolute.
+- Every PPB entry path—the product app block, automatic eligible-product embed,
+  and direct page-builder embed—renders a bootstrap loading status as soon as
+  its widget container exists. Use the validated Product Page loading-screen
+  background and Shopify-hosted GIF when configured; otherwise render the
+  default spinner. The PPB runtime replaces that bootstrap node with its normal
+  loading overlay and clears `aria-busy` after initialization.
+- Keep the existing FPB server-rendered loading-screen handoff as the FPB
+  bootstrap owner. It follows the same merchant-media/default-spinner contract
+  without adopting PPB's component-absolute shell.
 - Continue emitting readable CSS with `npm run build:css`; do not add another
   minification layer.
 
@@ -253,7 +263,47 @@ checks in both QA themes, including selection, variant changes, quantity control
 summaries or drawers, keyboard focus, console checks, and network checks. Keep
 screenshots outside the repository.
 
-## 7. Verification matrix
+## 7. Phase 5 — PPB exact variants and bounded template follow-up
+
+Keep the shared product-card renderer, but separate its responsibilities from
+template-specific selection behavior:
+
+- Grouped PPB cards render one explicit control per Shopify option dimension.
+  Dropdowns use per-dimension placeholders, while Pills and canonical swatches
+  keep one compact visual dimension and use dropdowns for the rest.
+- Resolve only exact complete combinations. Incomplete selections disable the
+  CTA as `Select variant`; unavailable or nonexistent combinations disable it as
+  `Out of Stock`. Normal grouped-card browsing adds and manages the exact
+  selected variant independently, so sibling variants of one product may
+  coexist. `Update` is reserved for the explicit Change action on a filled
+  slot, where it replaces one targeted unit atomically without removing other
+  units or sibling variants.
+- Individual-variant mode renders every configured variant, including sold-out
+  variants, without a selector. Keep the parent product title and use the shared
+  variant row for a compact visible summary plus dimension-aware accessible
+  text. Default-only variants render no summary.
+- Validate color- and image-swatch category modes in the existing FPB and PPB
+  save handlers against Shopify's canonical option-value swatches for direct and
+  collection products. Reject save with the existing inline category error when
+  no complete matching dimension exists. Skip this validation for default-only
+  products and individual-variant categories.
+- Rename the theme-block setting and runtime field to
+  `hide_native_purchase_controls` without a legacy reader. Preserve its default
+  and existing purchase-control hiding behavior.
+- Isolate PPB geometry from host root font scaling. Reflow Product Grid and
+  Horizontal Slots at their measured container widths, keep Vertical Slots at a
+  bounded row height, and cap empty slots at configured `maxQuantity` or the
+  required condition count. Do not retain open-ended slot growth.
+
+Behavior coverage must prove explicit multidimensional selection, unavailable
+and nonexistent combinations, independently selected sibling variants,
+one-unit explicit slot replacement, session restoration, individual sold-out
+rows, accessible summaries, Admin swatch rejection and exemptions, and
+deterministic slot capacity. Rebuild product-page widgets and PPB CSS, then run
+the generated JavaScript syntax, typecheck, modified-file lint, CSS-size, and
+diff checks before live QA.
+
+## 8. Verification matrix
 
 ### Automated verification
 
@@ -303,7 +353,7 @@ For each affected surface, verify:
 
 If the storefront is attached to an obsolete Shopify development preview handle, reopen it from the active Admin or CLI preview before evaluating application behavior. Treat stale preview delivery as environment evidence, not as a reason to add application fallbacks.
 
-## 8. Synchronization and persisted contracts
+## 9. Synchronization and persisted contracts
 
 No Prisma, metafield definition, metaobject definition, snapshot schema, app-proxy contract, or storefront value-writing change is planned.
 
@@ -316,7 +366,7 @@ Therefore:
 
 If implementation reveals that a persisted or storefront-writing contract must change, pause this plan and document the evidence. Replan that contract change separately, including the smallest required update to the existing general sync service and its focused behavior tests.
 
-## 9. Public contract changes
+## 10. Public contract changes
 
 - Public template identifiers: unchanged.
 - `StorefrontSyncReason`: unchanged.
@@ -325,8 +375,9 @@ If implementation reveals that a persisted or storefront-writing contract must c
 - Routes, Prisma schema, metafield/metaobject definitions, storefront snapshot shape, and value-writing contracts: unchanged.
 - Settings Design preview architecture: unchanged.
 - Product Resource Picker input: corrected to include exact saved variant-level `selectionIds`.
+- Theme-block setting ID: `hide_native_purchase_controls`; no legacy reader.
 
-## 10. Commit and release approach
+## 11. Commit and release approach
 
 Keep commits cohesive and limited to verified ownership boundaries:
 
@@ -337,7 +388,7 @@ Keep commits cohesive and limited to verified ownership boundaries:
 
 Preserve unrelated worktree changes and inspect generated output before staging. Production and SIT deployment remain manual. After the user deploys to SIT, verify the released asset version and representative FPB, PPB in-page, and PPB modal flows before production handoff.
 
-## 11. Completion criteria
+## 12. Completion criteria
 
 - Reopening Shopify's Product Resource Picker selects exactly the saved variants.
 - Preview Bundle remains a read-only, authenticated URL-preparation flow and requires no new pre-preview sync.

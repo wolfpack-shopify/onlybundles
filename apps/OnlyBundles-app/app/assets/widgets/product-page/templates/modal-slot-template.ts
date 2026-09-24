@@ -121,32 +121,12 @@ export const modalSlotTemplateMethods: Record<string, any> & ThisType<any> = {
     const requiredCount = ['greater_than', 'gt', '>'].includes(operator)
       ? rawRequired + 1
       : rawRequired;
-    const isExplicitlyBounded = [
-      'equal_to',
-      'eq',
-      '=',
-      '==',
-      'less_than',
-      'lt',
-      '<',
-      'less_than_or_equal_to',
-      'less_than_equal_to',
-      'lte',
-      '<=',
-    ].includes(operator);
-    const isOpenEnded = !isExplicitlyBounded;
-    let emptyCount = Math.max(0, requiredCount - selectedCount);
-
-    if (isOpenEnded) {
-      this._modalSlotCapacityByStep ||= {};
-      const capacity = Math.max(
-        this._modalSlotCapacityByStep[stepIndex] || 0,
-        requiredCount,
-        selectedCount + 1
-      );
-      this._modalSlotCapacityByStep[stepIndex] = capacity;
-      emptyCount = capacity - selectedCount;
-    }
+    const parsedMaximum = Number.parseFloat(step?.maxQuantity);
+    const configuredMaximum = Number.isFinite(parsedMaximum) && parsedMaximum > 0
+      ? Math.floor(parsedMaximum)
+      : null;
+    const capacity = configuredMaximum ?? requiredCount;
+    let emptyCount = Math.max(0, capacity - selectedCount);
 
     if (selectedCount === 0 && emptyCount === 0) {
       emptyCount = 1;

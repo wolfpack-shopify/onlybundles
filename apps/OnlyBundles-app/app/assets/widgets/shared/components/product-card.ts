@@ -26,7 +26,16 @@ export function createSharedProductCardElement(product: any = {}, currentQuantit
       ? options.description
       : product.description,
   );
-  const variantText = getVariantDisplayText(product);
+  const variantSummary = getVariantSummary(product);
+  const hasNamedVariantOptions = Array.isArray(product.selectedOptions)
+    && product.selectedOptions.some((option: any) => (
+      String(option?.name ?? '').trim()
+      && String(option?.value ?? '').trim()
+      && String(option?.value ?? '').trim() !== 'Default Title'
+    ));
+  const variantText = options.variantSelectorElement?.nodeType
+    ? ''
+    : variantSummary.visible;
   const isIndividualVariantCard = Boolean(product.parentProductId && selectionKey && variantText);
   const title = getDisplayTitle(product, variantText);
   const imageUrls = getProductImageUrls(product);
@@ -90,6 +99,10 @@ export function createSharedProductCardElement(product: any = {}, currentQuantit
     bwCardImageCount: String(imageUrls.length),
     bwCardImageIndex: '0',
   });
+  if (product.baseProductId) root.dataset.baseProductId = String(product.baseProductId);
+  if (product.committedSelectionId) {
+    root.dataset.committedSelectionId = String(product.committedSelectionId);
+  }
   if (isIndividualVariantCard) root.dataset.bwCardIndividualVariant = 'true';
   if (hasMultipleImages) root.dataset.bwCardHasMultipleImages = 'true';
   if (cardInteractive) root.tabIndex = 0;
@@ -154,7 +167,12 @@ export function createSharedProductCardElement(product: any = {}, currentQuantit
     const variant = runtimeDocument.createElement('div');
     variant.className = 'bw-product-card__variant product-variant-row';
     variant.dataset.bwCardVariantRow = 'true';
-    variant.setAttribute('aria-label', `${variantLabel}: ${variantText}`);
+    variant.setAttribute(
+      'aria-label',
+      hasNamedVariantOptions && variantSummary.accessible
+        ? variantSummary.accessible
+        : `${variantLabel}: ${variantText}`,
+    );
     variant.textContent = variantText;
     text.append(variant);
   }
@@ -206,7 +224,7 @@ export function createSharedProductCardElement(product: any = {}, currentQuantit
     ? createAddButton(selectionKey, {
       ...options,
       addButtonText: options.selectedButtonText || options.addButtonText,
-      addButtonAriaLabel: `${resolvedSelectedLabel} ${title}`,
+      addButtonAriaLabel: `${options.selectedButtonAriaLabel || options.selectedButtonText || resolvedSelectedLabel} ${title}`,
       isPressed: true,
     }, runtimeDocument)
     : isSelected
@@ -270,32 +288,53 @@ function getDisplayTitle(product: any, variantText: any) {
   return parentTitle || rawTitle;
 }
 
-function getVariantDisplayText(product: any) {
+export function getVariantSummary(product: any = {}) {
+  const selectedOptions = Array.isArray(product.selectedOptions)
+    ? product.selectedOptions
+        .map((option: any) => ({
+          name: String(option?.name ?? '').trim(),
+          value: String(option?.value ?? '').trim(),
+        }))
+        .filter((option: any) => option.name && option.value && option.value !== 'Default Title')
+    : [];
+  if (selectedOptions.length > 0) {
+    return {
+      visible: selectedOptions.map((option: any) => option.value).join(' / '),
+      accessible: selectedOptions
+        .map((option: any) => `${option.name}: ${option.value}`)
+        .join(', '),
+    };
+  }
+
   const explicitVariantTitle = typeof product.variantTitle === 'string' ? product.variantTitle.trim() : '';
   if (explicitVariantTitle && explicitVariantTitle !== 'Default Title') {
-    return explicitVariantTitle;
+    return { visible: explicitVariantTitle, accessible: `Variant: ${explicitVariantTitle}` };
   }
 
   const parentTitle = typeof product.parentTitle === 'string' ? product.parentTitle.trim() : '';
   const rawTitle = typeof product.title === 'string' ? product.title.trim() : '';
   const canInferExpandedVariant = Boolean(product.parentProductId || parentTitle);
-  if (!rawTitle) return '';
+  if (!rawTitle) return { visible: '', accessible: '' };
 
   if (parentTitle) {
     const parentPrefix = `${parentTitle} - `;
     if (rawTitle.startsWith(parentPrefix)) {
       const inferredVariant = rawTitle.slice(parentPrefix.length).trim();
-      return inferredVariant === 'Default Title' ? '' : inferredVariant;
+      return inferredVariant === 'Default Title'
+        ? { visible: '', accessible: '' }
+        : { visible: inferredVariant, accessible: `Variant: ${inferredVariant}` };
     }
   }
 
   const separatorIndex = rawTitle.indexOf(' - ');
   if (canInferExpandedVariant && separatorIndex > 0) {
     const inferredVariant = rawTitle.slice(separatorIndex + 3).trim();
-    return inferredVariant === 'Default Title' ? '' : inferredVariant;
+    return inferredVariant === 'Default Title'
+      ? { visible: '', accessible: '' }
+      : { visible: inferredVariant, accessible: `Variant: ${inferredVariant}` };
   }
 
-  return '';
+  return { visible: '', accessible: '' };
 }
 
 function createAddButton(selectionKey: string, options: any, runtimeDocument: Document) {

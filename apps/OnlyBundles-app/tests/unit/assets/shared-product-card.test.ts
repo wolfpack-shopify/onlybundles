@@ -261,6 +261,31 @@ describe('shared product card variant row', () => {
     expect(card.textContent).toContain('Everyday T-Shirt');
   });
 
+  it('renders selected option values visibly and exposes their dimension names accessibly', () => {
+    const document = new JSDOM('<!doctype html>').window.document;
+    const card = createSharedProductCardElement(
+      {
+        selectionId: 'variant-navy-large',
+        parentProductId: 'product-shirt',
+        parentTitle: 'Everyday T-Shirt',
+        title: 'Everyday T-Shirt',
+        selectedOptions: [
+          { name: 'Color', value: 'Navy' },
+          { name: 'Size', value: 'Large' },
+        ],
+        price: 3000,
+        currencyCode: 'USD',
+      },
+      0,
+      { display: { code: 'USD' } },
+      { document, addButtonText: 'Add' },
+    );
+    const row = card.querySelector('[data-bw-card-variant-row="true"]');
+
+    expect(row?.textContent).toBe('Navy / Large');
+    expect(row?.getAttribute('aria-label')).toBe('Color: Navy, Size: Large');
+  });
+
   it.each([undefined, '', 'Default Title'])(
     'renders no variant row for %p variant metadata',
     (variantTitle) => {

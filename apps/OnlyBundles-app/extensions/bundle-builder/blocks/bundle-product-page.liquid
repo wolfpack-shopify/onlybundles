@@ -4,6 +4,13 @@
 {% endcomment %}
 
 {% assign app_namespace = '$app' %}
+{% assign ppb_runtime_field = shop.metafields[app_namespace]['ppb_storefront_runtime'] %}
+{% assign ppb_runtime = ppb_runtime_field.value %}
+{% assign storefront_controls_runtime_field = shop.metafields[app_namespace]['storefront_controls_runtime'] %}
+{% assign ppb_css_field = shop.metafields[app_namespace]['ppb_storefront_css'] %}
+{% assign ppb_loading_screen = ppb_runtime.loadingScreen %}
+{% assign ppb_loading_background = ppb_loading_screen.backgroundColor | default: '#ffffff' %}
+{% assign ppb_loading_gif = ppb_loading_screen.gifUrl %}
 {% assign bundle_variant = product.variants.first %}
 {% assign bundle_ui_config = nil %}
 {% assign is_bundle_product = false %}
@@ -39,6 +46,8 @@
   {% assign bundle_config_json = bundle_ui_config | json %}
 {% endif %}
 
+<link rel="stylesheet" href="{{ 'bundle-widget-bootstrap.css' | asset_url }}">
+
 <div
   {{ block.shopify_attributes }}
   id="bundle-builder-app"
@@ -49,10 +58,11 @@
   data-container-bundle-id="{{ bundle_id }}"
   data-bundle-config='{{ bundle_config_json | escape }}'
   data-country-code="{{ localization.country.iso_code }}"
-  data-hide-default-buttons="{{ is_bundle_product }}"
+  data-hide-native-purchase-controls="{{ block.settings.hide_native_purchase_controls }}"
   data-show-step-numbers="{{ block.settings.show_step_numbers }}"
   {% if bundle_ui_config.sdkMode == true %}data-sdk-mode="true"{% endif %}
   data-wpb-bootstrap-loading="true"
+  aria-busy="true"
   class="bundle-widget-container"
 >
   {%- comment -%}
@@ -65,19 +75,24 @@
     role="status"
     aria-live="polite"
     aria-label="Loading bundle"
+    style="--wpb-loading-screen-bg: {{ ppb_loading_background | escape }}"
   >
-    <div
-      class="bundle-loading-overlay__spinner"
-      role="status"
-      aria-label="Loading"
-    ></div>
+    {% if ppb_loading_gif != blank %}
+      <img class="bundle-loading-overlay__gif" src="{{ ppb_loading_gif | escape }}" alt="">
+    {% else %}
+      <div
+        class="bundle-loading-overlay__spinner"
+        role="status"
+        aria-label="Loading"
+      ></div>
+    {% endif %}
   </div>
   <div class="bundle-steps" hidden aria-hidden="true"></div>
   <div class="bundle-includes" hidden aria-hidden="true"></div>
   <button class="add-bundle-to-cart" hidden aria-hidden="true">{{ block.settings.add_to_cart_label }}</button>
 </div>
 
-{% if is_bundle_product and block.settings.hide_native_buttons %}
+{% if is_bundle_product and block.settings.hide_native_purchase_controls %}
 <style>
   .product-form__cart-submit,
   .product-form__buttons button[name="add"],
@@ -95,9 +110,6 @@
 </style>
 {% endif %}
 
-{% assign ppb_runtime_field = shop.metafields[app_namespace]['ppb_storefront_runtime'] %}
-{% assign storefront_controls_runtime_field = shop.metafields[app_namespace]['storefront_controls_runtime'] %}
-{% assign ppb_css_field = shop.metafields[app_namespace]['ppb_storefront_css'] %}
 {%- capture product_collections_json -%}
 [
   {%- if product and product.collections -%}
@@ -173,8 +185,8 @@
     },
     {
       "type": "checkbox",
-      "id": "hide_native_buttons",
-      "label": "Hide native product buttons",
+      "id": "hide_native_purchase_controls",
+      "label": "Hide native purchase controls",
       "default": true
     },
     {

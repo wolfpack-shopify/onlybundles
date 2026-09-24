@@ -5,7 +5,7 @@ title: Storefront Draft Preview Authorization
 type: architecture-decision
 status: accepted
 summary: Draft FPB and PPB storefront previews use one 1-hour stateless token bound to the shop and bundle.
-last_audited: 2026-09-22
+last_audited: 2026-09-25
 owners:
   - engineering
 domains:
@@ -21,6 +21,7 @@ source_paths:
   - app/routes/root/wpb.$bundleId.tsx
   - app/routes/app/shared/storefront-sync-action.server.ts
   - app/assets/widgets/product-page/methods/config-lifecycle-methods.ts
+  - app/assets/widgets/shared/storefront-analytics.ts
 related_docs:
   - Architecture/FPB Host Evaluation.md
   - Architecture/Widget Architecture.md
@@ -53,4 +54,6 @@ PPB places the token on the Shopify product preview URL. The product-page widget
 
 Preview tokens are not stored in Prisma, metafields, local storage, or app events. Authorized draft API responses use `Cache-Control: private, no-store` and do not participate in conditional public caching. Public active and unlisted responses retain their existing short cache policy.
 
-The prepare client posts only the dedicated resource route. A route or network failure closes the synchronously reserved preview tab and surfaces the operation error; it never retries against the configure document or opens an unsigned fallback URL. Preview analytics remain a separate fire-and-forget action after successful navigation.
+The prepare client posts only the dedicated resource route. A route or network failure closes the synchronously reserved preview tab and surfaces the operation error; it never retries against the configure document or opens an unsigned fallback URL.
+
+Storefront locations carrying `wpb_preview` are excluded from bundle views, engagement beacons, and storefront analytics events. On ordinary storefront visits, load-time analytics are scheduled only after the page load boundary and an idle opportunity; critical bundle configuration and product data remain on the widget initialization path.

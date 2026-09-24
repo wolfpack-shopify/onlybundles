@@ -12,6 +12,7 @@ import {
   suppressesAutomaticPpbEmbed,
 } from "./page-builder-embed.js";
 import { resolveAppEmbedOwnership } from "./app-embed-marker.js";
+import { scheduleNonCriticalStorefrontTask } from "../assets/widgets/shared/storefront-analytics.js";
 
 const ownership = resolveAppEmbedOwnership();
 const embed = ownership.status === "owned" ? ownership.marker : null;
@@ -20,7 +21,9 @@ function hydrateProductFeatures() {
   if (!embed) return;
   void initializePageBuilderEmbed(embed);
   reconcileFpbUpsellPlacement();
-  void initializeFpbProductPageUpsells(embed);
+  scheduleNonCriticalStorefrontTask(() => {
+    void initializeFpbProductPageUpsells(embed);
+  });
   if (!suppressesAutomaticPpbEmbed(findPageBuilderEmbedMarker())) {
     reconcilePpbBundleEmbedPlacement();
     void initializePpbBundleEmbed(embed);

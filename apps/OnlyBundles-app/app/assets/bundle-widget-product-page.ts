@@ -68,6 +68,10 @@ import { ppbExpandSingleStepCategoriesAsSteps } from './widgets/product-page/sin
 import { getDiscountProgressData, getSelectedQuantity } from './widgets/shared/engine/bundle-selectors.js';
 import { installControllerMethods } from './widgets/shared/controller-methods.js';
 import { buildStorefrontApiPath } from '../config/storefront-proxy-routes.js';
+import {
+  scheduleNonCriticalStorefrontTask,
+  shouldTrackStorefrontAnalytics,
+} from './widgets/shared/storefront-analytics.js';
 import { ProductPageCartMethods } from './widgets/product-page/methods/cart-methods.js';
 import { ProductPageModalMethods } from './widgets/product-page/methods/modal-methods.js';
 import { ProductPageSelectionMethods } from './widgets/product-page/methods/selection-methods.js';
@@ -292,9 +296,9 @@ export class BundleWidgetProductPage {
       this.container.dataset.initialized = 'true';
       this.isInitialized = true;
 
-      // Fire-and-forget: record a view event for analytics (skip in Theme Editor preview)
-      if (!window.Shopify?.designMode) {
-        this._recordView();
+      // Analytics is non-critical: exclude previews and wait until the page is loaded/idle.
+      if (shouldTrackStorefrontAnalytics()) {
+        scheduleNonCriticalStorefrontTask(() => this._recordView());
       }
 
     } catch (error: any) {

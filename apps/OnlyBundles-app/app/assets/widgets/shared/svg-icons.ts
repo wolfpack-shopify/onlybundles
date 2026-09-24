@@ -144,12 +144,30 @@ export function createGiftBadgeIcon(runtimeDocument: Document) {
 export function createCartIcon(runtimeDocument: Document) {
   const svg = createSvgElement(runtimeDocument, 'svg', {
     viewBox: '0 0 24 24',
+    fill: 'none',
     focusable: 'false',
     'aria-hidden': 'true',
   });
-  svg.append(createSvgElement(runtimeDocument, 'path', {
-    d: 'M3 4.5h2.5l2.57 11.5H19.5M6.5 7.5h14l-3.5 5.9H7.8M9 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2Zm9 0a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z',
-    fill: 'currentColor',
-  }));
+  svg.append(
+    createSvgElement(runtimeDocument, 'path', {
+      d: 'M3 4.5h2.5l2.2 10.25h10.6l2.2-7.25H6.15',
+      stroke: 'currentColor',
+      'stroke-width': '1.75',
+      'stroke-linecap': 'round',
+      'stroke-linejoin': 'round',
+    }),
+    createSvgElement(runtimeDocument, 'circle', {
+      cx: '9',
+      cy: '19',
+      r: '1.25',
+      fill: 'currentColor',
+    }),
+    createSvgElement(runtimeDocument, 'circle', {
+      cx: '18',
+      cy: '19',
+      r: '1.25',
+      fill: 'currentColor',
+    }),
+  );
   return svg;
 }

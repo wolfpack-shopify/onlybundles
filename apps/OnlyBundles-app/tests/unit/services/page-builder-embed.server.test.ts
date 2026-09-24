@@ -11,6 +11,14 @@ describe("page builder embed service", () => {
   it("resolves a shop-scoped public PPB by generated parent-product handle", async () => {
     const db = database();
     db.bundle.findFirst.mockResolvedValue({ id: "ppb-1", bundleType: "product_page" });
+    db.designSettings.findUnique.mockResolvedValue({
+      generalSettings: {
+        loadingScreen: {
+          gifUrl: "https://cdn.shopify.com/s/files/ppb-loading.gif",
+          backgroundColor: "#abcdef",
+        },
+      },
+    });
 
     await expect(resolvePageBuilderEmbed(db as any, "shop.myshopify.com", {
       bundleType: "product_page",
@@ -18,7 +26,10 @@ describe("page builder embed service", () => {
       locale: "en",
     })).resolves.toEqual({
       bundle: { id: "ppb-1", bundleType: "product_page" },
-      loadingScreen: null,
+      loadingScreen: {
+        gifUrl: "https://cdn.shopify.com/s/files/ppb-loading.gif",
+        backgroundColor: "#abcdef",
+      },
     });
     expect(db.bundle.findFirst).toHaveBeenCalledWith(expect.objectContaining({
       where: {
@@ -32,7 +43,15 @@ describe("page builder embed service", () => {
         ],
       },
     }));
-    expect(db.designSettings.findUnique).not.toHaveBeenCalled();
+    expect(db.designSettings.findUnique).toHaveBeenCalledWith({
+      where: {
+        shopId_bundleType: {
+          shopId: "shop.myshopify.com",
+          bundleType: "product_page",
+        },
+      },
+      select: { generalSettings: true },
+    });
   });
 
   it("resolves a shop-scoped FPB and its loading-screen settings", async () => {

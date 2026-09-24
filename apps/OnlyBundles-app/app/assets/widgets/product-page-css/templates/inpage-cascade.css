@@ -250,6 +250,12 @@
   position: relative;
 }
 
+.bw-ppb-cascade-product-row--has-variant-selector .product-image {
+  height: auto;
+  min-height: 70px;
+  align-self: stretch;
+}
+
 .bw-ppb-cascade-product-row .product-image img {
   width: 100%;
   height: 100%;
@@ -269,7 +275,8 @@
 }
 
 .bw-ppb-cascade-product-row--has-variant-selector .product-content-wrapper {
-  grid-template-rows: auto auto auto auto;
+  grid-template-rows: auto auto auto;
+  row-gap: 0;
   align-content: start;
   height: auto;
   min-height: 70px;
@@ -338,8 +345,9 @@
 }
 
 .bw-ppb-cascade-product-row--has-variant-selector .product-price-row {
-  grid-row: 4;
+  grid-row: 3;
   height: 18px;
+  margin-block-start: clamp(6px, 1.5cqi, 8px);
   align-items: center;
 }
 
@@ -370,9 +378,10 @@
 }
 
 .bw-ppb-cascade-product-row--has-variant-selector .bw-product-card__selector {
-  grid-column: 1 / -1;
-  grid-row: 3;
+  grid-column: 1;
+  grid-row: 2;
   min-width: 0;
+  margin-block-start: 0;
 }
 
 .bw-ppb-cascade-product-row--has-variant-selector .variant-selector-wrapper {
@@ -405,7 +414,8 @@
 }
 
 .bw-ppb-cascade-product-row--has-variant-selector .product-card-action {
-  grid-row: 4;
+  grid-row: 2;
+  margin-block-start: 0;
 }
 
 .bw-ppb-cascade-product-row.bw-product-card--has-variant:not(
@@ -450,7 +460,9 @@
   height: var(--bundle-product-card-action-min-height, 44px);
   padding: 0;
   border-radius: var(--bw-ppb-cascade-action-radius, 5px);
-  background: transparent;
+  overflow: hidden;
+  background: var(--bundle-button-bg, #111111);
+  color: var(--bundle-button-text-color, #ffffff);
 }
 
 .bw-ppb-cascade-product-row .bw-quantity-control__button {
@@ -460,9 +472,9 @@
   width: var(--bundle-product-card-action-min-height, 44px);
   height: var(--bundle-product-card-action-min-height, 44px);
   border: 0;
-  border-radius: var(--bw-ppb-cascade-action-radius, 5px);
-  background: var(--bundle-button-bg, #111111);
-  color: var(--bundle-button-text-color, #ffffff);
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
   font-size: clamp(12px, 3cqi, 14px);
   font-weight: 700;
   line-height: 25.2px;
@@ -476,7 +488,7 @@
 }
 
 .bw-ppb-cascade-product-row .bw-quantity-control__value {
-  color: #1e1e1e;
+  color: inherit;
   flex: 0 0 auto;
   font-size: clamp(12px, 3cqi, 14px);
   font-weight: 500;

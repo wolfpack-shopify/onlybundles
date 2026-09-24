@@ -200,6 +200,13 @@ export function StepSetupSection({
                       "displayVariantsAsIndividual",
                       enabled
                     );
+                    if (enabled) {
+                      ((step.StepCategory as any[]) ?? []).forEach((category) => {
+                        details.clearValidationError?.(
+                          `steps.${step.id}.categories.${category.id}.variantSelectorMode`,
+                        );
+                      });
+                    }
                     details.markAsDirty();
                   }}
                 />

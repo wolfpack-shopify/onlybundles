@@ -52,6 +52,7 @@ import {
 } from "../../../../lib/offer-policy-admin";
 import { resolveOfferCountryTargetingSave } from "../../../../lib/offer-country-targeting";
 import { fetchShopConfiguration } from "../../../../lib/bundle-configure-loader.server";
+import { validateConfiguredVariantSwatches } from "../../../../lib/bundle-config/variant-swatch-validation.server";
 
 function hasEnabledAddonProducts(personalizationData: unknown) {
   if (
@@ -158,6 +159,16 @@ export async function handleSaveBundle(
       validateQuantityPerProduct,
       variantSelectorEnabled,
     } = parseFpbSaveBundleForm(formData);
+
+    const swatchValidationIssues = await validateConfiguredVariantSwatches(
+      admin,
+      stepsData,
+    );
+    if (swatchValidationIssues.length > 0) {
+      return json(configureValidationFailure(swatchValidationIssues), {
+        status: 400,
+      });
+    }
 
     for (const step of stepsData) {
       step.StepProduct = materializeCanonicalStepProducts(step);

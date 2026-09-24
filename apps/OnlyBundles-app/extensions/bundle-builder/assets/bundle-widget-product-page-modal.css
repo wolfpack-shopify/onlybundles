@@ -31,6 +31,18 @@
   overflow-wrap: anywhere;
 }
 
+.ppb-visually-hidden {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .ppb-variant-selector-group > .variant-selector {
   box-sizing: border-box;
   inline-size: 100%;
@@ -155,20 +167,6 @@
   outline-offset: 3px;
 }
 
-.ppb-variant-selector-option[data-unavailable="true"] {
-  cursor: not-allowed;
-  opacity: 0.48;
-}
-
-.ppb-variant-selector-option[data-unavailable="true"] .ppb-variant-selector-visual::after {
-  content: "";
-  position: absolute;
-  inline-size: 70%;
-  block-size: 1px;
-  background: currentColor;
-  transform: rotate(-45deg);
-}
-
 .ppb-variant-selector-tooltip {
   position: absolute;
   z-index: 20;
@@ -243,9 +241,9 @@
   --bw-ppb-slot-target: 44px;
   --bw-ppb-slot-tile-min-inline: 136px;
   --bw-ppb-slot-tile-min-block: clamp(176px, 48cqi, 208px);
-  --bw-ppb-slot-row-min-block: 4rem;
+  --bw-ppb-slot-row-min-block: 64px;
   --bw-ppb-slot-row-max-block: var(--bw-ppb-slot-row-min-block);
-  --bw-ppb-slot-empty-row-min-block: 3.75rem;
+  --bw-ppb-slot-empty-row-min-block: 64px;
   --bw-ppb-slot-row-padding: 5px;
   --bw-ppb-slot-row-gap: 5px;
   --bw-ppb-slot-list-gap: 14px;
@@ -279,7 +277,7 @@
 }
 
 .bw-ppb-modal-slot-section {
-  container-type: inline-size;
+  container: ppb-slot-section / inline-size;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 10px;
@@ -333,6 +331,20 @@
   height: auto;
   align-items: stretch;
   justify-items: stretch;
+}
+
+@container ppb-slot-section (max-width: 434px) {
+  .bw-ppb-modal-slot-grid,
+  #bundle-builder-app[data-ppb-design-preset="HORIZONTAL_SLOTS"] .bw-ppb-modal-slot-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container ppb-slot-section (max-width: 280px) {
+  .bw-ppb-modal-slot-grid,
+  #bundle-builder-app[data-ppb-design-preset="HORIZONTAL_SLOTS"] .bw-ppb-modal-slot-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .bw-ppb-modal-slot-grid > .step-box,
@@ -470,10 +482,8 @@
 .bw-ppb-modal-slot-grid .bw-slot-card--filled .step-clear-badge,
 #bundle-builder-app[data-ppb-slot-orientation="horizontal"] .bw-slot-card--filled .step-clear-badge {
   position: absolute;
-  top: -8px;
-  right: -8px;
-  inset-block-start: -8px;
-  inset-inline-end: -8px;
+  inset-block-start: 4px;
+  inset-inline-end: 4px;
   width: 24px;
   height: 24px;
   min-width: 24px;
@@ -561,7 +571,9 @@
   align-items: center;
   width: 100%;
   max-width: none;
-  height: auto;
+  height: var(--bw-ppb-slot-row-min-block);
+  min-height: var(--bw-ppb-slot-row-min-block);
+  max-height: var(--bw-ppb-slot-row-max-block);
   border-radius: var(--bw-ppb-slot-radius);
   box-shadow: none;
 }
@@ -734,7 +746,8 @@
 #bundle-builder-app[data-ppb-design-preset="VERTICAL_SLOTS"] .bw-slot-card--filled .step-clear-badge,
 #bundle-builder-app[data-ppb-design-preset="SIMPLIFIED"] .bw-slot-card--filled .step-clear-badge,
 #bundle-builder-app[data-ppb-slot-orientation="vertical"] .bw-slot-card--filled .step-clear-badge {
-  position: static;
+  position: relative;
+  inset: auto;
   order: 3;
   flex: 0 0 var(--bw-ppb-slot-target);
   width: var(--bw-ppb-slot-target);
@@ -754,7 +767,7 @@
   font-weight: 700;
   line-height: 1;
   cursor: pointer;
-  z-index: auto;
+  z-index: 2;
   box-shadow: none;
   transition: none;
 }
@@ -944,4 +957,37 @@
   flex: 1 1 auto;
   min-inline-size: 0;
   text-align: start;
+}
+
+.bw-ppb-modal-slot-grid > .bw-slot-card--filled > .bw-slot-card__edit {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.bw-ppb-modal-slot-grid > .bw-slot-card--filled > .bw-slot-card__edit:focus-visible {
+  outline: 2px solid var(--bw-ppb-slot-accent, #000000);
+  outline-offset: -2px;
+}
+
+#bundle-builder-app[data-ppb-slot-orientation="horizontal"]
+  .bw-ppb-modal-slot-grid
+  .bw-slot-card--filled
+  .step-clear-badge,
+#bundle-builder-app[data-ppb-design-preset="HORIZONTAL_SLOTS"]
+  .bw-ppb-modal-slot-grid
+  .bw-slot-card--filled
+  .step-clear-badge {
+  position: absolute;
+  inset-block-start: 4px;
+  inset-inline-end: 4px;
+  z-index: 2;
 }

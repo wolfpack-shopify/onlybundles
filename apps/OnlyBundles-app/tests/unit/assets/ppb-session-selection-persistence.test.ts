@@ -22,14 +22,14 @@ describe("ProductPageSessionSelectionPersistence", () => {
         {
           v: 2,
           selectedProducts: [
-            { "variant-1": 2, "variant-2": 0, "variant-3": -1 },
+            { "variant-1": 2, "variant-2": 1, "variant-3": -1 },
             { "variant-4": 1.9 },
             { "variant-extra-step": 1 },
           ],
         },
         2
       )
-    ).toEqual([{ "variant-1": 2 }, { "variant-4": 1 }]);
+    ).toEqual([{ "variant-1": 2, "variant-2": 1 }, { "variant-4": 1 }]);
   });
 
   it("rejects malformed or unsupported payloads", () => {

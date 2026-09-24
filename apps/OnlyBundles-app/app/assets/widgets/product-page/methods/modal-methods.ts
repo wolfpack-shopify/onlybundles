@@ -6,6 +6,7 @@ import { getSubscriptionProductCardPrice } from '../../shared/subscription-store
 import { resolvePpbModalCardPresentation } from '../ppb-modal-card-presentation.js';
 import {
   createPpbVariantSelectorElement,
+  resolvePpbExactVariantSelection,
   resolvePpbCategoryVariantSelectorConfiguration,
 } from '../variant-selector-modes.js';
 import { resolveLowStockAlert } from '../../../../lib/low-stock-alert.js';
@@ -42,6 +43,105 @@ export function shouldDisableProductPageVariantOption(variant: any, trackInvento
   return trackInventoryOnAddToCart === true
     && variant?.quantityAvailable === 0
     && variant?.currentlyNotInStock !== true;
+}
+
+function variantSelectionId(variant: any) {
+  return String(variant?.selectionId || variant?.id || '');
+}
+
+function variantImageUrl(variant: any, product: any) {
+  const image = variant?.image;
+  return (typeof image === 'string' ? image : image?.src || image?.url || image?.originalSrc)
+    || product?.imageUrl
+    || product?.image?.src
+    || '';
+}
+
+export function resolveProductPageVariantCardState({
+  product = {},
+  stepSelections = {},
+  draft = null,
+  replacementSelectionId = '',
+  normalizeSelectionKey = (value: any) => String(value || ''),
+  isUnavailable = (variant: any) => variant?.available === false,
+}: any = {}) {
+  const variants = Array.isArray(product.variants) ? product.variants : [];
+  const variantBySelectionKey = (selectionKey: any) => variants.find((variant: any) => (
+    normalizeSelectionKey(variantSelectionId(variant)) === normalizeSelectionKey(selectionKey)
+  ));
+  const committedEntries = Object.entries(stepSelections || {}).filter(([selectionKey, quantity]: any) => (
+    Number(quantity) > 0 && Boolean(variantBySelectionKey(selectionKey))
+  ));
+  const normalizedReplacementSelectionId = normalizeSelectionKey(replacementSelectionId);
+  const replacementEntry = Object.entries(stepSelections || {}).find(([selectionKey, quantity]: any) => (
+    Number(quantity) > 0
+    && normalizeSelectionKey(selectionKey) === normalizedReplacementSelectionId
+  ));
+  const committedSelectionId = replacementEntry ? String(replacementEntry[0]) : '';
+  const replacementVariant = variantBySelectionKey(committedSelectionId);
+  const soleCommittedVariant = committedEntries.length === 1
+    ? variantBySelectionKey(committedEntries[0][0])
+    : null;
+  const selectedOptions = Array.isArray(draft?.selectedOptions)
+    ? draft.selectedOptions
+    : Array.isArray(replacementVariant?.selectedOptions)
+      ? replacementVariant.selectedOptions
+      : Array.isArray(soleCommittedVariant?.selectedOptions)
+        ? soleCommittedVariant.selectedOptions
+        : [];
+  const resolution = resolvePpbExactVariantSelection({
+    product,
+    selectedOptions,
+    isUnavailable,
+  });
+  const resolvedSelectionId = variantSelectionId(resolution.variant);
+  const selectionId = resolvedSelectionId
+    || variantSelectionId(replacementVariant)
+    || variantSelectionId(soleCommittedVariant)
+    || String(product.id || product.productId || product.selectionId || product.variantId || '');
+  const exactCommittedEntry = Object.entries(stepSelections || {}).find(
+    ([selectionKey]: any) => normalizeSelectionKey(selectionKey) === normalizeSelectionKey(selectionId),
+  );
+  const committedQuantity = Number(exactCommittedEntry?.[1]) || 0;
+  const hasDraftDifference = Boolean(committedSelectionId)
+    && normalizeSelectionKey(resolvedSelectionId) !== normalizeSelectionKey(committedSelectionId);
+  const requiresActionButton = !resolution.complete
+    || resolution.unavailable
+    || (Boolean(committedSelectionId) && hasDraftDifference);
+  const presentationVariant = resolution.variant || replacementVariant || soleCommittedVariant || null;
+
+  return {
+    ...resolution,
+    cardProduct: {
+      ...product,
+      ...(presentationVariant ? {
+        imageUrl: variantImageUrl(presentationVariant, product),
+        price: normalizeVariantPrice(presentationVariant.price) ?? product.price,
+        compareAtPrice: normalizeVariantPrice(presentationVariant.compareAtPrice),
+        quantityAvailable: typeof presentationVariant.quantityAvailable === 'number'
+          ? presentationVariant.quantityAvailable
+          : null,
+        currentlyNotInStock: presentationVariant.currentlyNotInStock === true,
+        available: presentationVariant.available !== false,
+        variantTitle: presentationVariant.title === 'Default Title'
+          ? ''
+          : presentationVariant.title,
+        selectedOptions: Array.isArray(presentationVariant.selectedOptions)
+          ? presentationVariant.selectedOptions
+          : [],
+      } : {}),
+      baseProductId: product.id || product.productId,
+      committedSelectionId,
+      selectionId,
+      variantId: selectionId,
+    },
+    committedQuantity,
+    committedSelectionId,
+    hasDraftDifference,
+    requiresActionButton,
+    selectedOptions,
+    selectionId,
+  };
 }
 
 function shouldDisplayVariantsAsIndividualForModalCategory(
@@ -399,11 +499,34 @@ renderModalProducts(stepIndex: string|number, productsToRender: any = null) {
   );
 
   const cards = products.map((product: any)  => {
-    const selectionKey = product.selectionId || product.variantId || product.id;
-    const productSelection = product.selectionId
-      ? product
-      : { ...product, selectionId: selectionKey };
-    const currentQuantity = this.getSelectedQuantity(stepIndex, selectionKey);
+    const baseProductId = String(product.id || product.productId || 'product');
+    const draft = this._ppbVariantDrafts?.[stepIndex]?.[baseProductId] || null;
+    const trackInventoryOnAddToCart = this.isInventoryTrackingOnAddToCartEnabled?.() === true;
+    const variantState = Array.isArray(product.variants) && product.variants.length > 1
+      ? resolveProductPageVariantCardState({
+          product,
+          stepSelections: this.selectedProducts?.[stepIndex] || {},
+          draft,
+          replacementSelectionId: this._modalSlotReplacementTarget?.stepIndex === stepIndex
+            ? this._modalSlotReplacementTarget.selectionKey
+            : '',
+          normalizeSelectionKey: (value: any) => typeof this.normalizeSelectionKey === 'function'
+            ? this.normalizeSelectionKey(value)
+            : String(value || ''),
+          isUnavailable: (variant: any) => shouldDisableProductPageVariantOption(
+            variant,
+            trackInventoryOnAddToCart,
+          ),
+        })
+      : null;
+    const displayProduct = variantState?.cardProduct || product;
+    const selectionKey = variantState?.selectionId
+      || product.selectionId
+      || product.variantId
+      || product.id;
+    const productSelection = { ...displayProduct, selectionId: selectionKey };
+    const currentQuantity = variantState?.committedQuantity
+      ?? this.getSelectedQuantity(stepIndex, selectionKey);
     const cardPresentation = resolvePpbModalCardPresentation({
       quantity: currentQuantity,
       validation: this.selectedBundle?.validateQuantityPerProduct,
@@ -411,7 +534,13 @@ renderModalProducts(stepIndex: string|number, productsToRender: any = null) {
     const currencyInfo = CurrencyManager.getCurrencyInfo();
 
     // Per-variant stock state derived from Storefront API quantityAvailable
-    const { available, outOfStock } = this.getVariantAvailable(stepIndex, selectionKey);
+    const availability = this.getVariantAvailable(stepIndex, selectionKey);
+    const outOfStock = variantState?.complete
+      ? variantState.unavailable
+      : variantState
+        ? false
+        : availability.outOfStock;
+    const available = availability.available;
     const outOfStockText = this._resolveText('productCardOutOfStockButton', 'Out of Stock');
     const atMaxStock = available !== null && currentQuantity >= available;
     const atMaxProductQuantity = productQuantityLimit !== null && currentQuantity >= productQuantityLimit;
@@ -431,17 +560,37 @@ renderModalProducts(stepIndex: string|number, productsToRender: any = null) {
       stockBadgeElement.className = 'product-stock-badge product-stock-badge--low';
       stockBadgeElement.textContent = lowStockAlert?.message ?? '';
     }
+    const variantSelectorElement = this.renderVariantSelector(product, stepIndex, currentStep);
+    const selectorDisabled = Boolean(variantState && (!variantState.complete || variantState.unavailable));
+    const replacementSelectionKey = this._modalSlotReplacementTarget?.stepIndex === stepIndex
+      ? this.normalizeSelectionKey(this._modalSlotReplacementTarget.selectionKey)
+      : '';
+    const isReplacingDifferentSelection = Boolean(replacementSelectionKey)
+      && replacementSelectionKey !== this.normalizeSelectionKey(selectionKey);
+    const selectorButtonText = variantState && !variantState.complete
+      ? 'Select variant'
+      : variantState?.unavailable
+        ? outOfStockText
+        : isReplacingDifferentSelection
+          ? 'Update'
+          : resolveProductPageCardButtonText({
+              currentQuantity,
+              currentStep,
+              outOfStock,
+              outOfStockText,
+              defaultAddText: 'Add to Cart',
+            });
     return createSharedProductCardElement(
       {
         ...productSelection,
-        title: product.title,
-        imageUrl: product.imageUrl,
+        title: displayProduct.title,
+        imageUrl: displayProduct.imageUrl,
         description: '',
       },
       currentQuantity,
       currencyInfo,
       {
-        displayPrice: getSubscriptionProductCardPrice(this, product.price),
+        displayPrice: getSubscriptionProductCardPrice(this, displayProduct.price),
         description: '',
         displaySeeMoreLink: false,
         expandProductCardOnHover: false,
@@ -449,25 +598,17 @@ renderModalProducts(stepIndex: string|number, productsToRender: any = null) {
         cardInteractive: false,
         titleInteractive: false,
         className: `${freeGiftCardClass} ${currentQuantity > 0 ? 'bw-product-card--selected' : ''} ${outOfStock ? 'is-out-of-stock' : ''}`.trim(),
-        variantSelectorElement: this.renderVariantSelector(product, stepIndex, currentStep),
+        variantSelectorElement,
         stockBadgeElement,
         showCompareAtPrice: this._getProductPageControls?.()?.showCompareAtPrices !== false,
-        addButtonText: resolveProductPageCardButtonText({
-          currentQuantity,
-          currentStep,
-          outOfStock,
-          outOfStockText,
-          defaultAddText: 'Add to Cart',
-        }),
-        selectedButtonText: resolveProductPageCardButtonText({
-          currentQuantity,
-          currentStep,
-          outOfStock,
-          outOfStockText,
-          defaultAddText: 'Add to Cart',
-        }),
-        selectedAction: cardPresentation.mode === 'maximum-reached' ? 'button' : undefined,
-        addDisabled: outOfStock,
+        addButtonText: selectorButtonText,
+        selectedButtonText: selectorButtonText,
+        selectedAction: variantState?.requiresActionButton || isReplacingDifferentSelection
+          ? 'button'
+          : cardPresentation.mode === 'maximum-reached'
+            ? 'button'
+            : undefined,
+        addDisabled: selectorDisabled || outOfStock,
         increaseDisabled,
       },
     );
@@ -494,6 +635,21 @@ renderVariantSelector(product: any, stepIndex?: string | number, stepOverride: a
   const variantLabel = this._resolveText?.('productVariantLabel', 'Select variant') || 'Select variant';
   const resolvedStepIndex = stepIndex ?? this.currentStepIndex ?? 0;
   const step = stepOverride ?? this.selectedBundle?.steps?.[resolvedStepIndex] ?? {};
+  const baseProductId = String(product.id || product.productId || 'product');
+  const draft = this._ppbVariantDrafts?.[resolvedStepIndex]?.[baseProductId] || null;
+  const state = resolveProductPageVariantCardState({
+    product,
+    stepSelections: this.selectedProducts?.[resolvedStepIndex] || {},
+    draft,
+    replacementSelectionId: this._modalSlotReplacementTarget?.stepIndex === resolvedStepIndex
+      ? this._modalSlotReplacementTarget.selectionKey
+      : '',
+    normalizeSelectionKey: (value: any) => typeof this.normalizeSelectionKey === 'function'
+      ? this.normalizeSelectionKey(value)
+      : String(value || ''),
+    isUnavailable: (variant: any) =>
+      shouldDisableProductPageVariantOption(variant, trackInventoryOnAddToCart),
+  });
   const configuration = resolvePpbCategoryVariantSelectorConfiguration(
     step,
     resolvedStepIndex,
@@ -505,8 +661,41 @@ renderVariantSelector(product: any, stepIndex?: string | number, stepOverride: a
     configuration,
     label: variantLabel,
     document,
+    initialSelectedOptions: state.selectedOptions,
     isUnavailable: (variant: any) =>
       shouldDisableProductPageVariantOption(variant, trackInventoryOnAddToCart),
+    onSelectionChange: (resolution: any, changedControl: any) => {
+      this._ppbVariantDrafts ||= {};
+      this._ppbVariantDrafts[resolvedStepIndex] ||= {};
+      this._ppbVariantDrafts[resolvedStepIndex][baseProductId] = {
+        selectedOptions: resolution.selectedOptions,
+      };
+
+      const modalOpen = this.elements?.modal?.classList?.contains('bw-bs-panel--open') === true;
+      if (modalOpen) {
+        this.renderModalProducts(resolvedStepIndex);
+      } else {
+        const target = this.container?.querySelector?.(
+          '.bw-ppb-grid-product-grid, .bw-ppb-cascade-product-list',
+        );
+        if (target) this._renderInpageStepProducts(resolvedStepIndex, target);
+      }
+
+      const scope = modalOpen ? this.elements?.modal : this.container;
+      const replacementCard = Array.from(
+        scope?.querySelectorAll?.('[data-base-product-id]') || [],
+      ).find((candidate: any) => candidate.dataset?.baseProductId === baseProductId) as any;
+      const replacementGroup = replacementCard?.querySelector?.(
+        `[data-option-index="${changedControl.optionIndex}"]`,
+      );
+      const focusTarget = Array.from(
+        replacementGroup?.querySelectorAll?.('[data-option-value], select') || [],
+      ).find((candidate: any) => (
+        candidate.tagName === 'SELECT'
+        || candidate.dataset?.optionValue === changedControl.optionValue
+      )) as any;
+      focusTarget?.focus?.({ preventScroll: true });
+    },
   });
 },
 
@@ -543,9 +732,9 @@ renderModalProductsLoading(_stepIndex?: any) {
 },
 
 attachProductEventHandlers(productGrid: any, stepIndex: string|number) {
-  // Remove existing event listeners to prevent duplicates
-  const newProductGrid = productGrid.cloneNode(true);
-  productGrid.parentNode.replaceChild(newProductGrid, productGrid);
+  if (productGrid.dataset?.ppbProductHandlersAttached === 'true') return;
+  productGrid.dataset.ppbProductHandlersAttached = 'true';
+  const newProductGrid = productGrid;
 
   // Helper to find product by ID
   const findProduct = (productId: any) => {
@@ -586,75 +775,27 @@ attachProductEventHandlers(productGrid: any, stepIndex: string|number) {
 
       if (!product) return;
       const currentQuantity = this.getSelectedQuantity(stepIndex, productId);
+      const replacementTarget = this._modalSlotReplacementTarget?.stepIndex === stepIndex
+        ? this._modalSlotReplacementTarget
+        : null;
+      const isReplacingDifferentSelection = Boolean(replacementTarget)
+        && this.normalizeSelectionKey(replacementTarget.selectionKey)
+          !== this.normalizeSelectionKey(productId);
       const presentation = resolvePpbModalCardPresentation({
         quantity: currentQuantity,
         validation: this.selectedBundle?.validateQuantityPerProduct,
       });
       const directDefaultRequiredQuantity = this._getDirectDefaultRequiredQuantity(productId);
-      const toggleQuantity = presentation.mode === 'maximum-reached'
-        ? 0
-        : directDefaultRequiredQuantity ?? 1;
+      const toggleQuantity = isReplacingDifferentSelection
+        ? currentQuantity + Math.max(1, Number(replacementTarget?.quantity) || 1)
+        : presentation.mode === 'maximum-reached'
+          ? 0
+          : directDefaultRequiredQuantity ?? 1;
       if (toggleQuantity > 0 || currentQuantity > 0) {
         this.updateProductSelection(stepIndex, productId, toggleQuantity);
       }
     }
   });
 
-  // Variant selector handler (for inline dropdown if used)
-  newProductGrid.addEventListener('change', (e: any) => {
-    if (
-      e.target.classList.contains('variant-selector')
-      || e.target.classList.contains('ppb-variant-selector-input')
-    ) {
-      e.stopPropagation();
-      const newVariantId = e.target.dataset.resolvedVariantId || e.target.value;
-      const baseProductId = e.target.dataset.baseProductId;
-
-      // Find the product and update its variant
-      const product = this.stepProductData[stepIndex].find((p: any)  => p.id === baseProductId);
-      if (product && product.variants) {
-        const variantData = product.variants.find((v: any)  => v.id === newVariantId);
-        if (variantData) {
-          // Sync the new variant's stock fields onto the product so
-          // getVariantAvailable() reflects post-swap state.
-          product.quantityAvailable = typeof variantData.quantityAvailable === 'number'
-            ? variantData.quantityAvailable
-            : null;
-          product.currentlyNotInStock = variantData.currentlyNotInStock === true;
-
-          const productCard = e.target.closest('.product-card');
-          applyProductPageVariantSelection({
-            product,
-            variantData,
-            productCard,
-            formatPrice: (amount: any) => CurrencyManager.convertAndFormat(
-              getSubscriptionProductCardPrice(this, amount),
-              CurrencyManager.getCurrencyInfo(),
-            ),
-            showCompareAtPrice: this._getProductPageControls?.()?.showCompareAtPrices !== false,
-          });
-
-          const isInpageProductGrid = newProductGrid.classList.contains('bw-ppb-grid-product-grid')
-            || newProductGrid.classList.contains('bw-ppb-cascade-product-list');
-          if (isInpageProductGrid && typeof this._renderInpageStepProducts === 'function') {
-            this._renderInpageStepProducts(stepIndex, newProductGrid);
-            return;
-          }
-
-          // Re-render the active modal card context without mutating the bundle selection.
-          this.renderModalProducts(stepIndex);
-          const replacementInputs = this.elements?.modal?.querySelectorAll?.(
-            '.ppb-variant-selector-input',
-          ) ?? [];
-          const replacementInput = Array.from(replacementInputs as ArrayLike<any>).find((input: any) => (
-            String(input?.value ?? '') === String(newVariantId)
-          ));
-          replacementInput?.focus?.({ preventScroll: true });
-          this.updateModalNavigation();
-          this.updateModalFooterMessaging();
-        }
-      }
-    }
-  });
 }
 };

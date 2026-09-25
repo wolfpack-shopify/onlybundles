@@ -5,7 +5,7 @@ title: Build Process
 type: operations
 status: authoritative
 summary: Global Shopify CLI, Function, asset, lint, and pre-commit requirements for deployable application and storefront builds.
-last_audited: 2026-09-24
+last_audited: 2026-09-25
 owners:
   - engineering
 domains:
@@ -15,6 +15,7 @@ systems:
 source_paths:
   - apps/OnlyBundles-app/scripts/build-storefront.mjs
   - apps/OnlyBundles-app/scripts/build-cart-transform-function.mjs
+  - apps/OnlyBundles-app/scripts/build-and-verify-cart-transform.mjs
   - apps/OnlyBundles-app/scripts/build-discount-function.mjs
   - apps/OnlyBundles-app/extensions/bundle-cart-transform-rs/Cargo.toml
   - apps/OnlyBundles-app/extensions/bundle-discount-function/shopify.extension.toml
@@ -138,7 +139,6 @@ Keep split source modules semantically named by responsibility. Mechanical split
 
 ```bash
 npm run build:cart-transform
-shopify app function build --path apps/OnlyBundles-app/extensions/bundle-cart-transform-rs
 wc -c apps/OnlyBundles-app/extensions/bundle-cart-transform-rs/target/wasm32-unknown-unknown/release/bundle_cart_transform_rs.wasm
 ```
 
@@ -152,7 +152,9 @@ size printed by either `npm run build:cart-transform` or
 CLI printed `280301 bytes` and completed successfully; the configured output
 path contained the Shopify-optimized 250,491-byte WASM. Always verify that
 configured path with `wc -c` before diagnosing a size-limit failure.
-WASM output is not committed.
+WASM output is not committed. The npm command is the canonical build gate;
+calling `shopify app function build` directly is a lower-level diagnostic and
+does not run repository acceptance checks.
 
 A successful app build is not proof that the Function query or executable works
 in preview. In the 2026-09-19 investigation, preview rejected a Cart Transform
@@ -163,8 +165,10 @@ Removing the obsolete direct-parent self-expansion fields subsequently reduced
 the query below that limit. Dedicated parent variants require widget selections;
 their `requiresComponents` protection remains enabled.
 
-Also replay the final WASM through Shopify CLI before treating the build as
-verified. Broad `wasm-snip --snip-rust-panicking-code` removes
+The canonical build command automatically replays the final WASM through
+Shopify CLI with both an ordinary cart and a valid bundle. The ordinary cart
+must complete without operations, while the valid bundle must emit a
+`linesMerge`. Broad `wasm-snip --snip-rust-panicking-code` removes
 `std::panicking::set_hook`, which Shopify's Rust wrapper calls on every execution.
 The optimizer can collapse the exported function to an immediate `unreachable`:
 a suspiciously small binary then passes build while every cart execution traps
@@ -198,7 +202,9 @@ SIT Functions succeeded. A diagnostic Storefront `cartCreate` returned
 scoped to the querying app, so the SIT query did not show the production app's
 separate transform on the same QA store. Streaming production-app failure logs
 for that specific store exposed a five-instruction Cart Transform trap with
-`blockOnFailure: true`. Theme embed isolation does not disable installed backend
+`blockOnFailure: true`. Canonical registrations use `blockOnFailure: false` so
+a Function failure degrades to unmodified cart processing instead of blocking
+all cart mutations. Theme embed isolation does not disable installed backend
 Functions. Inspect each relevant app's registration and logs before changing
 SIT pricing code or weakening its failure handling. Removing another app's
 registration requires explicit approval and a restoration plan; do not uninstall

@@ -13,13 +13,10 @@ const MOCK_RUST_FUNCTION_ID = 'gid://shopify/ShopifyFunction/rust-1';
 function rustFunctionsMock() {
   return createMockGraphQLResponse({
     shopifyFunctions: {
-      edges: [{
-        node: {
-          id: MOCK_RUST_FUNCTION_ID,
-          title: 'Bundle Cart Transform (Rust)',
-          apiType: 'cart_transform',
-          description: 'Wolfpack Bundles Rust/WASM port',
-        }
+      nodes: [{
+        id: MOCK_RUST_FUNCTION_ID,
+        handle: 'bundle-cart-transform-rs',
+        apiType: 'cart_transform',
       }]
     }
   });
@@ -28,7 +25,7 @@ function rustFunctionsMock() {
 /** Mock that returns no matching Shopify function (simulates function not deployed) */
 function rustFunctionsEmptyMock() {
   return createMockGraphQLResponse({
-    shopifyFunctions: { edges: [] }
+    shopifyFunctions: { nodes: [] }
   });
 }
 
@@ -61,7 +58,7 @@ describe('CartTransformService', () => {
             cartTransform: {
               id: 'gid://shopify/CartTransform/1',
               functionId: MOCK_RUST_FUNCTION_ID,
-              blockOnFailure: true
+              blockOnFailure: false
             },
             userErrors: []
           }
@@ -82,7 +79,7 @@ describe('CartTransformService', () => {
       expect(createCall[1]).toEqual({
         variables: {
           functionHandle: 'bundle-cart-transform-rs',
-          blockOnFailure: true,
+          blockOnFailure: false,
         },
       });
     });
@@ -100,7 +97,7 @@ describe('CartTransformService', () => {
               node: {
                 id: existingTransformId,
                 functionId: MOCK_RUST_FUNCTION_ID,
-                blockOnFailure: true
+                blockOnFailure: false
               }
             }]
           }
@@ -117,8 +114,48 @@ describe('CartTransformService', () => {
       expect(mockShopifyAdmin.graphql).toHaveBeenCalledTimes(2);
     });
 
-    it('recreates an existing Rust transform when failure blocking is disabled', async () => {
-      const existingTransformId = 'gid://shopify/CartTransform/unsafe';
+    it('fails safely when the existing transform query fails', async () => {
+      mockShopifyAdmin.graphql
+        .mockResolvedValueOnce(rustFunctionsMock())
+        .mockResolvedValueOnce(createMockGraphQLResponse(undefined, [
+          { message: 'Cart Transform lookup unavailable' },
+        ]));
+
+      const result = await CartTransformService.activateForNewInstallation(
+        mockShopifyAdmin,
+        shopDomain,
+      );
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Could not inspect existing CartTransform: Cart Transform lookup unavailable',
+      });
+      expect(mockShopifyAdmin.graphql).toHaveBeenCalledTimes(2);
+    });
+
+    it('fails safely when Shopify rejects the existing transform request', async () => {
+      mockShopifyAdmin.graphql
+        .mockResolvedValueOnce(rustFunctionsMock())
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 503,
+          json: jest.fn(),
+        });
+
+      const result = await CartTransformService.activateForNewInstallation(
+        mockShopifyAdmin,
+        shopDomain,
+      );
+
+      expect(result).toEqual({
+        success: false,
+        error: 'Could not inspect existing CartTransform: Cart transform lookup failed with HTTP 503',
+      });
+      expect(mockShopifyAdmin.graphql).toHaveBeenCalledTimes(2);
+    });
+
+    it('recreates an existing Rust transform when failure blocking is enabled', async () => {
+      const existingTransformId = 'gid://shopify/CartTransform/blocking';
 
       mockShopifyAdmin.graphql
         .mockResolvedValueOnce(rustFunctionsMock())
@@ -128,7 +165,7 @@ describe('CartTransformService', () => {
               node: {
                 id: existingTransformId,
                 functionId: MOCK_RUST_FUNCTION_ID,
-                blockOnFailure: false,
+                blockOnFailure: true,
               }
             }]
           }
@@ -139,9 +176,9 @@ describe('CartTransformService', () => {
         .mockResolvedValueOnce(createMockGraphQLResponse({
           cartTransformCreate: {
             cartTransform: {
-              id: 'gid://shopify/CartTransform/safe',
+              id: 'gid://shopify/CartTransform/graceful',
               functionId: MOCK_RUST_FUNCTION_ID,
-              blockOnFailure: true,
+              blockOnFailure: false,
             },
             userErrors: []
           }
@@ -154,7 +191,7 @@ describe('CartTransformService', () => {
 
       expect(result).toEqual({
         success: true,
-        cartTransformId: 'gid://shopify/CartTransform/safe',
+        cartTransformId: 'gid://shopify/CartTransform/graceful',
       });
       expect(mockShopifyAdmin.graphql).toHaveBeenCalledTimes(4);
     });
@@ -183,7 +220,7 @@ describe('CartTransformService', () => {
             cartTransform: {
               id: 'gid://shopify/CartTransform/current',
               functionId: MOCK_RUST_FUNCTION_ID,
-              blockOnFailure: true,
+              blockOnFailure: false,
             },
             userErrors: []
           }
@@ -201,8 +238,8 @@ describe('CartTransformService', () => {
       expect(mockShopifyAdmin.graphql).toHaveBeenCalledTimes(4);
     });
 
-    it('returns failure without creating when an unsafe transform cannot be deleted', async () => {
-      const existingTransformId = 'gid://shopify/CartTransform/unsafe';
+    it('returns failure without creating when a blocking transform cannot be deleted', async () => {
+      const existingTransformId = 'gid://shopify/CartTransform/blocking';
 
       mockShopifyAdmin.graphql
         .mockResolvedValueOnce(rustFunctionsMock())
@@ -212,7 +249,7 @@ describe('CartTransformService', () => {
               node: {
                 id: existingTransformId,
                 functionId: MOCK_RUST_FUNCTION_ID,
-                blockOnFailure: false,
+                blockOnFailure: true,
               }
             }]
           }
@@ -232,7 +269,7 @@ describe('CartTransformService', () => {
       expect(result).toEqual({
         success: false,
         cartTransformId: existingTransformId,
-        error: 'Could not replace unsafe CartTransform',
+        error: 'Could not replace blocking CartTransform',
       });
       expect(mockShopifyAdmin.graphql).toHaveBeenCalledTimes(3);
     });
@@ -291,9 +328,7 @@ describe('CartTransformService', () => {
       mockShopifyAdmin.graphql
         // 1. getRustFunctionId succeeds
         .mockResolvedValueOnce(rustFunctionsMock())
-        // 2. checkExisting — network error (caught internally, returns {exists: false})
-        .mockRejectedValueOnce(new Error('Network error'))
-        // 3. createCartTransform — network error (propagates to outer catch)
+        // 2. checkExisting — a failed lookup must stop before creation
         .mockRejectedValueOnce(new Error('Network error'));
 
       const result = await CartTransformService.activateForNewInstallation(
@@ -302,7 +337,8 @@ describe('CartTransformService', () => {
       );
 
       expect(result.success).toBe(false);
-      expect(result.error).toBe('Network error');
+      expect(result.error).toBe('Could not inspect existing CartTransform: Network error');
+      expect(mockShopifyAdmin.graphql).toHaveBeenCalledTimes(2);
     });
   });
 
@@ -323,7 +359,7 @@ describe('CartTransformService', () => {
             cartTransform: {
               id: 'gid://shopify/CartTransform/1',
               functionId: MOCK_RUST_FUNCTION_ID,
-              blockOnFailure: true
+              blockOnFailure: false
             },
             userErrors: []
           }
@@ -412,7 +448,7 @@ describe('CartTransformService', () => {
               node: {
                 id: 'gid://shopify/CartTransform/existing',
                 functionId: MOCK_RUST_FUNCTION_ID,
-                blockOnFailure: true
+                blockOnFailure: false
               }
             }]
           }
@@ -474,7 +510,7 @@ describe('CartTransformService', () => {
               node: {
                 id: 'gid://shopify/CartTransform/existing',
                 functionId: MOCK_RUST_FUNCTION_ID,
-                blockOnFailure: true
+                blockOnFailure: false
               }
             }]
           }
@@ -504,7 +540,7 @@ describe('CartTransformService', () => {
         .mockResolvedValueOnce({
           json: jest.fn().mockResolvedValue({
             // Missing data property entirely
-            shopifyFunctions: { edges: [] }
+            shopifyFunctions: { nodes: [] }
           })
         });
 

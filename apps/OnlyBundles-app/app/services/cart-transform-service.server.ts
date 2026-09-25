@@ -18,7 +18,19 @@ interface CartTransformMetafieldSyncResult {
 }
 
 const RUST_FUNCTION_HANDLE = 'bundle-cart-transform-rs';
-const RUST_FUNCTION_TITLE = 'Bundle Cart Transform (Rust)';
+
+type CartTransformLookup =
+  | {
+      success: true;
+      exists: boolean;
+      id?: string;
+      functionId?: string;
+      blockOnFailure?: boolean;
+    }
+  | {
+      success: false;
+      error: string;
+    };
 
 export class CartTransformService {
   /**
@@ -30,13 +42,10 @@ export class CartTransformService {
     const QUERY = `
       query GetShopifyFunctions {
         shopifyFunctions(first: 25) {
-          edges {
-            node {
-              id
-              title
-              apiType
-              description
-            }
+          nodes {
+            id
+            handle
+            apiType
           }
         }
       }
@@ -45,15 +54,13 @@ export class CartTransformService {
     try {
       const response = await admin.graphql(QUERY);
       const data = await response.json() as any;
-      const edges = data.data?.shopifyFunctions?.edges || [];
-      const match = edges.find((e: any) => {
-        const fn = e.node;
-        return fn.apiType === 'cart_transform' && (
-          fn.title === RUST_FUNCTION_TITLE ||
-          fn.description?.includes('Rust/WASM port')
-        );
-      });
-      return match?.node?.id ?? null;
+      if (data.errors) return null;
+      const functions = data.data?.shopifyFunctions?.nodes || [];
+      const match = functions.find((fn: any) => (
+        fn.apiType === 'cart_transform'
+        && fn.handle === RUST_FUNCTION_HANDLE
+      ));
+      return match?.id ?? null;
     } catch {
       return null;
     }
@@ -106,7 +113,7 @@ export class CartTransformService {
    */
   private static async checkExistingCartTransform(
     admin: AdminApiContext
-  ): Promise<{ exists: boolean; id?: string; functionId?: string; blockOnFailure?: boolean }> {
+  ): Promise<CartTransformLookup> {
     const CHECK_EXISTING_QUERY = `
       query CheckExistingCartTransform {
         cartTransforms(first: 5) {
@@ -123,6 +130,12 @@ export class CartTransformService {
 
     try {
       const response = await admin.graphql(CHECK_EXISTING_QUERY);
+      if (response.ok === false) {
+        return {
+          success: false,
+          error: `Cart transform lookup failed with HTTP ${response.status}`,
+        };
+      }
       const data = await response.json() as any;
 
       if (data.errors) {
@@ -130,11 +143,15 @@ export class CartTransformService {
           component: 'cart-transform',
           operation: 'check-existing'
         }, data.errors);
-        return { exists: false };
+        return {
+          success: false,
+          error: data.errors.map((error: any) => error.message).join(', '),
+        };
       }
 
       const existingTransform = data.data?.cartTransforms?.edges?.[0];
       return {
+        success: true,
         exists: !!existingTransform,
         id: existingTransform?.node?.id,
         functionId: existingTransform?.node?.functionId,
@@ -145,43 +162,12 @@ export class CartTransformService {
         component: 'cart-transform',
         operation: 'check-existing'
       }, error);
-      return { exists: false };
-    }
-  }
-
-  private static async findCartTransformByFunctionId(
-    admin: AdminApiContext,
-    functionId: string
-  ): Promise<{ id?: string; functionId?: string }> {
-    const QUERY = `
-      query FindCartTransformByFunctionId {
-        cartTransforms(first: 10) {
-          edges {
-            node {
-              id
-              functionId
-            }
-          }
-        }
-      }
-    `;
-
-    try {
-      const response = await admin.graphql(QUERY);
-      const data = await response.json() as any;
-      const match = data.data?.cartTransforms?.edges?.find((edge: any) => {
-        return edge.node?.functionId === functionId;
-      });
       return {
-        id: match?.node?.id,
-        functionId: match?.node?.functionId,
+        success: false,
+        error: error instanceof Error
+          ? error.message
+          : 'Cart transform lookup failed',
       };
-    } catch (error: any) {
-      AppLogger.warn('Error finding cart transform by function ID', {
-        component: 'cart-transform',
-        operation: 'find-by-function-id'
-      }, error);
-      return {};
     }
   }
 
@@ -213,7 +199,7 @@ export class CartTransformService {
 
     try {
       const response = await admin.graphql(CREATE_CART_TRANSFORM_MUTATION, {
-        variables: { functionHandle, blockOnFailure: true }
+        variables: { functionHandle, blockOnFailure: false }
       });
       const data = await response.json() as any;
 
@@ -250,8 +236,8 @@ export class CartTransformService {
    *
    * Handles three cases:
    * 1. No CartTransform exists → create new with Rust handle
-   * 2. CartTransform uses Rust with failure blocking → skip (already correct)
-   * 3. CartTransform uses Rust without failure blocking → delete and recreate safely
+   * 2. CartTransform uses Rust with graceful degradation → skip (already correct)
+   * 3. CartTransform uses Rust with failure blocking → delete and recreate safely
    * 4. CartTransform points to another function → delete stale and recreate safely
    *
    * This replaces the old "exists → skip" logic which silently left merchants
@@ -278,19 +264,26 @@ export class CartTransformService {
 
       const existingCheck = await this.checkExistingCartTransform(admin);
 
+      if (!existingCheck.success) {
+        return {
+          success: false,
+          error: `Could not inspect existing CartTransform: ${existingCheck.error}`,
+        };
+      }
+
       if (existingCheck.exists) {
         if (
           existingCheck.functionId === rustFunctionId &&
-          existingCheck.blockOnFailure === true
+          existingCheck.blockOnFailure === false
         ) {
-          AppLogger.info('Cart transform already uses fail-closed Rust function', {
+          AppLogger.info('Cart transform already uses graceful-degradation Rust function', {
             component: 'cart-transform',
             operation: 'activate'
           }, { shopDomain, cartTransformId: existingCheck.id });
           return { success: true, cartTransformId: existingCheck.id, alreadyExists: true };
         }
 
-        AppLogger.info('Unsafe or stale CartTransform found — replacing with fail-closed Rust version', {
+        AppLogger.info('Blocking or stale CartTransform found — replacing with graceful-degradation Rust version', {
           component: 'cart-transform',
           operation: 'activate'
         }, {
@@ -305,7 +298,7 @@ export class CartTransformService {
           return {
             success: false,
             cartTransformId: existingCheck.id,
-            error: 'Could not replace unsafe CartTransform',
+            error: 'Could not replace blocking CartTransform',
           };
         }
       }
@@ -485,8 +478,18 @@ export class CartTransformService {
         return { success: false, error: errorMsg };
       }
 
-      let cartTransformId = (await this.findCartTransformByFunctionId(admin, rustFunctionId)).id;
-      if (!cartTransformId) {
+      const existingCheck = await this.checkExistingCartTransform(admin);
+      if (!existingCheck.success) {
+        return {
+          success: false,
+          error: `Could not inspect existing CartTransform: ${existingCheck.error}`,
+        };
+      }
+
+      let cartTransformId = existingCheck.functionId === rustFunctionId
+        ? existingCheck.id
+        : undefined;
+      if (!cartTransformId || existingCheck.blockOnFailure !== false) {
         const activation = await this.activateForNewInstallation(admin, shopDomain);
         if (!activation.success || !activation.cartTransformId) {
           return { success: false, error: activation.error ?? 'Cart transform activation failed' };

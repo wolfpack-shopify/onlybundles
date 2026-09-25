@@ -3,6 +3,7 @@ import { publishBundleRuntimePolicy } from '../../../app/services/bundle-runtime
 import { syncScheduledBundleDiscounts } from '../../../app/services/scheduled-bundle-discount.server';
 import { BundleType } from "../../../app/constants/bundle";
 import { updateBundleProductMetafields } from "../../../app/services/bundles/metafield-sync/operations/bundle-product.server";
+import { buildSyncBundleConfiguration } from "../../../app/routes/app/app.bundles.product-page-bundle.configure.$bundleId/handlers/runtime-config.server";
 import {
   getFirstVariantId,
   batchGetFirstVariantsWithPrices,
@@ -612,6 +613,58 @@ describe("updateBundleProductMetafields", () => {
         swatchTooltipEnabled: true,
         multiLangData: { en: { title: "Pick audit items" } },
       },
+    ]);
+  });
+
+  it("keeps category products through the PPB runtime builder and metafield publisher", async () => {
+    const admin = makeAdmin();
+    const productId = "gid://shopify/Product/9427287703811";
+    const variantId = "gid://shopify/ProductVariant/48191691456771";
+    const rawBundle = makeBundleConfig(BundleType.PRODUCT_PAGE, {
+      steps: [{
+        id: "step-1",
+        name: "Step 1",
+        position: 0,
+        minQuantity: 1,
+        maxQuantity: 1,
+        StepProduct: [{
+          productId,
+          title: "Category Product",
+          variants: [{ id: variantId, price: "123.00" }],
+        }],
+        StepCategory: [{
+          id: "category-1",
+          name: "Category 1",
+          products: [{
+            id: productId,
+            title: "Category Product",
+            variants: [{ id: variantId, price: "123.00" }],
+          }],
+          collections: [],
+        }],
+        collections: [],
+      }],
+    });
+    const runtimeConfig = buildSyncBundleConfiguration(
+      rawBundle,
+      "gid://shopify/Product/999",
+    );
+
+    await updateBundleProductMetafields(
+      admin,
+      "gid://shopify/Product/999",
+      runtimeConfig,
+    );
+
+    const metafields = getMetafieldsSetPayload(admin);
+    const parsed = JSON.parse(
+      metafields.find((field: any) => field.key === "bundle_ui_config").value,
+    );
+    expect(parsed.steps[0].categories[0].products).toEqual([
+      expect.objectContaining({
+        selectionId: productId,
+        title: "Category Product",
+      }),
     ]);
   });
 

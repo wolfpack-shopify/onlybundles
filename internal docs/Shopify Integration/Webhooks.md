@@ -5,7 +5,7 @@ title: Webhooks
 type: architecture-note
 status: active
 summary: Defines authenticated Remix webhook ingress, active Shopify subscriptions, Inngest handoff, and delivery-volume safeguards.
-last_audited: 2026-09-14
+last_audited: 2026-09-25
 owners:
   - engineering
 domains:
@@ -21,6 +21,7 @@ source_paths:
   - apps/OnlyBundles-app/app/routes/api/webhooks.tsx
   - apps/OnlyBundles-app/app/services/webhooks/topics.ts
   - apps/OnlyBundles-app/app/services/webhooks/product-delete-relevance.server.ts
+  - apps/OnlyBundles-app/app/services/shop-data-cleanup.server.ts
   - apps/OnlyBundles-app/app/services/webhooks/processor.server.ts
 related_docs:
   - internal docs/Shopify Integration/Admin API.md
@@ -111,11 +112,13 @@ implicit substitute.
 
 ## App Uninstall Cleanup
 
-`app/uninstalled` removes app-owned operational data for the shop: bundles and their cascaded child records, sessions, design settings, queued jobs, compliance records, old webhook events, old business events, and the shop record.
+`app/uninstalled` removes app-owned operational data for the shop: bundles and their cascaded child records, sessions, design settings, queued jobs, compliance records, old webhook events, old business events, and the shop record. The shared cleanup owner performs those deletions in one database transaction, excluding the webhook event currently being processed so the processor can finish its idempotency lifecycle.
 
 Revenue analytics are intentionally retained after uninstall. `OrderAttribution` and `BundleEngagement` are not deleted by the uninstall handler because they power historical revenue and funnel reporting for merchant performance driven by the app.
 
 The handler deletes old `BusinessEvent` rows before writing the final `app_uninstalled` event so churned shops do not keep growing event-log storage while still preserving a final uninstall marker.
+
+The mandatory `shop/redact` webhook uses the same transactional cleanup owner in full-purge mode. It also removes `OrderAttribution`, `BundleEngagement`, and the current webhook record, leaving no app-owned shop data after Shopify's required retention window. This full GDPR erasure is deliberately distinct from the immediate operational cleanup performed for an ordinary uninstall.
 
 ## Removed Topics
 

@@ -4,8 +4,8 @@ id: deployment-general-sync
 title: Deployment General Sync
 type: operations
 status: active
-summary: Post-deploy replay of the current persisted bundle storefront contract behind one true or false flag.
-last_audited: 2026-09-16
+summary: Shop-scoped post-deploy replay of the current persisted storefront contract behind one true or false flag.
+last_audited: 2026-09-25
 owners:
   - engineering
 domains:
@@ -46,22 +46,26 @@ are replayed. The command is a no-op unless:
 WPB_DEPLOYMENT_GENERAL_SYNC=true
 ```
 
-When enabled, it:
+When enabled, each installed shop is the orchestration unit. Shared Shopify setup
+is performed once per shop; saved bundle values are then replayed as child work:
 
 1. Lists installed shops and their saved FPB and PPB bundle rows.
 2. Acquires each shop's compliant offline Admin client.
 3. Ensures the current variant metafield definitions.
-4. Ensures the shop-level PPB Storefront token, environment-correct app-proxy
-   root, controls/language runtime, and generated Design CSS metafields.
+4. Completes Cart Transform setup and ensures the shop-level PPB Storefront
+   token, environment-correct app-proxy root, FPB runtime, controls/language
+   runtime, generated Design CSS metafields, and theme colors once for the shop.
 5. Checks saved variant references with Admin GraphQL `nodes`, in batches of
    at most 250 IDs, then removes confirmed missing or malformed references
    through the existing persistence contract. Storefront availability is not
    evidence that a variant has been deleted. Access errors, incomplete responses,
    unexpected node identities, and persistence failures stop that bundle's sync.
-6. Calls `syncBundleStorefrontNow(... reason: "sync_bundle")` after remediation.
-   It reloads the complete bundle graph from Prisma, activates the Cart Transform,
-   and writes current app-owned product/variant metafield values. Publishing
-   before remediation would leave Shopify using the stale composition.
+6. Calls `syncBundleStorefrontDataNow(... reason: "sync_bundle")` for each saved
+   bundle after remediation. It reloads the complete bundle graph from Prisma and
+   writes current app-owned product/variant metafield values without repeating
+   shop-level setup. Missing or obsolete FPB template identifiers are persisted
+   as the canonical Standard selection before publication; storefront aliases are
+   not used. Publishing before remediation would leave Shopify using stale state.
 7. Ensures the automatic add-on discount once for every shop with an enabled
    saved FPB add-on configuration.
 8. Ensures the role-tagged subscription initial-order automatic discount once
@@ -72,8 +76,10 @@ When enabled, it:
    `recurringCycleLimit=0`, and the Function accepts it only when the signed
    bundle selection also authorizes recurring bundle pricing.
 
-Any shop or bundle failure makes the command exit non-zero. This is the only
-deployment sync workflow and `WPB_DEPLOYMENT_GENERAL_SYNC` is its only flag.
+Any shop or bundle failure marks that shop failed and makes the command exit
+non-zero. Sibling bundles and other shops continue so the summary preserves
+bundle-level diagnostics. This is the only deployment sync workflow and
+`WPB_DEPLOYMENT_GENERAL_SYNC` is its only flag.
 
 Update the general-sync script, service, and tests only when the Prisma schema
 or metafield definition or value contract changes. Do not add placeholder

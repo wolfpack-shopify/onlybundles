@@ -9,6 +9,7 @@
 
 import db from "../../../db.server";
 import { AppLogger } from "../../../lib/logger";
+import { cleanupShopData } from "../../shop-data-cleanup.server";
 import type { WebhookProcessResult } from "../types";
 
 /**
@@ -128,75 +129,11 @@ export async function handleCustomerRedact(
  */
 export async function handleShopRedact(
   shopDomain: string,
-  payload: any,
-  currentWebhookEventId?: string
+  _payload: any,
+  _currentWebhookEventId?: string
 ): Promise<WebhookProcessResult> {
   try {
-    // Store compliance record first
-    await db.complianceRecord.create({
-      data: {
-        shop: shopDomain,
-        type: "shop_redact",
-        payload,
-        status: "processing"
-      }
-    });
-
-    // Delete all shop data (cascading deletes will handle related records)
-    const shop = await db.shop.findUnique({
-      where: { shopDomain }
-    });
-
-    if (shop) {
-      await db.shop.delete({
-        where: { id: shop.id }
-      });
-    }
-
-    // Delete bundles for this shop
-    await db.bundle.deleteMany({
-      where: { shopId: shopDomain }
-    });
-
-    // Delete sessions
-    await db.session.deleteMany({
-      where: { shop: shopDomain }
-    });
-
-    // Delete queued jobs
-    await db.queuedJob.deleteMany({
-      where: { shopId: shopDomain }
-    });
-
-    // Delete webhook events (excluding current event being processed)
-    // SAFETY: Explicitly handle the case where we need to exclude current webhook
-    if (currentWebhookEventId) {
-      // Safe: Delete all webhook events for this shop EXCEPT the current one
-      await db.webhookEvent.deleteMany({
-        where: {
-          shopDomain,
-          id: { not: currentWebhookEventId }
-        }
-      });
-    } else {
-      // Fallback: If no current webhook ID provided, delete all
-      // This should rarely happen, but is safe for cleanup scenarios
-      await db.webhookEvent.deleteMany({
-        where: { shopDomain }
-      });
-    }
-
-    // Update compliance record
-    await db.complianceRecord.updateMany({
-      where: {
-        shop: shopDomain,
-        type: "shop_redact"
-      },
-      data: {
-        status: "completed",
-        processedAt: new Date()
-      }
-    });
+    await cleanupShopData(shopDomain, { purgeAnalytics: true });
 
     AppLogger.info("Shop data redacted", {
       component: "webhook-processor",

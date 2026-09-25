@@ -15,11 +15,12 @@ async function main() {
     resolveGeneralSyncEnvironment,
     runDeploymentGeneralSync,
   } = await import("../app/services/deployment-general-sync.server");
-  const { syncBundleStorefrontNow } = await import("../app/services/bundles/storefront-sync.server");
+  const {
+    prepareShopStorefrontSync,
+    syncBundleStorefrontDataNow,
+  } = await import("../app/services/bundles/storefront-sync.server");
   const { ensureVariantBundleMetafieldDefinitions } = await import("../app/services/bundles/metafield-sync/operations/definitions.server");
   const { AddOnDiscountFunctionService } = await import("../app/services/addon-discount-function-service.server");
-  const { syncPpbStorefrontRuntime } = await import("../app/services/ppb-storefront-runtime.server");
-  const { syncFpbStorefrontRuntime } = await import("../app/services/fpb-storefront-runtime.server");
   const { syncStorefrontControlsRuntime } = await import("../app/services/storefront-controls-runtime.server");
   const { unauthenticated } = await import("../app/shopify.server");
   const { prisma: db } = await import("../app/db.server");
@@ -44,17 +45,15 @@ async function main() {
       },
       ensureMetafieldDefinitions: (admin) =>
         ensureVariantBundleMetafieldDefinitions(admin),
-      syncPpbRuntime: (admin, shopDomain) =>
-        syncPpbStorefrontRuntime(
-          admin as any,
+      prepareShopStorefront: (admin, shopDomain) =>
+        prepareShopStorefrontSync({
+          admin: admin as any,
           shopDomain,
-          configuredProxyRoot,
-        ),
-      syncFpbRuntime: (admin, shopDomain) =>
-        syncFpbStorefrontRuntime(admin as any, shopDomain),
+          proxyRoot: configuredProxyRoot,
+        }),
       syncStorefrontControlsRuntime: (admin, shopDomain) =>
         syncStorefrontControlsRuntime(admin as any, shopDomain),
-      syncBundle: syncBundleStorefrontNow as any,
+      syncBundleData: syncBundleStorefrontDataNow as any,
       updateStepProductVariants: async ({ stepProductId, variants }: any) => {
         await db.stepProduct.update({
           where: { id: stepProductId },

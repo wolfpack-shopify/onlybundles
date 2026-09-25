@@ -11,6 +11,7 @@ const mockDb = {
   shop: { deleteMany: jest.fn() },
   orderAttribution: { deleteMany: jest.fn() },
   bundleEngagement: { deleteMany: jest.fn() },
+  $transaction: jest.fn(),
 };
 
 const mockGetCachedShopifyShopGid = jest.fn();
@@ -45,6 +46,7 @@ describe("handleAppUninstalled", () => {
     mockDb.webhookEvent.deleteMany.mockResolvedValue({ count: 3 });
     mockDb.businessEvent.deleteMany.mockResolvedValue({ count: 12 });
     mockDb.shop.deleteMany.mockResolvedValue({ count: 1 });
+    mockDb.$transaction.mockImplementation(async (operation) => operation(mockDb));
     mockGetCachedShopifyShopGid.mockResolvedValue("gid://shopify/Shop/123");
     mockRecordBusinessEvent.mockResolvedValue({ id: "business-event-1" });
   });

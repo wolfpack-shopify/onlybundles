@@ -338,6 +338,11 @@ updateProductQuantityDisplay(stepIndex: string|number, productId: any, quantity:
     const existingInlineControls = productCard.querySelector('.inline-quantity-controls');
     const cascadeRow = productCard.classList.contains('bw-ppb-cascade-product-row');
     const step = this.selectedBundle?.steps?.[stepIndex];
+    const productName = productCard.querySelector('.product-title')?.textContent?.trim() || 'product';
+    const quantityLabel = this._resolveText?.('quantityLabel', 'Quantity') || 'Quantity';
+    const decreaseLabel = this._resolveText?.('quantityDecreaseText', 'Decrease quantity') || 'Decrease quantity';
+    const increaseLabel = this._resolveText?.('quantityIncreaseText', 'Increase quantity') || 'Increase quantity';
+    const removeLabel = this._resolveText?.('removeProductText', 'Remove') || 'Remove';
     const productQuantityLimit = ConditionValidator.getAllowedQuantityPerProduct(
       this.selectedBundle?.validateQuantityPerProduct
     );
@@ -354,6 +359,21 @@ updateProductQuantityDisplay(stepIndex: string|number, productId: any, quantity:
 
     if (quantityDisplay) {
       quantityDisplay.textContent = quantity;
+      quantityDisplay.setAttribute('aria-label', `${quantityLabel}: ${quantity}`);
+    }
+
+    if (existingInlineControls) {
+      const decreaseBtn = existingInlineControls.querySelector('.qty-decrease');
+      if (decreaseBtn) {
+        decreaseBtn.setAttribute(
+          'aria-label',
+          `${quantity <= 1 ? removeLabel : decreaseLabel} ${productName}`,
+        );
+      }
+      const existingIncreaseBtn = existingInlineControls.querySelector('.qty-increase');
+      if (existingIncreaseBtn) {
+        existingIncreaseBtn.setAttribute('aria-label', `${increaseLabel} ${productName}`);
+      }
     }
 
     if (increaseBtn) {
@@ -394,7 +414,7 @@ updateProductQuantityDisplay(stepIndex: string|number, productId: any, quantity:
           productId,
           quantity,
           outOfStock || atMaxStock || atMaxProductQuantity,
-          productCard.querySelector('.product-title')?.textContent?.trim() || '',
+          productName,
         ));
       }
     } else if (actionWrapper && quantity <= 0) {

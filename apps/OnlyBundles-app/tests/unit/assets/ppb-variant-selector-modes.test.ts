@@ -3,6 +3,7 @@ const { JSDOM } = require("jsdom");
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const {
   createPpbVariantSelectorElement,
+  resolvePpbExactVariantSelection,
   resolvePpbOptionDimensionPresentation,
   resolvePpbCategoryVariantSelectorConfiguration,
   resolvePpbVariantSwatch,
@@ -162,7 +163,7 @@ describe("PPB variant selector modes", () => {
     });
 
     expect(selector.querySelector('[role="radiogroup"]')).not.toBeNull();
-    const pink = selector.querySelector('input[value="gid://shopify/ProductVariant/12"]');
+    const pink = selector.querySelector('input[value="Soft pink"]');
     expect(pink.getAttribute("aria-label")).toBe("Soft pink");
     pink.checked = true;
     pink.dispatchEvent(new runtimeDocument.defaultView.Event("change", { bubbles: true }));
@@ -182,18 +183,18 @@ describe("PPB variant selector modes", () => {
       document: runtimeDocument,
     });
 
-    const navy = selector.querySelector('input[value="gid://shopify/ProductVariant/11"]');
+    const navy = selector.querySelector('input[value="Navy"]');
     const navyControl = navy.closest("label");
     const tooltip = navyControl.querySelector('[role="tooltip"]');
     expect(navy.getAttribute("aria-describedby")).toBe(tooltip.id);
     expect(tooltip.textContent).toBe("Navy");
     expect(navyControl.style.getPropertyValue("--wpb-ppb-swatch-color")).toBe("#001F3F");
 
-    const pink = selector.querySelector('input[value="gid://shopify/ProductVariant/12"]');
+    const pink = selector.querySelector('input[value="Soft pink"]');
     expect(pink.closest("label").style.getPropertyValue("--wpb-ppb-swatch-color")).toBe("");
   });
 
-  it("uses Shopify option-value imagery for image swatches and removes unavailable values from focus", () => {
+  it("uses Shopify option-value imagery and keeps unavailable values selectable for status feedback", () => {
     const selector = createPpbVariantSelectorElement({
       product: product(),
       configuration: { variantSelectorMode: "image_swatch" },
@@ -202,11 +203,11 @@ describe("PPB variant selector modes", () => {
       isUnavailable: (variant: { available?: boolean }) => variant.available === false,
     });
 
-    expect(selector.querySelector('input[value="gid://shopify/ProductVariant/11"] + span img'))
+    expect(selector.querySelector('input[value="Navy"] + span img'))
       .toBeNull();
-    expect(selector.querySelector('input[value="gid://shopify/ProductVariant/12"] + span img').src)
+    expect(selector.querySelector('input[value="Soft pink"] + span img').src)
       .toBe("https://cdn.example/shopify-pink.jpg");
-    expect(selector.querySelector('input[value="gid://shopify/ProductVariant/13"]').disabled).toBe(true);
+    expect(selector.querySelector('input[value="Sold out"]').disabled).toBe(false);
   });
 
   it("clamps tooltip placement and flips it below a top-edge anchor", () => {
@@ -253,22 +254,29 @@ describe("PPB variant selector modes", () => {
       .not.toBe(pillTwo.querySelector("input").name);
   });
 
-  it("does not call the change callback for an unavailable value", () => {
+  it("reports an unavailable exact choice without calling the available-variant callback", () => {
     const changes: string[] = [];
+    const states: any[] = [];
     const selector = createPpbVariantSelectorElement({
       product: product(),
       configuration: { variantSelectorMode: "pill" },
       label: "Select variant",
       document: runtimeDocument,
+      onSelectionChange: (state: any) => states.push(state),
       onVariantChange: (variantId: string) => changes.push(variantId),
     });
     const unavailable = selector.querySelector(
-      'input[value="gid://shopify/ProductVariant/13"]',
+      'input[value="Sold out"]',
     );
 
     unavailable.dispatchEvent(new runtimeDocument.defaultView.Event("change", { bubbles: true }));
 
-    expect(unavailable.disabled).toBe(true);
+    expect(unavailable.disabled).toBe(false);
+    expect(states).toEqual([expect.objectContaining({
+      complete: true,
+      unavailable: true,
+      variant: expect.objectContaining({ id: "gid://shopify/ProductVariant/13" }),
+    })]);
     expect(changes).toEqual([]);
   });
 
@@ -348,13 +356,13 @@ describe("PPB variant selector modes", () => {
     expect(groups[1].querySelector("label").textContent).toBe("Size");
 
     const large = groups[1].querySelector('select[aria-label="Size"]');
-    large.value = "red-large";
+    large.value = "Large";
     large.dispatchEvent(new runtimeDocument.defaultView.Event("change", { bubbles: true }));
     const blue = groups[0].querySelector('input[aria-label="Blue"]');
     blue.checked = true;
     blue.dispatchEvent(new runtimeDocument.defaultView.Event("change", { bubbles: true }));
 
-    expect(changes).toEqual(["red-large", "blue-large"]);
+    expect(changes).toEqual(["blue-large"]);
   });
 
   it("uses a compact native select only for a non-swatch dimension in a multi-dimensional color-swatch configuration", () => {
@@ -387,7 +395,7 @@ describe("PPB variant selector modes", () => {
     const sizeGroup = selector.querySelector('[data-option-index="0"]');
     const colorGroup = selector.querySelector('[data-option-index="1"]');
     expect(sizeGroup.querySelectorAll("select")).toHaveLength(1);
-    expect(sizeGroup.querySelectorAll("option")).toHaveLength(7);
+    expect(sizeGroup.querySelectorAll("option")).toHaveLength(8);
     expect(sizeGroup.querySelector('[role="radiogroup"]')).toBeNull();
     expect(colorGroup.getAttribute("role")).toBe("radiogroup");
     expect(colorGroup.querySelectorAll('input[type="radio"]')).toHaveLength(4);
@@ -403,7 +411,7 @@ describe("PPB variant selector modes", () => {
       onVariantChange: (variantId: string) => changes.push(variantId),
     });
     const size = selector.querySelector('[data-option-index="0"] select');
-    size.value = "3XL-Black";
+    size.value = "3XL";
     size.dispatchEvent(new runtimeDocument.defaultView.Event("change", { bubbles: true }));
     const white = selector.querySelector(
       '[data-option-index="1"] input[data-option-value="White"]',
@@ -411,20 +419,22 @@ describe("PPB variant selector modes", () => {
     white.checked = true;
     white.dispatchEvent(new runtimeDocument.defaultView.Event("change", { bubbles: true }));
 
-    expect(changes).toEqual(["3XL-Black", "3XL-White"]);
+    expect(changes).toEqual(["3XL-White"]);
     expect(size.selectedOptions[0].dataset.optionValue).toBe("3XL");
     expect(white.checked).toBe(true);
   });
 
   it("renders each compact dimension at the product's current variant after a card rebuild", () => {
     const selectedProduct = sizeByColorProduct();
-    selectedProduct.variantId = "M-Navy";
-
     const selector = createPpbVariantSelectorElement({
       product: selectedProduct,
       configuration: { variantSelectorMode: "dropdown" },
       label: "Select variant",
       document: runtimeDocument,
+      initialSelectedOptions: [
+        { name: "Size", value: "M" },
+        { name: "Color", value: "Navy" },
+      ],
     });
 
     const size = selector.querySelector('[data-option-index="0"] select');
@@ -433,7 +443,7 @@ describe("PPB variant selector modes", () => {
     expect(color.selectedOptions[0].dataset.optionValue).toBe("Navy");
   });
 
-  it("falls back each unmapped dimension to a native select for image-swatch mode", () => {
+  it("keeps the configured visual mode for one dimension when stale swatch data reaches the storefront", () => {
     const selector = createPpbVariantSelectorElement({
       product: sizeByColorProduct(),
       configuration: { variantSelectorMode: "image_swatch" },
@@ -441,8 +451,8 @@ describe("PPB variant selector modes", () => {
       document: runtimeDocument,
     });
 
-    expect(selector.querySelectorAll("select")).toHaveLength(2);
-    expect(selector.querySelectorAll('[role="radiogroup"]')).toHaveLength(0);
+    expect(selector.querySelectorAll("select")).toHaveLength(1);
+    expect(selector.querySelectorAll('[role="radiogroup"]')).toHaveLength(1);
   });
 
   it("keeps the smaller visual dimension as pills and compacts the other dimension to a native select", () => {
@@ -460,5 +470,46 @@ describe("PPB variant selector modes", () => {
     expect(sizeGroup.querySelector('[role="radiogroup"]')).toBeNull();
     expect(colorGroup.getAttribute("role")).toBe("radiogroup");
     expect(colorGroup.querySelectorAll('input[type="radio"]')).toHaveLength(4);
+  });
+
+  it("uses per-dimension placeholders and waits for every dropdown selection", () => {
+    const changes: string[] = [];
+    const selector = createPpbVariantSelectorElement({
+      product: sizeByColorProduct(),
+      configuration: { variantSelectorMode: "dropdown" },
+      label: "Select variant",
+      document: runtimeDocument,
+      onVariantChange: (variantId: string) => changes.push(variantId),
+    });
+    const size = selector.querySelector('[data-option-index="0"] select');
+    const color = selector.querySelector('[data-option-index="1"] select');
+
+    expect(size.selectedOptions[0].textContent).toBe("Select Size");
+    expect(color.selectedOptions[0].textContent).toBe("Select Color");
+    size.value = "M";
+    size.dispatchEvent(new runtimeDocument.defaultView.Event("change", { bubbles: true }));
+    expect(changes).toEqual([]);
+    color.value = "Navy";
+    color.dispatchEvent(new runtimeDocument.defaultView.Event("change", { bubbles: true }));
+    expect(changes).toEqual(["M-Navy"]);
+  });
+
+  it("treats a complete but nonexistent combination as unavailable without substitution", () => {
+    const twoDimensionalProduct = sizeByColorProduct();
+    twoDimensionalProduct.variants = twoDimensionalProduct.variants.filter(
+      (variant: any) => variant.id !== "M-Navy",
+    );
+
+    expect(resolvePpbExactVariantSelection({
+      product: twoDimensionalProduct,
+      selectedOptions: [
+        { name: "Size", value: "M" },
+        { name: "Color", value: "Navy" },
+      ],
+    })).toEqual(expect.objectContaining({
+      complete: true,
+      unavailable: true,
+      variant: null,
+    }));
   });
 });

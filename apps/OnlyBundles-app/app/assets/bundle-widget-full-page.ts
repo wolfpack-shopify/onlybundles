@@ -37,6 +37,10 @@ import { renderBundlePurchaseOptions } from './widgets/shared/components/purchas
 import { bundleSubscriptionStorefrontMethods } from './widgets/shared/subscription-storefront-methods.js';
 import { installDiscountTierPillFeedback } from './widgets/shared/discount-tier-feedback.js';
 import { SharedCountdownMethods } from './widgets/shared/countdown-timer.js';
+import {
+  scheduleNonCriticalStorefrontTask,
+  shouldTrackStorefrontAnalytics,
+} from './widgets/shared/storefront-analytics.js';
 
 
 export class BundleWidgetFullPage {
@@ -182,9 +186,6 @@ export class BundleWidgetFullPage {
       // Hide overlay now that UI is fully rendered
       this.hideLoadingOverlay();
 
-      // Storefront analytics: signal that the bundle has rendered and is interactive.
-      this._emitStorefrontEvent('bundle-ready', { stepCount: this.selectedBundle?.steps?.length || 0 });
-
       // Attach event listeners
       this.attachEventListeners();
       this.setupCountdown();
@@ -195,9 +196,14 @@ export class BundleWidgetFullPage {
       this.container.dataset.initialized = 'true';
       this.isInitialized = true;
 
-      // Fire-and-forget: record a view event for analytics (skip in Theme Editor preview)
-      if (!window.Shopify?.designMode) {
-        this._recordView();
+      // Analytics is non-critical: exclude previews and wait until the page is loaded/idle.
+      if (shouldTrackStorefrontAnalytics()) {
+        scheduleNonCriticalStorefrontTask(() => {
+          this._emitStorefrontEvent('bundle-ready', {
+            stepCount: this.selectedBundle?.steps?.length || 0,
+          });
+          this._recordView();
+        });
       }
 
     } catch (error: any) {

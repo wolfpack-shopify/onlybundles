@@ -13,6 +13,7 @@ import { localizeBundleConfig } from '../../shared/localized-bundle-config.js';
 import { replaceManagedStyle } from '../../shared/managed-style.js';
 import { captureDiscountTierState } from '../../shared/discount-tier-feedback.js';
 import { storefrontPath } from '../../shared/storefront-path.js';
+import { shouldTrackStorefrontAnalytics } from '../../shared/storefront-analytics.js';
 
 function parseJsonObject(value: string | undefined) {
   if (!value) return null;
@@ -46,6 +47,7 @@ _ensureWpbSessionId() {
 
 _emitStorefrontEvent(name: any, detail: any = {}) {
   try {
+    if (!shouldTrackStorefrontAnalytics()) return;
     const fullDetail = Object.assign({
       bundleId: this.selectedBundle?.id || null,
       bundleType: this.container?.dataset?.bundleType || 'full_page',
@@ -61,6 +63,7 @@ _emitStorefrontEvent(name: any, detail: any = {}) {
 
 _sendEngagementBeacon(eventName: any) {
   try {
+    if (!shouldTrackStorefrontAnalytics()) return;
     const bundleId = this.selectedBundle?.id || this.container?.dataset?.bundleId;
     if (!bundleId) return;
     const guardKey = `wpb_engagement_${eventName}_${bundleId}`;
@@ -348,7 +351,6 @@ parseConfiguration() {
     bundleId: dataset.bundleId || null,
     isContainerProduct: dataset.isContainerProduct === 'true',
     containerBundleId: dataset.containerBundleId || null,
-    hideDefaultButtons: dataset.hideDefaultButtons === 'true',
     showTitle: dataset.showTitle === 'true', // Default to false to avoid duplicate with main header
     showDescription: dataset.showDescription !== 'false',
     showStepNumbers: dataset.showStepNumbers !== 'false',

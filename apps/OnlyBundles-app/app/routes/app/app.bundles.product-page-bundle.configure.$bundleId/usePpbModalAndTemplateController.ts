@@ -16,6 +16,7 @@ import type { usePpbPreviewReadinessHandlers } from "./usePpbPreviewReadinessHan
 import type { usePpbSaveHandlers } from "./usePpbSaveHandlers";
 import { navigateWithSaveBarConfirmation } from "../../../lib/admin-unsaved-navigation";
 import { isFreeTemplate } from "../../../lib/subscriptions/entitlements";
+import { resolveTemplateReadyStep } from "../../../lib/template-ready-step";
 
 export function usePpbModalAndTemplateController({
   base,
@@ -26,7 +27,7 @@ export function usePpbModalAndTemplateController({
   saveHandlers,
 }: {
   base: Pick<ReturnType<typeof usePpbBaseConfigureState>,
-    "isCollectionsModalOpen" | "isProductsModalOpen" | "navigate" | "shopify" | "setEntitlementFailure"
+    "appEmbedEnabled" | "isCollectionsModalOpen" | "isProductsModalOpen" | "navigate" | "shopify" | "setEntitlementFailure"
   > & {
     isFreePlan?: boolean;
   };
@@ -39,7 +40,7 @@ export function usePpbModalAndTemplateController({
     | "pendingDesignTemplate" | "selectTemplateOpenButtonRef" | "setIsSelectTemplateModalOpen"
     | "setIsSyncModalOpen" | "setPendingDesignPresetId" | "setPendingDesignTemplate"
     | "setTemplateModalStep" | "setTemplateSaveError" | "templateFetcher"
-    | "templateSubmissionStartedRef"
+    | "templateSubmissionStartedRef" | "setTemplateSyncRequired"
   >;
   placement: Pick<ReturnType<typeof usePpbPlacementHandlers>,
     "handleCloseCollectionsModal" | "handleCloseProductsModal"
@@ -90,6 +91,7 @@ export function usePpbModalAndTemplateController({
     templateState.setIsSelectTemplateModalOpen(false);
     templateState.setTemplateModalStep("templates");
     templateState.setTemplateSaveError(null);
+    templateState.setTemplateSyncRequired(false);
     templateState.lastTemplateRequestRef.current = null;
     templateState.lastTemplateResponseRef.current = null;
     templateState.templateSubmissionStartedRef.current = false;
@@ -109,6 +111,7 @@ export function usePpbModalAndTemplateController({
     templateState.setPendingDesignPresetId(selectedTemplate.presetId);
     templateState.setTemplateModalStep("templates");
     templateState.setTemplateSaveError(null);
+    templateState.setTemplateSyncRequired(false);
     templateState.lastTemplateRequestRef.current = null;
     templateState.lastTemplateResponseRef.current = null;
     templateState.templateSubmissionStartedRef.current = false;
@@ -125,6 +128,17 @@ export function usePpbModalAndTemplateController({
       !templateState.pendingDesignTemplate ||
       !templateState.pendingDesignPresetId
     ) {
+      return;
+    }
+    if (
+      templateState.pendingDesignTemplate === templateState.bundleDesignTemplate
+      && templateState.pendingDesignPresetId === templateState.bundleDesignPresetId
+    ) {
+      templateState.setTemplateSaveError(null);
+      templateState.setTemplateSyncRequired(false);
+      templateState.setTemplateModalStep(
+        resolveTemplateReadyStep(base.appEmbedEnabled),
+      );
       return;
     }
     if (
@@ -145,6 +159,7 @@ export function usePpbModalAndTemplateController({
       return;
     }
     templateState.setTemplateSaveError(null);
+    templateState.setTemplateSyncRequired(false);
     templateState.lastTemplateRequestRef.current = {
       template: templateState.pendingDesignTemplate,
       presetId: templateState.pendingDesignPresetId,
@@ -163,6 +178,10 @@ export function usePpbModalAndTemplateController({
     );
     templateState.templateFetcher.submit(fd, { method: "POST" });
   }, [base, templateState]);
+  const handleTemplateSyncRequired = useCallback(() => {
+    templateState.setIsSelectTemplateModalOpen(false);
+    templateState.setIsSyncModalOpen(true);
+  }, [templateState]);
   const handleTemplatePreview = useCallback((
     onPreviewOpened?: (previewUrl: string) => void,
   ) => {
@@ -201,6 +220,7 @@ export function usePpbModalAndTemplateController({
     openSelectTemplateModal,
     openDesignControlPanel,
     handleTemplateNext,
+    handleTemplateSyncRequired,
     handleTemplatePreview,
     handleConfirmDiscard,
   };

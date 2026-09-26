@@ -183,31 +183,11 @@ processProductsForStep(products: any[], step: any) {
       ? sourceVariants.filter((variant: any)  => variant?.available !== false)
       : sourceVariants;
 
-    if (step.displayVariantsAsIndividual && product.variants && product.variants.length > 0) {
-      if (customerVisibleVariants.length === 0) {
-        return [];
-      }
-      // Display each variant as a separate product; keep unavailable variants
-      // only when the saved Product Page control says not to hide them.
-      // Preserve parent product reference for variant selection and tracking
-      const processedVariants = customerVisibleVariants.map(normalizeVariant);
-
-      const processedOptions = (product.options || []).map((option: any) => (
-        typeof option === 'string' ? option : {
-          ...option,
-          optionValues: Array.isArray(option.optionValues)
-            ? option.optionValues.map((optionValue: any) => ({
-              ...optionValue,
-              swatch: optionValue.swatch ? {
-                color: optionValue.swatch.color ?? null,
-                image: optionValue.swatch.image ? { ...optionValue.swatch.image } : null,
-              } : null,
-            }))
-            : [],
-        }
-      ));
-
-      return customerVisibleVariants
+    if (step.displayVariantsAsIndividual && sourceVariants.length > 0) {
+      // Individual mode is an explicit variant inventory view. Keep every
+      // configured variant visible so unavailable variants can communicate
+      // their state instead of disappearing from the bundle.
+      return sourceVariants
         .map((variant: any)  => {
           // Storefront API: prioritize variant image, fallback to product featured image
           const imageUrl = variant?.image?.src || product.imageUrl || BUNDLE_WIDGET.PLACEHOLDER_IMAGE;
@@ -215,7 +195,14 @@ processProductsForStep(products: any[], step: any) {
           return {
             id: this.extractId(variant.id || variant.selectionId),
             selectionId: this.extractId(variant.selectionId || variant.id),
-            title: `${product.title} - ${variant.title}`,
+            title: product.title,
+            variantTitle: variant.title === 'Default Title' ? '' : variant.title,
+            selectedOptions: Array.isArray(variant.selectedOptions)
+              ? variant.selectedOptions.map((option: any) => ({
+                name: option.name,
+                value: option.value,
+              }))
+              : [],
             imageUrl,
             price: toCents(variant.price),
             currencyCode: variant.currencyCode ?? null,
@@ -229,9 +216,11 @@ processProductsForStep(products: any[], step: any) {
             weightUnit: 'GRAMS',
             // Preserve parent product data for variant selection in modal
             parentProductId: this.extractId(product.id || product.selectionId),
+            baseProductId: this.extractId(product.id || product.selectionId),
             parentTitle: product.title,
-            variants: processedVariants,
-            options: processedOptions,
+            sourceVariantCount: sourceVariants.length,
+            variants: null,
+            options: product.options || [],
             images: product.images || (product.imageUrl ? [{ src: product.imageUrl }] : []),
             description: product.description || '',
             descriptionHtml: product.descriptionHtml || ''
@@ -250,7 +239,10 @@ processProductsForStep(products: any[], step: any) {
       const imageUrl = defaultVariant?.image?.src || product.imageUrl || BUNDLE_WIDGET.PLACEHOLDER_IMAGE;
 
       // Process variants array for variant selection in modal
-      const processedVariants = customerVisibleVariants.map(normalizeVariant);
+      // Once the parent product is visible, retain its complete variant matrix.
+      // Exact selectors need unavailable and non-existent combinations to
+      // resolve to a disabled CTA rather than silently substituting a variant.
+      const processedVariants = sourceVariants.map(normalizeVariant);
 
       // Process options array for variant selector labels
       const processedOptions = (product.options || []).map((option: any) => (

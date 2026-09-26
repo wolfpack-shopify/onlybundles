@@ -1,6 +1,7 @@
 import { ConditionValidator } from '../../shared/condition-validator.js';
 import { ToastManager } from '../../shared/toast-manager.js';
 import { resolveProductCardSelectionAriaLabel } from '../../shared/components/product-card.js';
+import { createQuantityControlElement } from '../../shared/components/quantity-control.js';
 import { resolveProductPageCardButtonText, resolveProductPageInlineAddText } from './modal-methods.js';
 import { areRequiredProductPageStepsValid } from './step-validation.js';
 import { resolvePpbModalCardPresentation } from '../ppb-modal-card-presentation.js';
@@ -9,36 +10,18 @@ import {
   dispatchDiscountTierTransition,
 } from '../../shared/discount-tier-feedback.js';
 
-function createInlineQuantityControl(productId: string|undefined, quantity: any, increaseDisabled: any) {
-  const wrapper = document.createElement('div');
-  wrapper.classList.add('inline-quantity-controls', 'bw-quantity-control');
-  wrapper.dataset.productId = productId;
-
-  const decreaseButton = document.createElement('button');
-  decreaseButton.type = 'button';
-  decreaseButton.classList.add('inline-qty-btn', 'qty-decrease', 'bw-quantity-control__button');
-  decreaseButton.dataset.productId = productId;
-  decreaseButton.textContent = '−';
-
-  const display = document.createElement('span');
-  display.classList.add('inline-qty-display', 'bw-quantity-control__value');
-  display.textContent = String(quantity);
-
-  const increaseButton = document.createElement('button');
-  increaseButton.type = 'button';
-  increaseButton.classList.add('inline-qty-btn', 'qty-increase', 'bw-quantity-control__button');
-  increaseButton.dataset.productId = productId;
-  increaseButton.textContent = '+';
-  if (increaseDisabled) {
-    increaseButton.disabled = true;
-    increaseButton.setAttribute('aria-disabled', 'true');
-  }
-
-  wrapper.appendChild(decreaseButton);
-  wrapper.appendChild(display);
-  wrapper.appendChild(increaseButton);
-
-  return wrapper;
+function createInlineQuantityControl(
+  productId: string|undefined,
+  quantity: any,
+  increaseDisabled: any,
+  productName: string,
+) {
+  return createQuantityControlElement({
+    selectionId: productId,
+    quantity,
+    increaseDisabled,
+    productName,
+  });
 }
 
 function createProductPageAddButton(productId: string|undefined, text: string|null, selected = false) {
@@ -165,12 +148,17 @@ updateProductSelection(stepIndex: string|number, productId: any, newQuantity: nu
   const replacementQuantity = replacementSelectionKey
     ? this.getSelectedQuantity(stepIndex, replacementSelectionKey)
     : 0;
+  const replacementUnitQuantity = Math.min(
+    replacementQuantity,
+    Math.max(1, Number(replacementTarget?.quantity) || 1),
+  );
+  const nextReplacementQuantity = Math.max(0, replacementQuantity - replacementUnitQuantity);
   const isReplacingFilledSlot = quantity > 0
     && replacementQuantity > 0
     && replacementSelectionKey !== selectionKey;
 
   if (isReplacingFilledSlot) {
-    this.setSelectedQuantity(stepIndex, replacementSelectionKey, 0);
+    this.setSelectedQuantity(stepIndex, replacementSelectionKey, nextReplacementQuantity);
   }
 
   // Validate step conditions
@@ -199,7 +187,7 @@ updateProductSelection(stepIndex: string|number, productId: any, newQuantity: nu
 
   // Update UI without re-rendering the entire modal (prevents event listener duplication)
   if (isReplacingFilledSlot) {
-    this.updateProductQuantityDisplay(stepIndex, replacementSelectionKey, 0);
+    this.updateProductQuantityDisplay(stepIndex, replacementSelectionKey, nextReplacementQuantity);
   }
   this.updateProductQuantityDisplay(stepIndex, selectionKey, quantity);
   if (this._isProductPageModalSlotTemplate?.()) {
@@ -406,6 +394,7 @@ updateProductQuantityDisplay(stepIndex: string|number, productId: any, quantity:
           productId,
           quantity,
           outOfStock || atMaxStock || atMaxProductQuantity,
+          productCard.querySelector('.product-title')?.textContent?.trim() || '',
         ));
       }
     } else if (actionWrapper && quantity <= 0) {

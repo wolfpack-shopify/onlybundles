@@ -1,6 +1,6 @@
 .layout-sidebar[data-fpb-design-preset="CLASSIC"] {
   --classic-variant-options-open-max-height: min(320px, 65vh);
-  --classic-variant-options-scrollbar-size: 0.125rem;
+  --classic-variant-options-scrollbar-size: 2px;
   --classic-product-grid-z-index: 1;
   --classic-variant-open-card-z-index: 40;
   --classic-variant-dropdown-z-index: calc(
@@ -47,13 +47,13 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  min-height: 2.375rem;
-  padding: 0.3125rem 0.3125rem 0.3125rem 0.625rem;
+  min-height: 38px;
+  padding: 5px 5px 5px 10px;
   background: #fff;
   color: #252525;
-  border: 0.09375rem solid #e3e3e3;
-  border-radius: 0.3125rem;
-  font-family: Assistant, sans-serif;
+  border: 1.5px solid #e3e3e3;
+  border-radius: 5px;
+  font-family: inherit;
   cursor: pointer;
 }
 
@@ -61,9 +61,9 @@
   .sidebar-content
   .vs-selected-label {
   overflow: hidden;
-  font-size: 0.75rem;
+  font-size: 12px;
   font-weight: 700;
-  line-height: 1.35rem;
+  line-height: 21.6px;
   text-align: left;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -73,9 +73,9 @@
   .sidebar-content
   .vs-selected-icon {
   display: flex;
-  width: 1.5625rem;
-  height: 1.5625rem;
-  flex: 0 0 1.5625rem;
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
   align-items: center;
   justify-content: center;
   color: #252525;
@@ -85,8 +85,8 @@
   .sidebar-content
   .vs-selected-icon
   svg {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 20px;
+  height: 20px;
 }
 
 .layout-sidebar[data-fpb-design-preset="CLASSIC"]
@@ -102,8 +102,8 @@
   overflow: hidden scroll;
   list-style: none;
   background: #fff;
-  border-radius: 0 0 0.5rem 0.5rem;
-  box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.1);
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   opacity: 1;
   transition: max-height 0.3s ease, opacity 0.3s ease;
   scrollbar-width: thin;
@@ -123,8 +123,8 @@
 .layout-sidebar[data-fpb-design-preset="CLASSIC"]
   .sidebar-content
   .vs-options::-webkit-scrollbar {
-  width: var(--classic-variant-options-scrollbar-size, 0.125rem);
-  height: 0.25rem;
+  width: var(--classic-variant-options-scrollbar-size, 2px);
+  height: 4px;
 }
 
 .layout-sidebar[data-fpb-design-preset="CLASSIC"]
@@ -143,15 +143,15 @@
   .sidebar-content
   .vs-option {
   display: flex;
-  min-height: var(--bundle-control-hit-target, 2.75rem);
+  min-height: var(--bundle-control-hit-target, 44px);
   align-items: center;
-  gap: 0.625rem;
-  padding: 0.3125rem;
+  gap: 10px;
+  padding: 5px;
   color: #252525;
-  font-family: Assistant, sans-serif;
-  font-size: 0.875rem;
+  font-family: inherit;
+  font-size: 14px;
   font-weight: 400;
-  line-height: 1.575rem;
+  line-height: 25.2px;
   cursor: pointer;
 }
 
@@ -165,11 +165,11 @@
 .layout-sidebar[data-fpb-design-preset="CLASSIC"]
   .sidebar-content
   .vs-option-image {
-  width: 1.5625rem;
-  height: 1.5625rem;
-  flex: 0 0 1.5625rem;
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
   object-fit: cover;
-  border-radius: 0.3125rem;
+  border-radius: 5px;
 }
 
 .layout-sidebar[data-fpb-design-preset="CLASSIC"][data-fpb-card-cta-mode="icon"]
@@ -207,7 +207,7 @@
     align-items: end;
     background: rgba(0, 0, 0, 0.5);
     color: #000;
-    font-family: Assistant, sans-serif;
+    font-family: inherit;
   }
 
   .vs-mobile-drawer--standard .vs-mobile-drawer-sheet {
@@ -217,21 +217,21 @@
     overflow: visible;
     background: #fff;
     border: thin solid #b0adad;
-    border-radius: 1.25rem 1.25rem 0 0;
+    border-radius: 20px 20px 0 0;
   }
 
   .vs-mobile-drawer--standard .vs-mobile-drawer-header {
     display: grid;
-    grid-template-columns: 7.25rem minmax(0, 1fr);
-    gap: 0.625rem;
-    padding: 0.625rem;
+    grid-template-columns: 116px minmax(0, 1fr);
+    gap: 10px;
+    padding: 10px;
     background: #fff;
-    border-radius: 1.25rem 1.25rem 0 0;
+    border-radius: 20px 20px 0 0;
   }
 
   .vs-mobile-drawer--standard .vs-mobile-drawer-product-image {
-    width: 7.25rem;
-    height: 7.25rem;
+    width: 116px;
+    height: 116px;
     object-fit: cover;
   }
 
@@ -244,36 +244,36 @@
   .vs-mobile-drawer--standard .vs-mobile-drawer-product-price {
     margin: 0;
     color: #000;
-    font-size: 1.125rem;
+    font-size: 18px;
     font-weight: 700;
-    line-height: 1.8rem;
+    line-height: 28.8px;
   }
 
   .vs-mobile-drawer--standard .vs-mobile-drawer-body {
-    padding: 0.625rem;
+    padding: 10px;
     background: #fff;
   }
 
   .vs-mobile-drawer--standard .vs-mobile-drawer-title {
     color: #000;
-    font-size: 1.25rem;
+    font-size: 20px;
     font-weight: 400;
-    line-height: 2.25rem;
+    line-height: 36px;
   }
 
   .vs-mobile-drawer--standard .vs-mobile-options {
     display: grid;
-    max-height: calc(80vh - 12.25rem);
+    max-height: calc(80vh - 196px);
     overflow-y: auto;
   }
 
   .vs-mobile-drawer--standard .vs-mobile-option {
     display: grid;
-    grid-template-columns: 3.125rem minmax(0, 1fr) auto;
+    grid-template-columns: 50px minmax(0, 1fr) auto;
     align-items: center;
-    gap: 0.5rem;
-    min-height: 3.4375rem;
-    padding: 0.3125rem;
+    gap: 8px;
+    min-height: 55px;
+    padding: 5px;
     background: transparent;
     border: 0;
     color: #000;
@@ -288,8 +288,8 @@
   }
 
   .vs-mobile-drawer--standard .vs-mobile-option-image {
-    width: 3.125rem;
-    height: 2.8125rem;
+    width: 50px;
+    height: 45px;
     object-fit: cover;
   }
 
@@ -297,8 +297,8 @@
   .vs-mobile-drawer--standard .vs-mobile-option-price {
     margin: 0;
     color: #000;
-    font-size: 1rem;
+    font-size: 16px;
     font-weight: 400;
-    line-height: 1.8rem;
+    line-height: 28.8px;
   }
 }

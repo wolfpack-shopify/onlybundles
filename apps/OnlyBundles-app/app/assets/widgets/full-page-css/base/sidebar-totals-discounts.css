@@ -20,7 +20,7 @@
 .side-panel-total-heading {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
+  gap: 4px;
   min-width: 0;
 }
 
@@ -82,7 +82,7 @@
   justify-content: center;
   gap: 2px;
   width: 100%;
-  min-height: var(--bundle-control-hit-target, 2.75rem);
+  min-height: var(--bundle-control-hit-target, 44px);
   padding: 12px 16px;
   border: none;
   border-radius: var(--bundle-side-panel-btn-radius, 8px);
@@ -570,7 +570,7 @@
   place-items: center;
   width: var(--fpb-summary-slot-width);
   height: var(--fpb-summary-slot-height);
-  border-radius: var(--bundle-product-card-border-radius, 0.5rem);
+  border-radius: var(--bundle-product-card-border-radius, 8px);
   box-sizing: border-box;
   overflow: hidden;
 }
@@ -601,8 +601,8 @@
 
 .layout-sidebar
   .side-panel-inline-slot-icon {
-  width: var(--bundle-control-hit-target, 2.5rem);
-  height: var(--bundle-control-hit-target, 2.5rem);
+  width: var(--bundle-control-hit-target, 40px);
+  height: var(--bundle-control-hit-target, 40px);
   object-fit: contain;
 }
 
@@ -611,7 +611,7 @@
   display: grid;
   place-items: center;
   color: var(--bundle-global-primary-text, #000);
-  font-size: 1.5rem;
+  font-size: 24px;
   font-weight: 400;
   line-height: 1;
 }
@@ -624,15 +624,15 @@
   z-index: 2;
   display: grid;
   place-items: center;
-  width: var(--bundle-control-hit-target, 2.75rem);
-  height: var(--bundle-control-hit-target, 2.75rem);
+  width: var(--bundle-control-hit-target, 44px);
+  height: var(--bundle-control-hit-target, 44px);
   padding: 0;
   border: 0;
   border-radius: 50%;
   background: radial-gradient(
-    circle at 0.5rem 0.5rem,
-    var(--bundle-side-panel-remove-icon-bg, #000) 0 0.5rem,
-    transparent calc(0.5rem + 0.5px)
+    circle at 8px 8px,
+    var(--bundle-side-panel-remove-icon-bg, #000) 0 8px,
+    transparent calc(8px + 0.5px)
   );
   color: var(--bundle-side-panel-remove-icon-color, #fff);
   cursor: pointer;
@@ -644,9 +644,9 @@
   .side-panel-inline-slot-remove::after {
   content: "";
   position: absolute;
-  inset-block-start: 0.5rem;
-  inset-inline-start: 0.5rem;
-  width: 0.5rem;
+  inset-block-start: 8px;
+  inset-inline-start: 8px;
+  width: 8px;
   height: 1px;
   background: currentColor;
 }
@@ -675,7 +675,7 @@
   position: absolute;
   inset: 50% auto auto 50%;
   display: var(--bundle-slot-icon-badge-overlay-display, none);
-  width: clamp(2rem, 25%, 4.3125rem);
+  width: clamp(32px, 25%, 69px);
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
   background-image: var(--bundle-slot-icon-badge-image, none);

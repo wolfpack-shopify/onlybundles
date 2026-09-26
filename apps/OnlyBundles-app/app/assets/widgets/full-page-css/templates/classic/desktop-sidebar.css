@@ -38,17 +38,17 @@
     grid-template-columns: repeat(
       auto-fit,
       minmax(
-        var(--classic-sidebar-slot-size, 5rem),
-        var(--classic-sidebar-slot-size, 5rem)
+        var(--classic-sidebar-slot-size, 80px),
+        var(--classic-sidebar-slot-size, 80px)
       )
     );
-    grid-auto-rows: var(--classic-sidebar-slot-size, 5rem);
+    grid-auto-rows: var(--classic-sidebar-slot-size, 80px);
     gap: var(--classic-sidebar-slot-gap, 10px);
     width: 100%;
     max-width: 100%;
     margin: 0 0 var(--classic-sidebar-slot-addon-gap, 15px);
     padding: 0;
-    --classic-sidebar-slot-size: 5rem;
+    --classic-sidebar-slot-size: 80px;
     --bw-selected-slot-padding: 0;
     --bw-selected-slot-radius: var(--bundle-side-panel-btn-radius, 5px);
     --bw-selected-slot-empty-min-height: auto;
@@ -58,8 +58,8 @@
   .fpb-preset-classic .classic-sidebar-slots .bw-selected-slot,
   .fpb-preset-classic .classic-sidebar-slot {
     position: relative;
-    width: var(--classic-sidebar-slot-size, 5rem);
-    height: var(--classic-sidebar-slot-size, 5rem);
+    width: var(--classic-sidebar-slot-size, 80px);
+    height: var(--classic-sidebar-slot-size, 80px);
     aspect-ratio: 1 / 1;
     border-radius: var(--bundle-side-panel-btn-radius, 5px);
     display: grid;
@@ -133,9 +133,9 @@
     inset: 0 auto auto 0;
     display: grid;
     place-items: center;
-    width: var(--bundle-control-hit-target, 2.75rem);
-    min-width: var(--bundle-control-hit-target, 2.75rem);
-    height: var(--bundle-control-hit-target, 2.75rem);
+    width: var(--bundle-control-hit-target, 44px);
+    min-width: var(--bundle-control-hit-target, 44px);
+    height: var(--bundle-control-hit-target, 44px);
     z-index: 2;
   }
 
@@ -151,17 +151,17 @@
     .bw-selected-slot--filled
     .bw-selected-row__remove {
     position: relative;
-    width: var(--bundle-control-hit-target, 2.75rem);
-    height: var(--bundle-control-hit-target, 2.75rem);
+    width: var(--bundle-control-hit-target, 44px);
+    height: var(--bundle-control-hit-target, 44px);
     border: 0;
     border-radius: 50%;
     padding: 0;
     display: grid;
     place-items: center;
     background: radial-gradient(
-      circle at 0.5rem 0.5rem,
-      var(--bundle-side-panel-remove-icon-bg, #000) 0 0.5rem,
-      transparent calc(0.5rem + 0.5px)
+      circle at 8px 8px,
+      var(--bundle-side-panel-remove-icon-bg, #000) 0 8px,
+      transparent calc(8px + 0.5px)
     );
     color: var(--bundle-side-panel-remove-icon-color, #fff);
     font-size: 0;
@@ -187,10 +187,10 @@
     .bw-selected-row__remove::after {
     content: "";
     position: absolute;
-    inset-block-start: 0.5rem;
-    inset-inline-start: 0.5rem;
-    width: 0.5rem;
-    height: 0.125rem;
+    inset-block-start: 8px;
+    inset-inline-start: 8px;
+    width: 8px;
+    height: 2px;
     border-radius: 999px;
     background: currentColor;
   }
@@ -306,7 +306,7 @@
     .side-panel-addon-summary,
   .fpb-preset-classic .side-panel-addon-summary {
     --classic-sidebar-addon-title-row: calc(
-      0.875rem * 1.8 + var(--classic-sidebar-addon-title-gap, 10px)
+      14px * 1.8 + var(--classic-sidebar-addon-title-gap, 10px)
     );
     order: 5;
     align-self: start;
@@ -314,7 +314,7 @@
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
     gap: 0;
-    max-height: var(--classic-sidebar-addon-summary-max-height, 9rem);
+    max-height: var(--classic-sidebar-addon-summary-max-height, 144px);
     margin: 0 0 var(--classic-sidebar-addon-action-gap, 10px);
     padding: 0;
     overflow: hidden;
@@ -326,7 +326,7 @@
       --bundle-side-panel-text-color,
       var(--bundle-global-primary-text, #000)
     );
-    font-family: Assistant, sans-serif;
+    font-family: inherit;
   }
 
   .bundle-widget-full-page
@@ -335,7 +335,7 @@
   .fpb-preset-classic .side-panel-addon-tier-list {
     display: block;
     max-height: calc(
-      var(--classic-sidebar-addon-summary-max-height, 9rem) -
+      var(--classic-sidebar-addon-summary-max-height, 144px) -
         var(--classic-sidebar-addon-title-row)
     );
     min-height: 0;
@@ -365,7 +365,7 @@
       --bundle-side-panel-text-color,
       var(--bundle-global-primary-text, #000)
     );
-    font-size: 0.875rem;
+    font-size: 14px;
     font-weight: 700;
     line-height: 1.8;
     text-align: start;
@@ -392,15 +392,15 @@
     margin: 0;
     padding: 0;
     background: transparent;
-    border: 0.125rem solid
+    border: 2px solid
       var(--bundle-side-panel-product-border, #d9d9d9);
-    border-radius: 0.5rem;
+    border-radius: 8px;
     color: var(
       --bundle-side-panel-text-color,
       var(--bundle-global-primary-text, #000)
     );
     overflow: hidden;
-    min-height: 5.125rem;
+    min-height: 82px;
   }
 
   .bundle-widget-full-page
@@ -418,11 +418,11 @@
     .side-panel-addon-tier-message-container,
   .fpb-preset-classic .side-panel-addon-tier-message-container {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 1.671875rem;
+    grid-template-columns: minmax(0, 1fr) 26.75px;
     align-items: center;
-    gap: 0.375rem;
+    gap: 6px;
     padding: 10px;
-    min-height: 4.375rem;
+    min-height: 70px;
   }
 
   .bundle-widget-full-page
@@ -435,8 +435,8 @@
     display: grid;
     place-items: center;
     position: relative;
-    width: 1.671875rem;
-    height: 1.5625rem;
+    width: 26.75px;
+    height: 25px;
     margin: 0;
     overflow: visible;
   }
@@ -451,10 +451,10 @@
     content: "";
     position: absolute;
     left: 50%;
-    bottom: 0.125rem;
-    width: 1.25rem;
-    height: 1rem;
-    border-radius: 0.1875rem;
+    bottom: 2px;
+    width: 20px;
+    height: 16px;
+    border-radius: 3px;
     background: var(--classic-addon-lock-color, #4a4a4a);
     transform: translateX(-50%);
   }
@@ -469,12 +469,12 @@
     content: "";
     position: absolute;
     left: 50%;
-    top: 0.0625rem;
-    width: 0.8125rem;
-    height: 0.75rem;
-    border: 0.1875rem solid var(--classic-addon-lock-color, #4a4a4a);
+    top: 1px;
+    width: 13px;
+    height: 12px;
+    border: 3px solid var(--classic-addon-lock-color, #4a4a4a);
     border-bottom: 0;
-    border-radius: 0.8125rem 0.8125rem 0 0;
+    border-radius: 13px 13px 0 0;
     transform: translateX(-50%);
   }
 
@@ -487,9 +487,9 @@
     .side-panel-free-gift-icon::before {
     top: 50%;
     bottom: auto;
-    width: 1.5625rem;
-    height: 1.5625rem;
-    border: 0.125rem solid var(--classic-addon-eligible-color, #55bd47);
+    width: 25px;
+    height: 25px;
+    border: 2px solid var(--classic-addon-eligible-color, #55bd47);
     border-radius: 50%;
     background: transparent;
     transform: translate(-50%, -50%);
@@ -504,12 +504,12 @@
     .side-panel-free-gift-icon::after {
     top: 50%;
     left: 50%;
-    width: 0.5rem;
-    height: 0.3125rem;
+    width: 8px;
+    height: 5px;
     border: 0;
-    border-left: 0.125rem solid
+    border-left: 2px solid
       var(--classic-addon-eligible-color, #55bd47);
-    border-bottom: 0.125rem solid
+    border-bottom: 2px solid
       var(--classic-addon-eligible-color, #55bd47);
     border-radius: 0;
     transform: translate(-50%, -60%) rotate(-45deg);
@@ -539,8 +539,8 @@
       --bundle-side-panel-text-color,
       var(--bundle-global-primary-text, #000)
     );
-    font-family: Assistant, sans-serif;
-    font-size: 0.875rem;
+    font-family: inherit;
+    font-size: 14px;
     font-weight: 400;
     line-height: 1.8;
     text-align: start;
@@ -550,7 +550,7 @@
     .layout-sidebar[data-fpb-design-preset="CLASSIC"]
     .side-panel-addon-tier-bottom-bar,
   .fpb-preset-classic .side-panel-addon-tier-bottom-bar {
-    height: 0.25rem;
+    height: 4px;
   }
 
 }

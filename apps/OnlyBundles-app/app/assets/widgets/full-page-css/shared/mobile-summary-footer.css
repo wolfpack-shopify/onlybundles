@@ -399,7 +399,7 @@ body:has(
   position: absolute;
   inset: 50% auto auto 50%;
   display: var(--bundle-slot-icon-badge-overlay-display, none);
-  width: clamp(2rem, 25%, 4.3125rem);
+  width: clamp(32px, 25%, 69px);
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
   background-image: var(--bundle-slot-icon-badge-image, none);

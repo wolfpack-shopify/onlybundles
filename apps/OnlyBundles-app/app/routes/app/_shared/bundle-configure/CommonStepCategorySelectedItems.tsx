@@ -11,8 +11,26 @@ type SelectedItemsModalProps = {
   styles: Record<string, string>;
 };
 
+type SelectedProductVariant = {
+  id: string;
+  title?: string | null;
+};
+
+type SelectedProduct = {
+  id: string;
+  title?: string | null;
+  name?: string | null;
+  imageUrl?: string | null;
+  image?: { url?: string | null } | null;
+  images?: Array<{
+    url?: string | null;
+    originalSrc?: string | null;
+  }> | null;
+  variants?: SelectedProductVariant[] | null;
+};
+
 type SelectedProductsPanelProps = SelectedItemsModalProps & {
-  products: any[];
+  products: SelectedProduct[];
   draggedProductIndex: number | null;
   handlePickProducts: () => Promise<void>;
   removeProduct: (productId: string) => void;
@@ -65,63 +83,82 @@ export function SelectedProductsPanel({
       >
         {products.length > 0 ? (
           <ul className={styles.selectedItemList}>
-            {products.map((product: any, index: number) => (
-              <li
-                key={product.id ?? index}
-                className={styles.categorySelectedItemRow}
-                onDragOver={(event: React.DragEvent) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                }}
-                onDrop={(event: React.DragEvent) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  if (draggedProductIndex === null) return;
-                  reorderProduct(draggedProductIndex, index);
-                  setDraggedProductIndex(null);
-                }}
-              >
-                <button
-                  type="button"
-                  className={styles.categorySelectedItemDrag}
-                  aria-label={`Reorder ${product.title || "selected product"}`}
-                  draggable="true"
-                  onClick={(event: React.MouseEvent) => {
+            {products.map((product, index) => {
+              const selectedVariants = (product.variants ?? []).filter(
+                (
+                  variant
+                ): variant is SelectedProductVariant & { title: string } =>
+                  typeof variant.title === "string" &&
+                  variant.title.trim().length > 0
+              );
+
+              return (
+                <li
+                  key={product.id ?? index}
+                  className={styles.categorySelectedItemRow}
+                  onDragOver={(event: React.DragEvent) => {
+                    event.preventDefault();
                     event.stopPropagation();
                   }}
-                  onDragStart={(event: React.DragEvent) => {
+                  onDrop={(event: React.DragEvent) => {
+                    event.preventDefault();
                     event.stopPropagation();
-                    setDraggedProductIndex(index);
-                  }}
-                  onDragEnd={(event: React.DragEvent) => {
-                    event.stopPropagation();
+                    if (draggedProductIndex === null) return;
+                    reorderProduct(draggedProductIndex, index);
                     setDraggedProductIndex(null);
                   }}
                 >
-                  ::
-                </button>
-                <span className={styles.categorySelectedItemImage}>
-                  <s-image
-                    src={getProductImageUrl(product)}
-                    alt={product.title || product.name || "Product"}
-                    aspectRatio="1/1"
-                    objectFit="cover"
-                  />
-                </span>
-                <span className={styles.categorySelectedItemName}>
-                  {product.title || product.name || "Unnamed Product"}
-                </span>
-                <s-button
-                  variant="tertiary"
-                  tone="critical"
-                  icon="delete"
-                  accessibilityLabel={`Remove ${
-                    product.title || "selected product"
-                  }`}
-                  onClick={() => removeProduct(product.id)}
-                ></s-button>
-              </li>
-            ))}
+                  <button
+                    type="button"
+                    className={styles.categorySelectedItemDrag}
+                    aria-label={`Reorder ${product.title || "selected product"}`}
+                    draggable="true"
+                    onClick={(event: React.MouseEvent) => {
+                      event.stopPropagation();
+                    }}
+                    onDragStart={(event: React.DragEvent) => {
+                      event.stopPropagation();
+                      setDraggedProductIndex(index);
+                    }}
+                    onDragEnd={(event: React.DragEvent) => {
+                      event.stopPropagation();
+                      setDraggedProductIndex(null);
+                    }}
+                  >
+                    ::
+                  </button>
+                  <span className={styles.categorySelectedItemImage}>
+                    <s-image
+                      src={getProductImageUrl(product)}
+                      alt={product.title || product.name || "Product"}
+                      aspectRatio="1/1"
+                      objectFit="cover"
+                    />
+                  </span>
+                  <span className={styles.categorySelectedItemName}>
+                    <s-stack gap="small">
+                      <s-text type="strong">
+                        {product.title || product.name || "Unnamed Product"}
+                      </s-text>
+                      {selectedVariants.map((variant) => (
+                        <s-text key={variant.id} color="subdued">
+                          {variant.title}
+                        </s-text>
+                      ))}
+                    </s-stack>
+                  </span>
+                  <s-button
+                    variant="tertiary"
+                    tone="critical"
+                    icon="delete"
+                    accessibilityLabel={`Remove ${
+                      product.title || "selected product"
+                    }`}
+                    onClick={() => removeProduct(product.id)}
+                  ></s-button>
+                </li>
+              );
+            })}
           </ul>
         ) : (
           <p style={{ margin: 0, fontSize: 14, color: "#6d7175" }}>
@@ -291,7 +328,7 @@ export function SelectedCollectionsPanel({
   );
 }
 
-function getProductImageUrl(product: any) {
+function getProductImageUrl(product: SelectedProduct) {
   return (
     product.imageUrl ||
     product.image?.url ||

@@ -8,6 +8,7 @@ import {
 import { getLastRequiredProductPageStepIndex } from './step-validation.js';
 import { buildStorefrontApiPath } from '../../../../config/storefront-proxy-routes.js';
 import { bindDrawerSwipeDismissal } from '../../shared/drawer-layer-manager.js';
+import { shouldTrackStorefrontAnalytics } from '../../shared/storefront-analytics.js';
 
 const MIN_LOADING_OVERLAY_VISIBLE_MS = 180;
 
@@ -17,6 +18,7 @@ showLoadingOverlay(gifUrl: string | null, options: any = {}) {
   if (options.bootstrap === true) {
     this.container.dataset.wpbBootstrapLoading = 'true';
   }
+  this.container.setAttribute('aria-busy', 'true');
   // Ensure container is positioned so absolute overlay works
   const pos = getComputedStyle(this.container).position;
   if (pos !== 'relative' && pos !== 'absolute' && pos !== 'fixed' && pos !== 'sticky') {
@@ -73,6 +75,7 @@ hideLoadingOverlay() {
     if (this._bundleLoadingOverlayToken !== overlayToken) return;
     this._bundleLoadingOverlayToken = 0;
     delete this.container.dataset.wpbBootstrapLoading;
+    this.container.setAttribute('aria-busy', 'false');
     hideLoadingOverlayElement(overlay);
   }, delayMs);
 },
@@ -303,6 +306,7 @@ _resolveText(key: string|number, fallback: any) {
 
 _recordView() {
   try {
+    if (!shouldTrackStorefrontAnalytics()) return;
     const bundleId = this.container?.dataset?.bundleId;
     const shop = window.Shopify?.shop;
     if (!bundleId || !shop) return;

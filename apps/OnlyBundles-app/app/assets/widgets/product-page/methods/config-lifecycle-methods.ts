@@ -190,7 +190,7 @@ parseConfiguration() {
     isEmbedSource: dataset.wpbPpbEmbedSource === 'true',
     preselectBrowsedProduct: dataset.preselectBrowsedProduct === 'true',
     selectedVariantId: dataset.selectedVariantId || null,
-    hideDefaultButtons: dataset.hideDefaultButtons === 'true',
+    hideNativePurchaseControls: dataset.hideNativePurchaseControls === 'true',
     showStepNumbers: dataset.showStepNumbers !== 'false',
     // Quantity selector visibility settings (default: show on card)
     showQuantitySelectorOnCard,

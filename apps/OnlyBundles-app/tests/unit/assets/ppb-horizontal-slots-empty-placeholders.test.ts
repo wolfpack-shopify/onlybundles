@@ -37,16 +37,16 @@ describe('PPB Horizontal Slots empty placeholders', () => {
       labels: ['Product 1', 'Product 2', 'Product 3'],
     },
     {
-      name: 'keeps the next slot open when a minimum target is reached',
+      name: 'stops at the required count when a minimum target is reached',
       step: { name: 'Step 1', conditionOperator: 'greater_than_or_equal_to', conditionValue: 2 },
       selectedCount: 2,
-      labels: ['Product 3'],
+      labels: [],
     },
     {
-      name: 'keeps the next slot open after selection exceeds a minimum target',
+      name: 'does not grow beyond a minimum target',
       step: { name: 'Step 1', conditionOperator: 'greater_than_or_equal_to', conditionValue: 2 },
       selectedCount: 3,
-      labels: ['Product 4'],
+      labels: [],
     },
   ])('$name', ({ step, selectedCount, labels }: any) => {
     const target = document.createElement('div');
@@ -57,7 +57,7 @@ describe('PPB Horizontal Slots empty placeholders', () => {
     expect(getSlotLabels(target)).toEqual(labels);
   });
 
-  it('retains expanded slot capacity after selections are removed', () => {
+  it('recomputes deterministic capacity after selections are removed', () => {
     const widget = createWidget();
     const step = { name: 'Step 1', conditionOperator: 'greater_than_or_equal_to', conditionValue: 2 };
 
@@ -69,8 +69,6 @@ describe('PPB Horizontal Slots empty placeholders', () => {
     expect(getSlotLabels(target)).toEqual([
       'Product 1',
       'Product 2',
-      'Product 3',
-      'Product 4',
     ]);
   });
 
@@ -183,7 +181,7 @@ describe('PPB Horizontal Slots empty placeholders', () => {
     ]);
   });
 
-  it('keeps an operable slot open as items are selected when step has no condition operator', () => {
+  it('uses an explicit maximum as the fixed slot capacity', () => {
     const widget = createWidget();
     const step = { name: 'Step 1', conditionValue: null, conditionOperator: null, minQuantity: 0, maxQuantity: 10 };
 
@@ -192,6 +190,14 @@ describe('PPB Horizontal Slots empty placeholders', () => {
 
     expect(getSlotLabels(target)).toEqual([
       'Product 2',
+      'Product 3',
+      'Product 4',
+      'Product 5',
+      'Product 6',
+      'Product 7',
+      'Product 8',
+      'Product 9',
+      'Product 10',
     ]);
   });
 });

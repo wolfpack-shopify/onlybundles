@@ -120,24 +120,6 @@ export function usePpbPreviewReadinessHandlers({
         return false;
       }
       const isStorefrontUrl = !productUrl.includes("/admin.shopify.com/");
-      if (isStorefrontUrl && base.bundleProduct?.id) {
-        try {
-          const formData = new FormData();
-          formData.append("intent", "assignProductTemplate");
-          formData.append("productId", base.bundleProduct.id);
-          formData.append(
-            "templateSuffix",
-            (base.formState.templateName || "").trim(),
-          );
-          await fetch(window.location.href, { method: "POST", body: formData });
-        } catch (err: any) {
-          AppLogger.error(
-            "Failed to sync product templateSuffix before preview",
-            {},
-            err,
-          );
-        }
-      }
       if (isStorefrontUrl) {
         const templateSuffix = (base.formState.templateName || "").trim();
         const installationLink = buildProductPageThemeEditorDeepLink({

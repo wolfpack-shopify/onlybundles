@@ -21,31 +21,11 @@ jest.mock("../../../app/services/subscriptions/subscription-service.server", () 
   resolveShopEntitlements: jest.fn(),
 }));
 
-jest.mock("../../../app/services/subscriptions/design-entitlement-state.server", () => ({
-  shopUsesAdvancedDesign: jest.fn().mockResolvedValue(false),
-}));
-
-jest.mock("../../../app/services/subscriptions/bundle-entitlement-gate.server", () => {
-  const actual = jest.requireActual(
-    "../../../app/services/subscriptions/bundle-entitlement-gate.server"
-  );
-  return {
-    ...actual,
-    updateBundleWithPublicationGate: jest.fn((input) =>
-      input.database.bundle.update({
-        where: { id: input.bundleId, shopId: input.shopDomain },
-        data: input.data,
-      })
-    ),
-  };
-});
-
-jest.mock("../../../app/routes/app/app.bundles.product-page-bundle.configure.$bundleId/handlers/runtime-config.server", () => ({
-  updateSyncMetafields: jest.fn().mockResolvedValue(undefined),
-}));
-
-jest.mock("../../../app/services/bundles/storefront-sync.server", () => ({
-  syncBundleStorefrontNow: jest.fn().mockResolvedValue({ skipped: false, synced: true }),
+jest.mock("../../../app/services/bundles/metafield-sync/operations/bundle-template.server", () => ({
+  ...jest.requireActual(
+    "../../../app/services/bundles/metafield-sync/operations/bundle-template.server"
+  ),
+  syncBundleTemplateSnapshot: jest.fn().mockResolvedValue({ updated: true }),
 }));
 
 const mockResolveShopEntitlements = resolveShopEntitlements as jest.MockedFunction<
@@ -58,6 +38,12 @@ const mockSession = { shop: "test-shop.myshopify.com" } as any;
 describe("handleUpdateBundleDesignTemplate - Entitlement Gating", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockResolveShopEntitlements.mockReset();
+    (db.bundle.findUnique as jest.Mock).mockResolvedValue({
+      bundleDesignTemplate: null,
+      bundleDesignPresetId: null,
+      shopifyProductId: null,
+    });
   });
 
   const freeEntitlements = {
@@ -161,6 +147,7 @@ describe("handleUpdateBundleDesignTemplate - Entitlement Gating", () => {
       expect(response.status).toBe(200);
       const json = (await response.json()) as any;
       expect(json.success).toBe(true);
+      expect(mockResolveShopEntitlements).not.toHaveBeenCalled();
     });
 
     it("allows non-standard PPB template (GRID) on Growth plan", async () => {
@@ -194,6 +181,9 @@ describe("handleUpdateBundleDesignTemplate - Entitlement Gating", () => {
       expect(response.status).toBe(200);
       const json = (await response.json()) as any;
       expect(json.success).toBe(true);
+      expect(mockResolveShopEntitlements).toHaveBeenCalledWith({
+        shopDomain: "test-shop.myshopify.com",
+      });
     });
   });
 
@@ -250,6 +240,7 @@ describe("handleUpdateBundleDesignTemplate - Entitlement Gating", () => {
       expect(response.status).toBe(200);
       const json = (await response.json()) as any;
       expect(json.success).toBe(true);
+      expect(mockResolveShopEntitlements).not.toHaveBeenCalled();
       expect(db.bundle.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: "bundle-1", shopId: "test-shop.myshopify.com" },
@@ -284,6 +275,9 @@ describe("handleUpdateBundleDesignTemplate - Entitlement Gating", () => {
       expect(response.status).toBe(200);
       const json = (await response.json()) as any;
       expect(json.success).toBe(true);
+      expect(mockResolveShopEntitlements).toHaveBeenCalledWith({
+        shopDomain: "test-shop.myshopify.com",
+      });
     });
   });
 });

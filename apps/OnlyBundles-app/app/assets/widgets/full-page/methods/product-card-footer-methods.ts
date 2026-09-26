@@ -211,8 +211,6 @@ createProductCard(product: any, stepIndex: string|number, options: any = {}) {
       }
     );
 
-  this.applyStandardExpandedVariantTitle(cardElement, displayProduct);
-
   // Default (included) step: add "Included" badge and disable interaction controls
   const currentStepData = (this.selectedBundle?.steps || [])[stepIndex];
   if (currentStepData?.isDefault) {
@@ -321,39 +319,6 @@ getProductCardAddButtonText(step: any) {
   }
 
   return this.getProductAddButtonText();
-},
-
-applyStandardExpandedVariantTitle(cardElement: any, product: any) {
-  const contract = getFpbPresetContract(this.getFullPageDesignPreset?.());
-  if (!contract || contract.summary?.mode !== 'rows') return;
-  if (!cardElement) return;
-  if (cardElement.querySelector('[data-bw-card-variant-row="true"]')) return;
-
-  const variantTitle = this.getSummaryProductVariantDisplay(product);
-  if (!product?.parentProductId || !variantTitle) return;
-
-  const titleEl = cardElement.querySelector('.product-title');
-  if (!titleEl) return;
-
-  const parentTitle = this.getSummaryProductDisplayTitle({
-    ...product,
-    variantTitle: product.variantTitle || 'Default Title',
-    title: product.title || '',
-    parentTitle: product.parentTitle || ''
-  });
-  if (!parentTitle) return;
-
-  cardElement.classList.add('product-card--expanded-variant');
-  titleEl.textContent = parentTitle;
-  const variantDividerEl = document.createElement('div');
-  variantDividerEl.className = 'bw-product-card__variant-divider';
-  variantDividerEl.setAttribute('aria-hidden', 'true');
-  titleEl.insertAdjacentElement('afterend', variantDividerEl);
-  const variantEl = document.createElement('div');
-  variantEl.className = 'bw-product-card__variant product-variant-row';
-  variantEl.setAttribute('data-bw-card-variant-row', 'true');
-  variantEl.textContent = variantTitle;
-  variantDividerEl.insertAdjacentElement('afterend', variantEl);
 },
 
 getSummaryProductDisplayTitle(item: any) {

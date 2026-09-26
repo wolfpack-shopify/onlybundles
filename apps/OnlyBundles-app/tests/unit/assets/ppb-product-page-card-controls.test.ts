@@ -4,7 +4,10 @@ const { JSDOM } = require('jsdom');
 
 const { ProductPageConfigLifecycleMethods } = require('../../../app/assets/widgets/product-page/methods/config-lifecycle-methods.js');
 const { ProductPageInpageRenderMethods } = require('../../../app/assets/widgets/product-page/methods/inpage-render-methods.js');
-const { ProductPageModalMethods } = require('../../../app/assets/widgets/product-page/methods/modal-methods.js');
+const {
+  ProductPageModalMethods,
+  resolveProductPageVariantCardState,
+} = require('../../../app/assets/widgets/product-page/methods/modal-methods.js');
 
 function createTarget() {
   return document.createElement('div');
@@ -135,6 +138,139 @@ describe('PPB card control setting parsing', () => {
 
     context.parseConfiguration();
     expect(context.config.showQuantitySelectorOnCard).toBe(false);
+  });
+});
+
+describe('PPB exact variant card state', () => {
+  const product = {
+    id: 'product-1',
+    title: 'T-shirt',
+    options: [
+      { name: 'Color', optionValues: [{ name: 'Navy' }] },
+      { name: 'Size', optionValues: [{ name: 'Small' }, { name: 'Large' }] },
+    ],
+    variants: [
+      {
+        id: 'navy-small',
+        title: 'Navy / Small',
+        selectedOptions: [
+          { name: 'Color', value: 'Navy' },
+          { name: 'Size', value: 'Small' },
+        ],
+        available: true,
+        price: 2500,
+      },
+      {
+        id: 'navy-large',
+        title: 'Navy / Large',
+        selectedOptions: [
+          { name: 'Color', value: 'Navy' },
+          { name: 'Size', value: 'Large' },
+        ],
+        available: false,
+        price: 2600,
+      },
+    ],
+  };
+
+  it('keeps an uncommitted card incomplete until every dimension is chosen', () => {
+    expect(resolveProductPageVariantCardState({
+      product,
+      draft: { selectedOptions: [{ name: 'Color', value: 'Navy' }] },
+    })).toEqual(expect.objectContaining({
+      complete: false,
+      unavailable: false,
+      committedQuantity: 0,
+    }));
+  });
+
+  it('marks an exact unavailable combination without replacing the committed selection', () => {
+    const state = resolveProductPageVariantCardState({
+      product,
+      stepSelections: { 'navy-small': 2 },
+      draft: {
+        selectedOptions: [
+          { name: 'Color', value: 'Navy' },
+          { name: 'Size', value: 'Large' },
+        ],
+      },
+    });
+
+    expect(state).toEqual(expect.objectContaining({
+      complete: true,
+      unavailable: true,
+      committedSelectionId: '',
+      committedQuantity: 0,
+      selectionId: 'navy-large',
+      requiresActionButton: true,
+    }));
+  });
+
+  it('targets the exact drafted variant without treating a selected sibling as an update', () => {
+    const state = resolveProductPageVariantCardState({
+      product: {
+        ...product,
+        variants: product.variants.map((variant) => ({ ...variant, available: true })),
+      },
+      stepSelections: { 'navy-small': 2 },
+      draft: {
+        selectedOptions: [
+          { name: 'Color', value: 'Navy' },
+          { name: 'Size', value: 'Large' },
+        ],
+      },
+    });
+
+    expect(state).toEqual(expect.objectContaining({
+      selectionId: 'navy-large',
+      committedQuantity: 0,
+      committedSelectionId: '',
+      hasDraftDifference: false,
+      requiresActionButton: false,
+    }));
+  });
+
+  it('uses an explicit slot edit target for replacement state', () => {
+    const state = resolveProductPageVariantCardState({
+      product: {
+        ...product,
+        variants: product.variants.map((variant) => ({ ...variant, available: true })),
+      },
+      stepSelections: { 'navy-small': 2, 'navy-large': 1 },
+      draft: {
+        selectedOptions: [
+          { name: 'Color', value: 'Navy' },
+          { name: 'Size', value: 'Large' },
+        ],
+      },
+      replacementSelectionId: 'navy-small',
+    });
+
+    expect(state).toEqual(expect.objectContaining({
+      selectionId: 'navy-large',
+      committedQuantity: 1,
+      committedSelectionId: 'navy-small',
+      hasDraftDifference: true,
+      requiresActionButton: true,
+    }));
+  });
+
+  it('does not choose an arbitrary sibling when multiple variants are restored', () => {
+    const state = resolveProductPageVariantCardState({
+      product: {
+        ...product,
+        variants: product.variants.map((variant) => ({ ...variant, available: true })),
+      },
+      stepSelections: { 'navy-small': 2, 'navy-large': 1 },
+    });
+
+    expect(state).toEqual(expect.objectContaining({
+      complete: false,
+      selectionId: 'product-1',
+      committedQuantity: 0,
+      committedSelectionId: '',
+      selectedOptions: [],
+    }));
   });
 });
 
@@ -310,6 +446,69 @@ describe('PPB in-page rendering control wiring', () => {
     expect(target.innerHTML).toContain('disabled');
     expect(target.innerHTML).toContain('aria-disabled="true"');
     expect(target.textContent).toMatch(/Out of Stock/);
+  });
+
+  it('replaces sibling quantity controls with a disabled CTA for an unavailable combination', () => {
+    const target = createTarget();
+    const groupedProduct = {
+      id: 'shirt',
+      title: 'T-shirt',
+      options: [
+        { name: 'Color', optionValues: [{ name: 'Navy' }, { name: 'Blue' }] },
+        { name: 'Size', optionValues: [{ name: 'Small' }, { name: 'Large' }] },
+      ],
+      variants: [
+        {
+          id: 'navy-small',
+          title: 'Navy / Small',
+          selectedOptions: [
+            { name: 'Color', value: 'Navy' },
+            { name: 'Size', value: 'Small' },
+          ],
+          available: true,
+          price: 2500,
+        },
+        {
+          id: 'blue-small',
+          title: 'Blue / Small',
+          selectedOptions: [
+            { name: 'Color', value: 'Blue' },
+            { name: 'Size', value: 'Small' },
+          ],
+          available: true,
+          price: 2500,
+        },
+      ],
+    };
+    const context = {
+      ...ProductPageInpageRenderMethods,
+      ...createBaseContext({
+        stepProductData: [[groupedProduct]],
+        selectedProducts: [{ 'navy-small': 2 }],
+        _ppbVariantDrafts: {
+          0: {
+            shirt: {
+              selectedOptions: [
+                { name: 'Color', value: 'Navy' },
+                { name: 'Size', value: 'Large' },
+              ],
+            },
+          },
+        },
+        _isProductPageCascadeTemplate: () => true,
+        renderInlineCardVariantSelector: () => document.createElement('div'),
+      }),
+    } as any;
+
+    ProductPageInpageRenderMethods._renderInpageStepProducts.call(context, 0, target);
+
+    const action = target.querySelector('.product-add-btn') as HTMLButtonElement;
+    expect(action).not.toBeNull();
+    expect(action.disabled).toBe(true);
+    expect(action.textContent).toBe('Out of Stock');
+    expect(action.getAttribute('aria-label')).toBe('Out of Stock T-shirt');
+    expect(target.querySelector('.inline-quantity-controls')).toBeNull();
+    expect(context.selectedProducts[0]).toEqual({ 'navy-small': 2 });
   });
 
   it('shows merchant low-stock copy from exact Shopify variant quantity', () => {
@@ -525,6 +724,7 @@ describe('PPB modal product-card description wiring', () => {
 
   it('preserves both selected dimensions while rebuilding a modal product card', () => {
     const modal = document.createElement('div');
+    modal.classList.add('bw-bs-panel--open');
     const productGrid = document.createElement('div');
     productGrid.className = 'product-grid';
     modal.append(productGrid);
@@ -571,6 +771,7 @@ describe('PPB modal product-card description wiring', () => {
       getSelectedQuantity: () => 0,
       getVariantAvailable: () => ({ available: null, outOfStock: false }),
       isInventoryTrackingOnAddToCartEnabled: () => false,
+      normalizeSelectionKey: (value: unknown) => String(value || ''),
       _shouldShowProductComparedAtPrice: () => false,
       _resolveText: (_key: string, fallback: string) => fallback,
       findProductBySelectionKey: (products: any[], key: string) => products.find((candidate) => (
@@ -585,21 +786,25 @@ describe('PPB modal product-card description wiring', () => {
     ProductPageModalMethods.renderModalProducts.call(context, 0);
     let renderedGrid = modal.querySelector<HTMLElement>('.product-grid')!;
     let size = renderedGrid.querySelector<HTMLSelectElement>('[data-option-index="0"] select')!;
-    size.value = 'M-Black';
+    size.value = 'M';
     size.dispatchEvent(new window.Event('change', { bubbles: true }));
 
     renderedGrid = modal.querySelector<HTMLElement>('.product-grid')!;
     let color = renderedGrid.querySelector<HTMLSelectElement>('[data-option-index="1"] select')!;
-    color.value = 'M-Navy';
+    color.value = 'Navy';
     color.dispatchEvent(new window.Event('change', { bubbles: true }));
 
     renderedGrid = modal.querySelector<HTMLElement>('.product-grid')!;
     size = renderedGrid.querySelector<HTMLSelectElement>('[data-option-index="0"] select')!;
     color = renderedGrid.querySelector<HTMLSelectElement>('[data-option-index="1"] select')!;
-    expect(product.variantId).toBe('M-Navy');
+    expect(product.variantId).toBe('S-Black');
+    expect(context._ppbVariantDrafts[0]['product-1'].selectedOptions).toEqual([
+      { name: 'Size', value: 'M' },
+      { name: 'Color', value: 'Navy' },
+    ]);
     expect(size.selectedOptions[0].dataset.optionValue).toBe('M');
     expect(color.selectedOptions[0].dataset.optionValue).toBe('Navy');
-    expect(renderedGrid.querySelector('.product-variant-row')?.textContent).toBe('M / Navy');
+    expect(renderedGrid.querySelector('.product-add-btn')?.getAttribute('data-product-id')).toBe('M-Navy');
   });
 
   it('preserves both selected dimensions while rebuilding an in-page product card', () => {
@@ -637,6 +842,7 @@ describe('PPB modal product-card description wiring', () => {
       ...ProductPageInpageRenderMethods,
       ...ProductPageModalMethods,
       config: {},
+      container: host,
       selectedBundle: {
         variantSelectorEnabled: true,
         steps: [{ categories: [{ variantSelectorMode: 'dropdown' }] }],
@@ -671,20 +877,24 @@ describe('PPB modal product-card description wiring', () => {
     ProductPageInpageRenderMethods._renderInpageStepProducts.call(context, 0, target);
     let renderedGrid = host.querySelector<HTMLElement>('.bw-ppb-grid-product-grid')!;
     let size = renderedGrid.querySelector<HTMLSelectElement>('[data-option-index="0"] select')!;
-    size.value = 'M-Black';
+    size.value = 'M';
     size.dispatchEvent(new window.Event('change', { bubbles: true }));
 
     renderedGrid = host.querySelector<HTMLElement>('.bw-ppb-grid-product-grid')!;
     let color = renderedGrid.querySelector<HTMLSelectElement>('[data-option-index="1"] select')!;
-    color.value = 'M-Navy';
+    color.value = 'Navy';
     color.dispatchEvent(new window.Event('change', { bubbles: true }));
 
     renderedGrid = host.querySelector<HTMLElement>('.bw-ppb-grid-product-grid')!;
     size = renderedGrid.querySelector<HTMLSelectElement>('[data-option-index="0"] select')!;
     color = renderedGrid.querySelector<HTMLSelectElement>('[data-option-index="1"] select')!;
-    expect(product.variantId).toBe('M-Navy');
+    expect(product.variantId).toBe('S-Black');
+    expect(context._ppbVariantDrafts[0]['product-1'].selectedOptions).toEqual([
+      { name: 'Size', value: 'M' },
+      { name: 'Color', value: 'Navy' },
+    ]);
     expect(size.selectedOptions[0].dataset.optionValue).toBe('M');
     expect(color.selectedOptions[0].dataset.optionValue).toBe('Navy');
-    expect(renderedGrid.querySelector('.product-variant-row')?.textContent).toBe('M / Navy');
+    expect(renderedGrid.querySelector('.product-add-btn')?.getAttribute('data-product-id')).toBe('M-Navy');
   });
 });

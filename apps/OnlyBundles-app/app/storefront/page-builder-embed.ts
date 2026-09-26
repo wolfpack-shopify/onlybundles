@@ -3,6 +3,7 @@ import {
   type FpbDesignPreset,
 } from "./fpb-template-assets.js";
 import { exposeStorefrontContext } from "./ppb-bundle-embed.js";
+import { createPpbLoadingOverlay } from "./ppb-loading-screen.js";
 
 type PageBuilderEmbedMode =
   | "eligible-product"
@@ -227,7 +228,7 @@ function mountDirectEmbed(
       bundleId: String(payload.bundle.id ?? ""),
       bundleType: payload.bundleType,
       bundleConfig: JSON.stringify(payload.bundle),
-      hideDefaultButtons: "false",
+      hideNativePurchaseControls: "false",
     });
     if (payload.bundleType === "product_page") {
       container.classList.add("bundle-widget-container--embed-source");
@@ -236,7 +237,10 @@ function mountDirectEmbed(
         wpbPpbEmbedSource: "true",
         preselectBrowsedProduct: "false",
         isContainerProduct: "false",
+        wpbBootstrapLoading: "true",
       });
+      container.setAttribute("aria-busy", "true");
+      container.append(createPpbLoadingOverlay(payload.loadingScreen));
     } else {
       const preset = normalizePreset(payload.bundle.bundleDesignPresetId);
       container.classList.add(

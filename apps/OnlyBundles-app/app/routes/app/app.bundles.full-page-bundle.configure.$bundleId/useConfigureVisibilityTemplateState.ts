@@ -284,6 +284,7 @@ export function useConfigureVisibilityTemplateState(
   const [templateSaveError, setTemplateSaveError] = useState<string | null>(
     null
   );
+  const [templateSyncRequired, setTemplateSyncRequired] = useState(false);
   const lastTemplateRequestRef = useRef<{
     template: string | null;
     presetId: string | null;
@@ -363,6 +364,7 @@ export function useConfigureVisibilityTemplateState(
     setSlideKey,
     setTemplateModalStep,
     setTemplateSaveError,
+    setTemplateSyncRequired,
     setUpsellWidgetButtonText,
     setUpsellWidgetCollectionsSelectedData,
     setUpsellWidgetDescription,
@@ -381,6 +383,7 @@ export function useConfigureVisibilityTemplateState(
     templateFetcher,
     templateModalStep,
     templateSaveError,
+    templateSyncRequired,
     updateCategoryAutoNextRule,
     updateCategoryConditionRule,
     updateStepCategories,

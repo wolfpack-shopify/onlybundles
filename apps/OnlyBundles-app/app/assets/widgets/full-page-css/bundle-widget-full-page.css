@@ -1,5 +1,6 @@
 @import "./base/fpb-product-page-upsell.css";
 @import "./base/bootstrap-reservation.css";
+@import "../shared-css/loading-overlay.css";
 @import "./base/layout-tiers-timeline.css";
 @import "./base/steps-header-banners.css";
 @import "./base/search-category-product-grid.css";

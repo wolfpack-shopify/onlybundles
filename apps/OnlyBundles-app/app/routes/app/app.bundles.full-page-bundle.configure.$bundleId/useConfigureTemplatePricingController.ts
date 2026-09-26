@@ -50,10 +50,12 @@ type ConfigureTemplatePricingDependencies = Pick<
     | "setBundleDesignPresetId"
     | "setBundleDesignTemplate"
     | "setIsSelectTemplateModalOpen"
+    | "setIsSyncModalOpen"
     | "setPendingDesignPresetId"
     | "setPendingDesignTemplate"
     | "setTemplateModalStep"
     | "setTemplateSaveError"
+    | "setTemplateSyncRequired"
     | "templateFetcher"
     | "templateSubmissionStartedRef"
     | "upsellWidgetButtonText"
@@ -96,10 +98,12 @@ export function useConfigureTemplatePricingController(
     setBundleDesignPresetId,
     setBundleDesignTemplate,
     setIsSelectTemplateModalOpen,
+    setIsSyncModalOpen,
     setPendingDesignPresetId,
     setPendingDesignTemplate,
     setTemplateModalStep,
     setTemplateSaveError,
+    setTemplateSyncRequired,
     setEntitlementFailure,
     isFreePlan,
     stepsState,
@@ -123,6 +127,7 @@ export function useConfigureTemplatePricingController(
     setIsSelectTemplateModalOpen(false);
     setTemplateModalStep("templates");
     setTemplateSaveError(null);
+    setTemplateSyncRequired(false);
     lastTemplateRequestRef.current = null;
     lastTemplateResponseRef.current = null;
     templateSubmissionStartedRef.current = false;
@@ -136,6 +141,7 @@ export function useConfigureTemplatePricingController(
     setIsSelectTemplateModalOpen,
     setTemplateModalStep,
     setTemplateSaveError,
+    setTemplateSyncRequired,
     templateSubmissionStartedRef,
   ]);
   const closeSelectTemplateModal = useCallback(() => {
@@ -146,6 +152,7 @@ export function useConfigureTemplatePricingController(
     setPendingDesignPresetId(bundleDesignPresetId);
     setTemplateModalStep("templates");
     setTemplateSaveError(null);
+    setTemplateSyncRequired(false);
     lastTemplateRequestRef.current = null;
     lastTemplateResponseRef.current = null;
     templateSubmissionStartedRef.current = false;
@@ -160,6 +167,7 @@ export function useConfigureTemplatePricingController(
     setPendingDesignTemplate,
     setTemplateModalStep,
     setTemplateSaveError,
+    setTemplateSyncRequired,
     templateSubmissionStartedRef,
   ]);
   const openDesignControlPanel = useCallback(() => {
@@ -188,6 +196,7 @@ export function useConfigureTemplatePricingController(
     }
     if (templateFetcher.data == null) {
       setTemplateSaveError("Unable to save template. Please try again.");
+      setTemplateSyncRequired(false);
       setTemplateModalStep("templates");
       lastTemplateRequestRef.current = null;
       templateSubmissionStartedRef.current = false;
@@ -200,6 +209,8 @@ export function useConfigureTemplatePricingController(
     const response = templateFetcher.data as {
       success?: boolean;
       error?: string;
+      syncRequired?: boolean;
+      templatePersisted?: boolean;
     };
     const request = lastTemplateRequestRef.current;
     if (response.success) {
@@ -209,6 +220,7 @@ export function useConfigureTemplatePricingController(
         setTemplateModalStep(resolveTemplateReadyStep(appEmbedEnabled));
       }
       setTemplateSaveError(null);
+      setTemplateSyncRequired(false);
       lastTemplateRequestRef.current = null;
       templateSubmissionStartedRef.current = false;
       return;
@@ -216,6 +228,7 @@ export function useConfigureTemplatePricingController(
     const entitlementFailure = (response as any).entitlementFailure;
     if (entitlementFailure || response.error === "ENTITLEMENT_REQUIRED") {
       setTemplateSaveError(null);
+      setTemplateSyncRequired(false);
       setIsSelectTemplateModalOpen(false);
       setEntitlementFailure(
         entitlementFailure || {
@@ -229,8 +242,13 @@ export function useConfigureTemplatePricingController(
       templateSubmissionStartedRef.current = false;
       return;
     }
+    if (response.syncRequired && response.templatePersisted && request) {
+      setBundleDesignTemplate(request.template);
+      setBundleDesignPresetId(request.presetId);
+    }
     setTemplateModalStep("templates");
-    setTemplateSaveError(response.error || "Failed to save template settings.");
+    setTemplateSaveError(response.error ?? "Failed to save template settings.");
+    setTemplateSyncRequired(response.syncRequired === true);
     lastTemplateRequestRef.current = null;
     templateSubmissionStartedRef.current = false;
   }, [
@@ -242,6 +260,7 @@ export function useConfigureTemplatePricingController(
     setIsSelectTemplateModalOpen,
     setTemplateModalStep,
     setTemplateSaveError,
+    setTemplateSyncRequired,
     setEntitlementFailure,
     templateSubmissionStartedRef,
     templateFetcher.data,
@@ -251,6 +270,15 @@ export function useConfigureTemplatePricingController(
 
   const handleTemplateNext = useCallback(() => {
     if (!pendingDesignTemplate || !pendingDesignPresetId) {
+      return;
+    }
+    if (
+      pendingDesignTemplate === bundleDesignTemplate
+      && pendingDesignPresetId === bundleDesignPresetId
+    ) {
+      setTemplateSaveError(null);
+      setTemplateSyncRequired(false);
+      setTemplateModalStep(resolveTemplateReadyStep(appEmbedEnabled));
       return;
     }
     if (
@@ -271,6 +299,7 @@ export function useConfigureTemplatePricingController(
       return;
     }
     setTemplateSaveError(null);
+    setTemplateSyncRequired(false);
     lastTemplateRequestRef.current = {
       template: pendingDesignTemplate,
       presetId: pendingDesignPresetId,
@@ -284,6 +313,9 @@ export function useConfigureTemplatePricingController(
     templateFetcher.submit(fd, { method: "POST" });
   }, [
     isFreePlan,
+    appEmbedEnabled,
+    bundleDesignPresetId,
+    bundleDesignTemplate,
     lastTemplateRequestRef,
     lastTemplateResponseRef,
     pendingDesignPresetId,
@@ -291,9 +323,15 @@ export function useConfigureTemplatePricingController(
     setIsSelectTemplateModalOpen,
     setEntitlementFailure,
     setTemplateSaveError,
+    setTemplateModalStep,
+    setTemplateSyncRequired,
     templateSubmissionStartedRef,
     templateFetcher,
   ]);
+  const handleTemplateSyncRequired = useCallback(() => {
+    setIsSelectTemplateModalOpen(false);
+    setIsSyncModalOpen(true);
+  }, [setIsSelectTemplateModalOpen, setIsSyncModalOpen]);
   function buildBundleUpsellConfig() {
     const multiLangText = Object.fromEntries(
       Object.entries(textOverridesByLocale ?? {}).flatMap(
@@ -483,6 +521,7 @@ export function useConfigureTemplatePricingController(
     FPB_DESIGN_CONTROL_PANEL_URL,
     fullPageBundleStyles,
     handleTemplateNext,
+    handleTemplateSyncRequired,
     normalizedPricingDisplayOptions,
     normalizedRuleMessages,
     normalizePricingDisplayOptions,

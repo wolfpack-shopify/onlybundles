@@ -116,6 +116,9 @@ export function PpbCategoryAccordion({
                 "StepCategory",
                 updatePpbCategoryVariantFlag(categories, catIndex, checked)
               );
+              if (checked) {
+                adapter.clearValidationError?.(`${categoryBase}.variantSelectorMode`);
+              }
               adapter.markAsDirty();
             }}
           />

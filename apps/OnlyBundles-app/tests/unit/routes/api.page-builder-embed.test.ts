@@ -45,6 +45,7 @@ describe("api.page-builder-embed", () => {
       embed: {
         bundleType: "product_page",
         bundle: { id: "ppb-1", bundleType: "product_page", steps: [] },
+        loadingScreen: { gifUrl: null, backgroundColor: "#ffffff" },
       },
     });
     expect(first.headers.get("Cache-Control")).toBe("private, max-age=30, must-revalidate");

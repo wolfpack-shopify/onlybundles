@@ -1,5 +1,6 @@
 import { ToastManager } from '../../shared/toast-manager.js';
 import { buildStorefrontApiPath } from '../../../../config/storefront-proxy-routes.js';
+import { shouldTrackStorefrontAnalytics } from '../../shared/storefront-analytics.js';
 export const fullPageTierFloatingRuntimeMethods: Record<string, any> & ThisType<any> = {
 initTierPills(tiers: any[]) {
   if (tiers.length < 2) return;
@@ -318,6 +319,7 @@ _resolveText(key: string|number, fallback: any) {
 
 _recordView() {
   try {
+    if (!shouldTrackStorefrontAnalytics()) return;
     const bundleId = this.config?.bundleId ?? this.container?.dataset?.bundleId;
     const shop = window.Shopify?.shop;
     if (!bundleId || !shop) return;

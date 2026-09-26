@@ -18,8 +18,10 @@ const GENERATED_FILES = new Set([
   appPath("extensions/bundle-builder/assets/bundle-widget-product-page-bundled.js"),
   appPath("extensions/bundle-builder/assets/wolfpack-bundles-sdk.js"),
   appPath("extensions/bundle-builder/assets/bundle-app-embed.js"),
+  appPath("extensions/bundle-builder/assets/bundle-widget-bootstrap.css"),
   appPath("extensions/bundle-builder/assets/bundle-widget-full-page.css"),
   appPath("extensions/bundle-builder/assets/bundle-widget-full-page-mobile-summary.css"),
+  appPath("extensions/bundle-builder/assets/bundle-widget-full-page-responsive.css"),
   appPath("extensions/bundle-builder/assets/bundle-widget-full-page-standard.css"),
   appPath("extensions/bundle-builder/assets/bundle-widget-full-page-classic.css"),
   appPath("extensions/bundle-builder/assets/bundle-widget-full-page-compact.css"),
@@ -129,8 +131,8 @@ function affectsWidgetCss(file) {
   const normalized = normalizePath(file);
   return normalized.startsWith(appPath("app/assets/widgets/full-page-css/"))
     || normalized.startsWith(appPath("app/assets/widgets/product-page-css/"))
-    || normalized === appPath("scripts/minify-assets.js")
-    || normalized.startsWith(appPath("scripts/minify-assets/"));
+    || normalized === appPath("scripts/build-css-assets.js")
+    || normalized.startsWith(appPath("scripts/build-css-assets/"));
 }
 
 function shouldRunGraphifyFor(file) {
@@ -181,7 +183,7 @@ function createCheckPlan(stagedFilesInput, unstagedFilesInput = []) {
     relatedSourceFiles: stagedFiles.filter(isRelatedTestSource),
     partialFiles: stagedFiles.filter((file) => unstagedFiles.has(file) && isCheckedForPartialStaging(file)),
     widgetBuildTargets: [...widgetBuildTargets].sort(),
-    shouldMinifyCss: stagedFiles.some(affectsWidgetCss),
+    shouldBuildCss: stagedFiles.some(affectsWidgetCss),
     shouldRunGraphify: stagedFiles.some(shouldRunGraphifyFor),
   };
 }

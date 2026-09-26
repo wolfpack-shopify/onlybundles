@@ -1,4 +1,8 @@
 import { applyBrowsedProductPreselection } from "../assets/widgets/product-page/embed-preselection.js";
+import {
+  createPpbLoadingOverlay,
+  readPpbLoadingScreen,
+} from "./ppb-loading-screen.js";
 
 export { applyBrowsedProductPreselection };
 
@@ -238,9 +242,14 @@ function createHost(embedElement: HTMLElement, resolution: EmbedPayload, context
     wpbPpbEmbedSource: "true",
     preselectBrowsedProduct: String(resolution.preselectBrowsedProduct),
     selectedVariantId: context.selectedVariantId,
-    hideDefaultButtons: "false",
+    hideNativePurchaseControls: "false",
     isContainerProduct: "false",
+    wpbBootstrapLoading: "true",
   });
+  container.setAttribute("aria-busy", "true");
+  container.append(createPpbLoadingOverlay(
+    readPpbLoadingScreen(embedElement.dataset.ppbStorefrontRuntime),
+  ));
   host.append(container);
   exposePpbProductContext(embedElement, context);
   return host;

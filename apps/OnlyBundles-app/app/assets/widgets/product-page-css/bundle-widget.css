@@ -1,4 +1,6 @@
 @import "./base/layout-steps-summary.css";
+@import "../shared-css/loading-overlay.css";
+@import "./base/bootstrap-loading.css";
 @import "./base/modal-shell-tabs.css";
 @import "./base/modal-product-grid.css";
 @import "./base/modal-footer-empty-toast.css";

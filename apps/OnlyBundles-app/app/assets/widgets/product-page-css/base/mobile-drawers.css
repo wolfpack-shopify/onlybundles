@@ -235,7 +235,6 @@
     font-size: clamp(1rem, 4.5vw, 1.125rem);
     font-weight: 700;
     line-height: 1.35;
-    text-align: left;
     text-align: start;
   }
 

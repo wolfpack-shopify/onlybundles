@@ -15,6 +15,7 @@ const GENERATED_PREFIXES = [
 
 const GENERATED_FILES = new Set([
   appPath("extensions/bundle-builder/assets/bundle-widget-full-page-bundled.js"),
+  appPath("extensions/bundle-builder/assets/bundle-widget-full-page-modal.js"),
   appPath("extensions/bundle-builder/assets/bundle-widget-product-page-bundled.js"),
   appPath("extensions/bundle-builder/assets/wolfpack-bundles-sdk.js"),
   appPath("extensions/bundle-builder/assets/bundle-app-embed.js"),

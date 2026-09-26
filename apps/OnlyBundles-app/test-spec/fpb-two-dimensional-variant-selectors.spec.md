@@ -5,7 +5,7 @@ title: FPB Two-Dimensional Variant Selectors
 type: test-spec
 status: active
 summary: Verifies compact Shopify-native multi-dimensional selector behavior across FPB cards and product modals.
-last_audited: 2026-09-12
+last_audited: 2026-09-25
 owners:
   - engineering
 domains:
@@ -15,7 +15,7 @@ systems:
   - full-page-bundle
 source_paths:
   - apps/OnlyBundles-app/app/assets/widgets/shared/variant-selector.ts
-  - apps/OnlyBundles-app/app/assets/widgets/full-page/modal/variant-methods.ts
+  - apps/OnlyBundles-app/app/assets/bundle-modal-component.ts
   - apps/OnlyBundles-app/app/lib/bundle-config/configure-validation.ts
 related_docs:
   - internal docs/Architecture/Product Card Layout Contract.md
@@ -51,7 +51,7 @@ Verify that FPB preserves the merchant's category selector mode and presents mul
 | 4 | Two-dimensional pill selector without an explicit primary | Size with seven values x Color with four values | The four-value Color dimension uses pills; Size uses a labeled native select | Minimizes card height without hiding values |
 | 5 | Two-dimensional color swatch | Shopify color swatches plus Size | Color stays visual; Size uses a labeled native select | Never infer a color from its name |
 | 6 | Two-dimensional image swatch | Shopify image swatches plus Size | Image stays visual; Size uses a labeled native select | Shopify swatch data is authoritative |
-| 7 | Coordinated selection | Change either compact control | Exact compatible variant becomes active and all controls synchronize | Existing price/image/inventory callback remains single-fire |
+| 7 | Exact selection | Change either compact control | Only the shopper's completed exact combination resolves; sibling choices never change | Price, image, and inventory update only for that result |
 | 8 | Product has no meaningful variants | One variant or no options | No selector is rendered | Card still owns an empty stable selector region |
 | 9 | Review integration hydrates beside a mixed selector fixture | Judge.me badge HTML for each product | Badge mounts in the card identity region | It must not become an unowned card-grid child |
 | 10 | Product-card reading order | Any configured selector mode | Selector controls precede price content and the Add or quantity control in the rendered card | Visual and keyboard order stay aligned |
@@ -64,8 +64,8 @@ Verify that FPB preserves the merchant's category selector mode and presents mul
 - [x] Two-dimensional pill, color-swatch, and image-swatch modes use one visual dimension plus compact native selects for remaining dimensions.
 - [x] Without an explicit primary option, a pill selector makes the dimension with the fewest distinct values visual.
 - [x] Shopify swatch metadata is the only swatch source.
-- [x] Unavailable values remain disabled and named.
-- [x] Variant changes preserve the existing exact variant, price, image, availability, and inventory update flow.
+- [x] Unavailable values remain selectable and named while the resulting action is disabled.
+- [x] Variant changes preserve sibling choices and resolve only the exact variant, price, image, availability, and inventory state.
 - [x] Every product-card selector precedes price and Add or quantity controls in semantic DOM order.
 - [x] Empty modal descriptions are hidden without hiding meaningful product copy.
 - [x] All listed behavior tests pass.

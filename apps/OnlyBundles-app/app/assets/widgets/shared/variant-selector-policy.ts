@@ -21,15 +21,15 @@ export function getInlineVariantSelectorPresentation(designPreset: any) {
 
   const contract = templateSystem.fpb.resolveContract(designPreset);
   if (contract?.id === 'COMPACT') {
-    return { type: 'buttons', mobileMode: null };
+    return { type: 'buttons', mobileMode: 'inline' };
   }
   const cardMode = contract?.productCard?.mode;
   if (cardMode === 'row') {
     return { type: 'dropdown', mobileMode: 'inline' };
   }
   if (cardMode === 'grid' || cardMode === 'compact') {
-    return { type: 'dropdown', mobileMode: 'drawer' };
+    return { type: 'dropdown', mobileMode: 'inline' };
   }
 
-  return { type: 'buttons', mobileMode: null };
+  return { type: 'buttons', mobileMode: 'inline' };
 }

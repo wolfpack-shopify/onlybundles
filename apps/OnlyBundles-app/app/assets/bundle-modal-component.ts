@@ -1,37 +1,23 @@
 /**
- * Bundle Product Modal Component
- *
- * Handles the product variant selection modal for full-page bundles.
- * Opens when user clicks "Choose Options" on a product card.
- *
- * Features:
- * - Product image, title, and description
- * - Variant selection dropdowns
- * - Quantity controls
- * - Add To Box functionality
- * - Responsive mobile layout
- *
- * @version 1.0.0
+ * Shared actionable FPB product dialog.
  */
-
 'use strict';
 
-import { BundleModalVariantMethods } from './widgets/full-page/modal/variant-methods.js';
 import { sanitizeRichHtmlFragment } from './widgets/shared/rich-html.js';
 import { createChevronIcon, createCloseIcon } from './widgets/shared/svg-icons.js';
 import { BUNDLE_WIDGET } from './widgets/shared/constants.js';
-import { shouldDismissDrawerSwipe } from './widgets/shared/drawer-layer-manager.js';
+import { CurrencyManager } from './widgets/shared/currency-manager.js';
+import {
+  getVariantSelectionDraft,
+  resolveExactVariantSelection,
+  selectionForVariant,
+  setVariantSelectionDraft,
+  VariantSelectorComponent,
+  type VariantSelectionResult,
+} from './widgets/shared/variant-selector.js';
 
 export interface BundleProductModal {
   [key: string]: any;
-}
-
-export function shouldDismissProductDrawerSwipe({
-  distanceY = 0,
-  distanceX = 0,
-  velocityY = 0,
-}: any = {}) {
-  return shouldDismissDrawerSwipe({ distanceY, distanceX, velocityY });
 }
 
 export function getProductCarouselSwipeDirection({
@@ -50,144 +36,129 @@ function hasMeaningfulDescription(element: HTMLElement) {
   return Boolean(element.querySelector('img, picture, video, iframe, svg, canvas'));
 }
 
+function isSellable(candidate: any) {
+  return candidate?.available !== false && candidate?.availableForSale !== false;
+}
+
+function variantId(candidate: any) {
+  return String(candidate?.selectionId || candidate?.variantId || candidate?.id || '');
+}
+
+function resolveProductDisplayTitle(product: any = {}) {
+  const candidates = [
+    product?.baseTitle,
+    product?.parentTitle,
+    product?.productTitle,
+    product?.title,
+  ];
+  return candidates
+    .map((candidate) => String(candidate || '').trim())
+    .find((candidate) => candidate && candidate !== 'Default Title') || '';
+}
+
 export class BundleProductModal {
   widget: any;
-  modalElement: any;
+  modalElement: HTMLDialogElement | null;
   currentProduct: any;
   currentStep: any;
-  selectedVariant: any;
-  selectedOptions: Record<string, any>;
+  selectionResult: VariantSelectionResult;
   selectedQuantity: number;
   currentImageIndex: number;
-  readOnly: boolean;
+  trigger: HTMLElement | null;
+  draftKey: string;
+  configuration: any;
   lockedScrollY: number;
-  isDocumentScrollLocked: boolean;
-  previousRootScrollbarGutter: string;
+  previousScrollStyles: Record<string, string> | null;
 
   constructor(widget: any) {
     this.widget = widget;
     this.modalElement = null;
     this.currentProduct = null;
     this.currentStep = null;
-    this.selectedVariant = null;
-    this.selectedOptions = {};
+    this.selectionResult = { status: 'incomplete', selection: {}, variant: null };
     this.selectedQuantity = 1;
     this.currentImageIndex = 0;
-    this.readOnly = false;
+    this.trigger = null;
+    this.draftKey = '';
+    this.configuration = {};
     this.lockedScrollY = 0;
-    this.isDocumentScrollLocked = false;
-    this.previousRootScrollbarGutter = '';
-
+    this.previousScrollStyles = null;
     this.init();
   }
 
-  lockDocumentScroll() {
-    if (this.isDocumentScrollLocked) return;
-
-    this.lockedScrollY = Math.max(0, Number(window.scrollY) || 0);
-    this.previousRootScrollbarGutter = document.documentElement.style.scrollbarGutter;
-    document.documentElement.style.scrollbarGutter = 'stable';
-    document.documentElement.classList.add('modal-open');
-    document.body.classList.add('modal-open');
-    document.body.style.setProperty(
-      '--bundle-modal-scroll-offset',
-      `-${this.lockedScrollY}px`,
-    );
-    this.isDocumentScrollLocked = true;
+  text(key: string, fallback: string) {
+    return typeof this.widget?._resolveText === 'function'
+      ? this.widget._resolveText(key, fallback)
+      : fallback;
   }
 
-  unlockDocumentScroll() {
-    if (!this.isDocumentScrollLocked) return;
-
-    document.documentElement.classList.remove('modal-open');
-    document.body.classList.remove('modal-open');
-    document.documentElement.style.scrollbarGutter = this.previousRootScrollbarGutter;
-    document.body.style.removeProperty('--bundle-modal-scroll-offset');
-    document.documentElement.scrollTop = this.lockedScrollY;
-    document.body.scrollTop = this.lockedScrollY;
-    this.lockedScrollY = 0;
-    this.isDocumentScrollLocked = false;
-    this.previousRootScrollbarGutter = '';
-  }
-
-  /**
-   * Initialize modal
-   */
   init() {
     this.createModalHTML();
     this.attachEventListeners();
   }
 
-  /**
-   * Create modal DOM structure
-   */
   createModalHTML() {
-    const modal = document.createElement('div');
-    modal.className = 'bundle-modal-overlay';
-    modal.id = 'bundle-product-modal';
+    const dialog = document.createElement('dialog');
+    dialog.className = 'bundle-modal-overlay';
+    dialog.id = 'bundle-product-modal';
+    dialog.setAttribute('aria-labelledby', 'modal-product-title');
+
     const container = document.createElement('div');
     container.className = 'bundle-modal-container';
-    const dragHandle = document.createElement('div');
-    dragHandle.className = 'bundle-modal-drag-handle';
-    dragHandle.setAttribute('aria-hidden', 'true');
-    const dragIndicator = document.createElement('div');
-    dragIndicator.className = 'bundle-modal-drag-indicator';
-    dragHandle.appendChild(dragIndicator);
-    const close = document.createElement('button');
-    close.className = 'bundle-modal-close';
-    close.setAttribute('aria-label', 'Close modal');
-    close.appendChild(createCloseIcon(document));
 
-    const content = document.createElement('div');
-    content.className = 'bundle-modal-content';
-    const images = document.createElement('div');
-    images.className = 'bundle-modal-images';
-    const imageContainer = document.createElement('div');
-    imageContainer.className = 'bundle-modal-main-image-container';
-    const mainImageWrap = document.createElement('div');
-    mainImageWrap.className = 'bundle-modal-main-image';
-    const mainImage = document.createElement('img');
-    mainImage.id = 'modal-main-image';
-    mainImage.alt = 'Product image';
-    const previousImage = document.createElement('button');
-    previousImage.type = 'button';
-    previousImage.className = 'bundle-modal-image-nav bundle-modal-image-nav--prev';
-    previousImage.dataset.modalImageNav = 'prev';
-    previousImage.setAttribute('aria-label', 'Previous image');
-    previousImage.hidden = true;
-    previousImage.appendChild(createChevronIcon(document, 'left'));
-    const nextImage = document.createElement('button');
-    nextImage.type = 'button';
-    nextImage.className = 'bundle-modal-image-nav bundle-modal-image-nav--next';
-    nextImage.dataset.modalImageNav = 'next';
-    nextImage.setAttribute('aria-label', 'Next image');
-    nextImage.hidden = true;
-    nextImage.appendChild(createChevronIcon(document, 'right'));
-    mainImageWrap.append(mainImage, previousImage, nextImage);
-    imageContainer.appendChild(mainImageWrap);
-    images.appendChild(imageContainer);
-
-    const details = document.createElement('div');
-    details.className = 'bundle-modal-details';
-    const header = document.createElement('div');
+    const header = document.createElement('header');
     header.className = 'bundle-modal-header';
     const title = document.createElement('h2');
     title.className = 'bundle-modal-title';
     title.id = 'modal-product-title';
+    const close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'bundle-modal-close';
+    close.setAttribute('aria-label', this.text('closeModalText', 'Close product details'));
+    close.append(createCloseIcon(document));
+    header.append(title, close);
+
+    const scroll = document.createElement('div');
+    scroll.className = 'bundle-modal-scroll';
+    const content = document.createElement('div');
+    content.className = 'bundle-modal-content';
+
+    const images = document.createElement('div');
+    images.className = 'bundle-modal-images';
+    const imageFrame = document.createElement('div');
+    imageFrame.className = 'bundle-modal-main-image';
+    const mainImage = document.createElement('img');
+    mainImage.id = 'modal-main-image';
+    const previousImage = document.createElement('button');
+    previousImage.type = 'button';
+    previousImage.className = 'bundle-modal-image-nav bundle-modal-image-nav--prev';
+    previousImage.dataset.modalImageNav = 'prev';
+    previousImage.setAttribute('aria-label', this.text('productImagePreviousLabel', 'Previous image'));
+    previousImage.append(createChevronIcon(document, 'left'));
+    const nextImage = document.createElement('button');
+    nextImage.type = 'button';
+    nextImage.className = 'bundle-modal-image-nav bundle-modal-image-nav--next';
+    nextImage.dataset.modalImageNav = 'next';
+    nextImage.setAttribute('aria-label', this.text('productImageNextLabel', 'Next image'));
+    nextImage.append(createChevronIcon(document, 'right'));
+    imageFrame.append(mainImage, previousImage, nextImage);
+    const thumbnails = document.createElement('div');
+    thumbnails.className = 'bundle-modal-thumbnails';
+    thumbnails.dataset.modalThumbnails = 'true';
+    images.append(imageFrame, thumbnails);
+
+    const details = document.createElement('div');
+    details.className = 'bundle-modal-details';
     const selection = document.createElement('div');
     selection.className = 'bundle-modal-selection-summary';
     selection.id = 'modal-selection-summary';
     selection.hidden = true;
-    const selectionTextWrap = document.createElement('span');
-    selectionTextWrap.append(document.createTextNode('Selected: '));
     const selectionText = document.createElement('strong');
     selectionText.id = 'modal-selection-text';
-    selectionTextWrap.appendChild(selectionText);
-    selection.appendChild(selectionTextWrap);
+    selection.append(selectionText);
     const price = document.createElement('div');
     price.className = 'bundle-modal-price';
     price.id = 'modal-product-price';
-    header.append(title, selection, price);
     const description = document.createElement('div');
     description.className = 'bundle-modal-description';
     description.id = 'modal-product-description';
@@ -198,99 +169,78 @@ export class BundleProductModal {
     quantity.className = 'bundle-modal-quantity';
     const quantityLabel = document.createElement('span');
     quantityLabel.className = 'bundle-modal-quantity-label';
-    quantityLabel.textContent = 'Quantity';
+    quantityLabel.textContent = this.text('quantityLabel', 'Quantity');
     const quantityControls = document.createElement('div');
     quantityControls.className = 'bundle-modal-quantity-controls';
     const decrease = document.createElement('button');
+    decrease.type = 'button';
     decrease.className = 'bundle-modal-qty-btn';
     decrease.id = 'modal-qty-decrease';
+    decrease.setAttribute('aria-label', this.text('decreaseQuantityText', 'Decrease quantity'));
     decrease.textContent = '−';
     const quantityDisplay = document.createElement('span');
     quantityDisplay.className = 'bundle-modal-qty-display';
     quantityDisplay.id = 'modal-qty-display';
-    quantityDisplay.textContent = '1';
+    quantityDisplay.setAttribute('aria-live', 'polite');
     const increase = document.createElement('button');
+    increase.type = 'button';
     increase.className = 'bundle-modal-qty-btn';
     increase.id = 'modal-qty-increase';
+    increase.setAttribute('aria-label', this.text('increaseQuantityText', 'Increase quantity'));
     increase.textContent = '+';
     quantityControls.append(decrease, quantityDisplay, increase);
     quantity.append(quantityLabel, quantityControls);
-    const add = document.createElement('button');
-    add.className = 'bundle-modal-add-btn';
-    add.id = 'modal-add-to-box';
-    add.textContent = 'Add To Box';
-    details.append(header, description, variants, quantity, add);
+    details.append(selection, price, description, variants, quantity);
     content.append(images, details);
-    container.append(dragHandle, close, content);
-    modal.appendChild(container);
-    document.body.appendChild(modal);
-    this.modalElement = modal;
+    scroll.append(content);
+
+    const footer = document.createElement('footer');
+    footer.className = 'bundle-modal-footer';
+    const action = document.createElement('button');
+    action.type = 'button';
+    action.className = 'bundle-modal-add-btn';
+    action.id = 'modal-add-to-box';
+    footer.append(action);
+    container.append(header, scroll, footer);
+    dialog.append(container);
+    const mount = this.widget?.container?.append ? this.widget.container : document.body;
+    mount.append(dialog);
+    this.modalElement = dialog;
   }
 
-  /**
-   * Attach event listeners
-   */
   attachEventListeners() {
-    // Close button
-    const closeBtn = this.modalElement.querySelector('.bundle-modal-close');
-    closeBtn.addEventListener('click', () => this.close());
-
-    // Close on overlay click
-    this.modalElement.addEventListener('click', (e: any) => {
-      if (e.target === this.modalElement) {
-        this.close();
-      }
+    if (!this.modalElement) return;
+    this.modalElement.querySelector('.bundle-modal-close')?.addEventListener('click', () => this.close());
+    this.modalElement.addEventListener('cancel', (event) => {
+      event.preventDefault();
+      this.close();
     });
-
-    // Close on ESC key
-    document.addEventListener('keydown', (e: any) => {
-      if (!this.modalElement.classList.contains('active')) return;
-      if (e.key === 'Escape') {
-        e.preventDefault();
-        e.stopImmediatePropagation?.();
-        this.close();
-      }
+    this.modalElement.addEventListener('click', (event) => {
+      if (event.target === this.modalElement) this.close();
     });
-
-    // Quantity controls
-    document.getElementById('modal-qty-decrease')!.addEventListener('click', () => {
+    this.modalElement.addEventListener('close', () => this.finishClose());
+    this.modalElement.querySelector('#modal-qty-decrease')?.addEventListener('click', () => {
       this.updateQuantity(Math.max(1, this.selectedQuantity - 1));
     });
-
-    document.getElementById('modal-qty-increase')!.addEventListener('click', () => {
+    this.modalElement.querySelector('#modal-qty-increase')?.addEventListener('click', () => {
       this.updateQuantity(this.selectedQuantity + 1);
     });
-
-    // Add To Box button
-    document.getElementById('modal-add-to-box')!.addEventListener('click', () => {
-      this.addToBundle();
-    });
-
-    this.modalElement.querySelectorAll('[data-modal-image-nav]').forEach((button: any) => {
-      button.addEventListener('click', (event: any) => {
-        event.preventDefault();
-        event.stopPropagation();
-        this.showAdjacentImage(button.dataset.modalImageNav === 'prev' ? -1 : 1);
+    this.modalElement.querySelector('#modal-add-to-box')?.addEventListener('click', () => this.addToBundle());
+    this.modalElement.querySelectorAll('[data-modal-image-nav]').forEach((button: Element) => {
+      button.addEventListener('click', () => {
+        this.showAdjacentImage((button as HTMLElement).dataset.modalImageNav === 'prev' ? -1 : 1);
       });
     });
     this.setupImageCarouselGestures();
-
-    // Swipe gesture detection for mobile
-    this.setupSwipeGestures();
   }
 
   setupImageCarouselGestures() {
-    const imageFrame = this.modalElement.querySelector('.bundle-modal-main-image');
+    const imageFrame = this.modalElement?.querySelector('.bundle-modal-main-image');
     if (!imageFrame) return;
-
     let gesture: any = null;
     imageFrame.addEventListener('pointerdown', (event: any) => {
-      gesture = {
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        startY: event.clientY,
-      };
-      imageFrame.setPointerCapture?.(event.pointerId);
+      gesture = { pointerId: event.pointerId, startX: event.clientX, startY: event.clientY };
+      (imageFrame as HTMLElement).setPointerCapture?.(event.pointerId);
     });
     imageFrame.addEventListener('pointerup', (event: any) => {
       if (!gesture || event.pointerId !== gesture.pointerId) return;
@@ -299,196 +249,225 @@ export class BundleProductModal {
         distanceY: event.clientY - gesture.startY,
       });
       gesture = null;
-      if (direction !== 0) this.showAdjacentImage(direction);
+      if (direction) this.showAdjacentImage(direction);
     });
     imageFrame.addEventListener('pointercancel', () => {
       gesture = null;
     });
   }
 
-  /**
-   * Setup swipe gestures for mobile
-   * - Swipe down on container to dismiss
-   */
-  setupSwipeGestures() {
-    const modalContainer = this.modalElement.querySelector('.bundle-modal-container');
-    const dragHandle = this.modalElement.querySelector('.bundle-modal-drag-handle');
-    if (!dragHandle || !modalContainer) return;
-
-    let gesture: any = null;
-    const resetDrawerPosition = () => {
-      modalContainer.style.transform = '';
-      modalContainer.style.opacity = '';
+  lockDocumentScroll() {
+    if (this.previousScrollStyles) return;
+    const root = document.documentElement;
+    const body = document.body;
+    this.lockedScrollY = Math.max(0, Number(window.scrollY) || 0);
+    this.previousScrollStyles = {
+      rootOverflow: root.style.overflow,
+      rootScrollbarGutter: root.style.scrollbarGutter,
+      bodyOverflow: body.style.overflow,
+      bodyOverscrollBehavior: body.style.overscrollBehavior,
     };
-
-    dragHandle.addEventListener('pointerdown', (event: any) => {
-      gesture = {
-        pointerId: event.pointerId,
-        startX: event.clientX,
-        startY: event.clientY,
-        startedAt: performance.now(),
-      };
-      modalContainer.style.transition = 'none';
-      dragHandle.setPointerCapture?.(event.pointerId);
-    });
-
-    dragHandle.addEventListener('pointermove', (event: any) => {
-      if (!gesture || event.pointerId !== gesture.pointerId) return;
-      const distanceX = event.clientX - gesture.startX;
-      const distanceY = Math.max(0, event.clientY - gesture.startY);
-      if (Math.abs(distanceX) > distanceY) return;
-      modalContainer.style.transform = `translateY(${distanceY}px)`;
-      modalContainer.style.opacity = String(Math.max(0.5, 1 - distanceY / 300));
-    });
-
-    const finishGesture = (event: any) => {
-      if (!gesture || event.pointerId !== gesture.pointerId) return;
-      const elapsed = Math.max(1, performance.now() - gesture.startedAt);
-      const distanceY = event.clientY - gesture.startY;
-      const distanceX = event.clientX - gesture.startX;
-      gesture = null;
-      modalContainer.style.transition = 'transform 0.24s ease, opacity 0.24s ease';
-
-      if (shouldDismissProductDrawerSwipe({
-        distanceY,
-        distanceX,
-        velocityY: distanceY / elapsed,
-      })) {
-        modalContainer.style.transform = 'translateY(100%)';
-        modalContainer.style.opacity = '0';
-        setTimeout(() => {
-          this.close();
-          resetDrawerPosition();
-        }, 240);
-        return;
-      }
-
-      resetDrawerPosition();
-    };
-
-    dragHandle.addEventListener('pointerup', finishGesture);
-    dragHandle.addEventListener('pointercancel', () => {
-      gesture = null;
-      modalContainer.style.transition = 'transform 0.24s ease, opacity 0.24s ease';
-      resetDrawerPosition();
-    });
+    root.style.overflow = 'hidden';
+    root.style.scrollbarGutter = 'stable';
+    body.style.overflow = 'hidden';
+    body.style.overscrollBehavior = 'none';
   }
 
-  /**
-   * Open modal with product data
-   * @param {Object} product - Product data
-   * @param {Object} step - Step data
-   */
+  unlockDocumentScroll() {
+    if (!this.previousScrollStyles) return;
+    const root = document.documentElement;
+    const body = document.body;
+    root.style.overflow = this.previousScrollStyles.rootOverflow;
+    root.style.scrollbarGutter = this.previousScrollStyles.rootScrollbarGutter;
+    body.style.overflow = this.previousScrollStyles.bodyOverflow;
+    body.style.overscrollBehavior = this.previousScrollStyles.bodyOverscrollBehavior;
+    window.scrollTo?.(0, this.lockedScrollY);
+    this.previousScrollStyles = null;
+  }
+
   open(product: any, step: any, options: any = {}) {
-
-    this.currentProduct = product;
+    if (!this.modalElement) return;
+    this.currentProduct = { ...product };
     this.currentStep = step;
-    this.selectedVariant = null;
-    this.selectedOptions = {};
-    this.selectedQuantity = Math.max(1, Number(options.selectedQuantity || 1));
-    this.readOnly = options.readOnly === true;
-    const imageCount = this.getProductImages().length;
-    const initialImageIndex = Number(options.initialImageIndex || 0);
-    this.currentImageIndex = imageCount > 0
-      ? Math.min(Math.max(0, initialImageIndex), imageCount - 1)
-      : 0;
-
-    // Populate modal content
+    this.configuration = options;
+    this.trigger = options.trigger?.nodeType === 1
+      ? options.trigger
+      : document.activeElement as HTMLElement;
+    this.draftKey = String(options.draftKey || '');
+    this.currentImageIndex = Math.max(0, Number(options.initialImageIndex || 0));
+    this.selectionResult = this.initialSelectionResult(options.selection || {});
+    this.syncQuantityFromSelection();
     this.populateModal();
-    this.updateReadOnlyState();
-
-    // Show modal
-    this.modalElement.classList.add('active');
     this.lockDocumentScroll();
+    if (typeof this.modalElement.showModal === 'function') {
+      this.modalElement.showModal();
+    } else {
+      this.modalElement.setAttribute('open', '');
+    }
+    this.modalElement.querySelector<HTMLElement>('.bundle-modal-close')?.focus({ preventScroll: true });
   }
 
-  /**
-   * Close modal
-   */
-  close() {
-    this.modalElement.classList.remove('active');
-    this.unlockDocumentScroll();
+  initialSelectionResult(selection: Record<string, string>) {
+    const variants = Array.isArray(this.currentProduct?.variants) ? this.currentProduct.variants : [];
+    if (this.configuration.displayVariantsAsIndividualProducts === true) {
+      const currentId = variantId(this.currentProduct);
+      const candidate = variants.find((variant: any) => variantId(variant) === currentId)
+        || this.currentProduct;
+      return {
+        status: isSellable(candidate) ? 'available' : 'unavailable',
+        selection: selectionForVariant(this.currentProduct, candidate),
+        variant: candidate,
+      } as VariantSelectionResult;
+    }
+    if (variants.length <= 1) {
+      const candidate = variants[0] || this.currentProduct;
+      return {
+        status: isSellable(candidate) ? 'available' : 'unavailable',
+        selection,
+        variant: candidate,
+      } as VariantSelectionResult;
+    }
+    return resolveExactVariantSelection(this.currentProduct, selection);
+  }
 
-    // Reset state
+  close() {
+    if (!this.modalElement) return;
+    if (this.modalElement.open && typeof this.modalElement.close === 'function') {
+      this.modalElement.close();
+      return;
+    }
+    this.modalElement.removeAttribute('open');
+    this.finishClose();
+  }
+
+  finishClose() {
+    this.unlockDocumentScroll();
+    const returnTarget = this.trigger;
     this.currentProduct = null;
     this.currentStep = null;
-    this.selectedVariant = null;
+    this.selectionResult = { status: 'incomplete', selection: {}, variant: null };
     this.selectedQuantity = 1;
     this.currentImageIndex = 0;
-    this.readOnly = false;
-    this.updateReadOnlyState();
+    this.trigger = null;
+    queueMicrotask(() => returnTarget?.focus?.({ preventScroll: true }));
   }
 
-  /**
-   * Populate modal with product data
-   */
   populateModal() {
-    // Set title - use parent title if this is a flattened variant
-    const displayTitle = this.currentProduct.parentTitle || this.currentProduct.title;
-    document.getElementById('modal-product-title')!.textContent = displayTitle;
-
-    const descriptionEl = document.getElementById('modal-product-description')!;
-    const descriptionHtml = typeof this.currentProduct.descriptionHtml === 'string'
-      ? this.currentProduct.descriptionHtml.trim()
-      : '';
+    if (!this.modalElement) return;
+    const title = resolveProductDisplayTitle(this.currentProduct);
+    this.modalElement.querySelector('#modal-product-title')!.textContent = title;
+    const description = this.modalElement.querySelector<HTMLElement>('#modal-product-description')!;
+    const descriptionHtml = String(this.currentProduct?.descriptionHtml || '').trim();
     if (descriptionHtml) {
-      descriptionEl.replaceChildren(sanitizeRichHtmlFragment(descriptionHtml, 'product-description'));
+      description.replaceChildren(sanitizeRichHtmlFragment(descriptionHtml, 'product-description'));
     } else {
-      descriptionEl.textContent = this.currentProduct.description || '';
+      description.textContent = this.currentProduct?.description || '';
     }
-    descriptionEl.hidden = !hasMeaningfulDescription(descriptionEl);
-
-    // Load image
-    this.loadImage();
-
-    // Create variant selectors
-    this.createVariantSelectors();
-
-    // Set initial price
-    this.updatePrice();
-
-    // Reset quantity display
-    document.getElementById('modal-qty-display')!.textContent = String(this.selectedQuantity);
+    description.hidden = !hasMeaningfulDescription(description);
+    this.renderVariantSelector();
+    this.updatePresentation();
   }
 
-  updateReadOnlyState() {
-    if (!this.modalElement) return;
-
-    this.modalElement.dataset.readOnly = this.readOnly ? 'true' : 'false';
-    [
-      '#modal-product-price',
-      '#modal-variants-container',
-      '.bundle-modal-quantity',
-      '#modal-add-to-box',
-    ].forEach((selector) => {
-      const element = this.modalElement.querySelector(selector);
-      if (element) {
-        element.hidden = this.readOnly;
-      }
+  renderVariantSelector() {
+    const container = this.modalElement?.querySelector<HTMLElement>('#modal-variants-container');
+    if (!container) return;
+    if (this.configuration.displayVariantsAsIndividualProducts === true) {
+      container.replaceChildren();
+      return;
+    }
+    const selector = VariantSelectorComponent.createConfiguredElement(
+      this.currentProduct,
+      this.configuration.primaryOptionName || null,
+      {
+        variantSelectorMode: this.configuration.variantSelectorMode || 'dropdown',
+        swatchTooltipEnabled: this.configuration.swatchTooltipEnabled === true,
+        selection: this.selectionResult.selection,
+      },
+      document,
+    );
+    container.replaceChildren(...(selector ? [selector] : []));
+    if (!selector) return;
+    VariantSelectorComponent.attachListeners(selector, this.currentProduct, (result: VariantSelectionResult) => {
+      this.selectionResult = result;
+      this.currentImageIndex = 0;
+      this.syncQuantityFromSelection();
+      this.updatePresentation();
     });
   }
 
-  /**
-   * Get normalized product image.
-   * Handles imageUrl, image.src, images array, and featuredImage.url.
-   * @returns {string} Image URL
-   */
-  getProductImages() {
-    const product = this.currentProduct;
-    if (!product) return [BUNDLE_WIDGET.PLACEHOLDER_IMAGE];
+  syncQuantityFromSelection() {
+    const id = variantId(this.selectionResult.variant);
+    const steps = this.widget?.selectedBundle?.steps || [];
+    const stepIndex = steps.findIndex((candidate: any) => candidate?.id === this.currentStep?.id);
+    const committedQuantity = id && stepIndex >= 0
+      ? Number(this.widget?.selectedProducts?.[stepIndex]?.[id] || 0)
+      : 0;
+    this.selectedQuantity = committedQuantity > 0 ? committedQuantity : 1;
+  }
 
-    const urls: any[] = [];
-    const addUrl = (value: any) => {
-      const url = this.normalizeImageUrl(value);
-      if (url && !urls.includes(url)) urls.push(url);
+  updatePresentation() {
+    if (!this.modalElement) return;
+    const presented = this.getPresentedProduct();
+    const title = this.modalElement.querySelector<HTMLElement>('#modal-product-title');
+    if (title) {
+      title.textContent = resolveProductDisplayTitle(this.currentProduct)
+        || resolveProductDisplayTitle(presented);
+    }
+    this.updatePrice(presented);
+    this.loadImage(presented);
+    this.updateSelectionSummary();
+    this.updateQuantity(this.selectedQuantity);
+    this.updateAvailability();
+  }
+
+  getPresentedProduct() {
+    const useVariantPresentation = this.selectionResult.status === 'available'
+      || this.selectionResult.status === 'unavailable';
+    if (useVariantPresentation && this.selectionResult.variant) {
+      return this.selectionResult.variant;
+    }
+    return {
+      title: resolveProductDisplayTitle(this.currentProduct),
+      price: this.currentProduct?.basePrice ?? this.currentProduct?.price,
+      compareAtPrice: this.currentProduct?.baseCompareAtPrice,
+      currencyCode: this.currentProduct?.currencyCode,
+      imageUrl: this.currentProduct?.baseImageUrl || BUNDLE_WIDGET.PLACEHOLDER_IMAGE,
+      images: Array.isArray(this.currentProduct?.baseImages) ? this.currentProduct.baseImages : [],
+      parentPresentation: true,
     };
+  }
 
-    addUrl(product.imageUrl);
-    addUrl(product.image);
-    addUrl(product.featuredImage);
-    (Array.isArray(product.images) ? product.images : []).forEach(addUrl);
+  updateSelectionSummary() {
+    const summary = this.modalElement?.querySelector<HTMLElement>('#modal-selection-summary');
+    const text = this.modalElement?.querySelector<HTMLElement>('#modal-selection-text');
+    if (!summary || !text) return;
+    const values = Object.values(this.selectionResult.selection).filter(Boolean);
+    text.textContent = values.join(' / ');
+    summary.hidden = values.length === 0;
+  }
 
-    return urls.length > 0 ? urls : [BUNDLE_WIDGET.PLACEHOLDER_IMAGE];
+  updatePrice(candidate: any) {
+    const price = this.modalElement?.querySelector<HTMLElement>('#modal-product-price');
+    if (!price) return;
+    const rawPrice = candidate?.price ?? this.currentProduct?.price ?? 0;
+    const finalPrice = this.widget?.getSubscriptionProductCardPrice
+      ? this.widget.getSubscriptionProductCardPrice(rawPrice)
+      : rawPrice;
+    const rawCompareAt = candidate?.compareAtPrice ?? candidate?.compare_at_price;
+    const compareAt = typeof rawCompareAt === 'object' ? rawCompareAt?.amount : rawCompareAt;
+    const currencyCode = candidate?.currencyCode || this.currentProduct?.currencyCode || '';
+    price.replaceChildren();
+    if (compareAt && Number(compareAt) > Number(finalPrice)) {
+      const strike = document.createElement('span');
+      strike.className = 'bundle-modal-price-strike';
+      strike.textContent = CurrencyManager.formatMoney(compareAt, currencyCode);
+      const sale = document.createElement('span');
+      sale.className = 'bundle-modal-price-sale';
+      sale.textContent = CurrencyManager.formatMoney(finalPrice, currencyCode);
+      price.append(strike, sale);
+    } else {
+      price.textContent = CurrencyManager.formatMoney(finalPrice, currencyCode);
+    }
   }
 
   normalizeImageUrl(value: any) {
@@ -497,105 +476,119 @@ export class BundleProductModal {
     return value.url || value.src || value.originalSrc || value.transformedSrc || '';
   }
 
-  getProductImage() {
-    const images = this.getProductImages();
-    return images[this.currentImageIndex] || images[0] || BUNDLE_WIDGET.PLACEHOLDER_IMAGE;
+  getProductImages(candidate: any = null) {
+    if (!this.currentProduct) return [BUNDLE_WIDGET.PLACEHOLDER_IMAGE];
+    const urls: string[] = [];
+    const add = (value: any) => {
+      const url = this.normalizeImageUrl(value);
+      if (url && !urls.includes(url)) urls.push(url);
+    };
+    if (candidate?.parentPresentation === true) {
+      add(candidate.imageUrl);
+      (Array.isArray(candidate.images) ? candidate.images : []).forEach(add);
+      return urls.length > 0 ? urls : [BUNDLE_WIDGET.PLACEHOLDER_IMAGE];
+    }
+    if (candidate && candidate !== this.currentProduct) {
+      add(candidate.image);
+      add(candidate.featuredImage);
+      add(candidate.imageUrl);
+    }
+    add(this.currentProduct.imageUrl);
+    add(this.currentProduct.image);
+    add(this.currentProduct.featuredImage);
+    (Array.isArray(this.currentProduct.images) ? this.currentProduct.images : []).forEach(add);
+    return urls.length > 0 ? urls : [BUNDLE_WIDGET.PLACEHOLDER_IMAGE];
   }
 
-  loadImage() {
-    const mainImageEl = document.getElementById('modal-main-image') as HTMLImageElement | null;
-    if (!mainImageEl) return;
-
-    const images = this.getProductImages();
-    this.currentImageIndex = Math.min(Math.max(0, this.currentImageIndex), images.length - 1);
-    mainImageEl.src = this.getProductImage();
-    mainImageEl.alt = this.currentProduct?.title || 'Product image';
-
-    const hasGallery = images.length > 1;
-    const imageFrame = this.modalElement.querySelector('.bundle-modal-main-image');
-    if (imageFrame) {
-      imageFrame.classList.toggle('bundle-modal-main-image--has-gallery', hasGallery);
-    }
-    this.modalElement.querySelectorAll('[data-modal-image-nav]').forEach((button: any) => {
-      button.hidden = !hasGallery;
+  loadImage(candidate: any) {
+    const image = this.modalElement?.querySelector<HTMLImageElement>('#modal-main-image');
+    const thumbnails = this.modalElement?.querySelector<HTMLElement>('[data-modal-thumbnails]');
+    if (!image || !thumbnails) return;
+    const images = this.getProductImages(candidate);
+    this.currentImageIndex = Math.min(this.currentImageIndex, images.length - 1);
+    image.src = images[this.currentImageIndex];
+    image.alt = resolveProductDisplayTitle(this.currentProduct)
+      || resolveProductDisplayTitle(candidate)
+      || this.text('productImageLabel', 'Product image');
+    this.modalElement?.querySelectorAll<HTMLElement>('[data-modal-image-nav]').forEach((button) => {
+      button.hidden = images.length <= 1;
     });
+    const thumbnailButtons = images.map((url, index) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'bundle-modal-thumbnail';
+      button.setAttribute('aria-label', `${this.text('productImageLabel', 'Product image')} ${index + 1}`);
+      button.setAttribute('aria-pressed', index === this.currentImageIndex ? 'true' : 'false');
+      const thumbnail = document.createElement('img');
+      thumbnail.src = url;
+      thumbnail.alt = '';
+      button.append(thumbnail);
+      button.addEventListener('click', () => {
+        this.currentImageIndex = index;
+        this.loadImage(candidate);
+      });
+      return button;
+    });
+    thumbnails.hidden = images.length <= 1;
+    thumbnails.replaceChildren(...thumbnailButtons);
   }
 
   showAdjacentImage(direction: number) {
-    const images = this.getProductImages();
+    const candidate = this.getPresentedProduct();
+    const images = this.getProductImages(candidate);
     if (images.length <= 1) return;
-
     this.currentImageIndex = (this.currentImageIndex + direction + images.length) % images.length;
-    this.loadImage();
+    this.loadImage(candidate);
   }
 
   updateQuantity(quantity: number) {
-    this.selectedQuantity = Math.max(1, quantity);
-    document.getElementById('modal-qty-display')!.textContent = String(this.selectedQuantity);
+    this.selectedQuantity = Math.max(1, Number(quantity) || 1);
+    const display = this.modalElement?.querySelector('#modal-qty-display');
+    if (display) display.textContent = String(this.selectedQuantity);
   }
 
-  /**
-   * Add product to bundle
-   */
+  updateAvailability() {
+    const action = this.modalElement?.querySelector<HTMLButtonElement>('#modal-add-to-box');
+    if (!action) return;
+    const id = variantId(this.selectionResult.variant);
+    const steps = this.widget?.selectedBundle?.steps || [];
+    const stepIndex = steps.findIndex((candidate: any) => candidate?.id === this.currentStep?.id);
+    const isCommitted = Boolean(id && stepIndex >= 0 && this.widget?.selectedProducts?.[stepIndex]?.[id] > 0);
+    if (this.selectionResult.status === 'incomplete') {
+      action.disabled = true;
+      action.textContent = this.text('selectVariantText', 'Select variant');
+    } else if (this.selectionResult.status === 'unavailable' || this.selectionResult.status === 'nonexistent') {
+      action.disabled = true;
+      action.textContent = this.text('outOfStockText', 'Out of stock');
+    } else {
+      action.disabled = false;
+      action.textContent = isCommitted
+        ? this.text('updateQuantityText', 'Update quantity')
+        : this.text('addToBoxText', 'Add To Box');
+    }
+    action.classList.toggle('out-of-stock', action.disabled && this.selectionResult.status !== 'incomplete');
+  }
+
   addToBundle() {
-    if (this.readOnly) {
+    if (this.selectionResult.status !== 'available' || !this.currentStep) return;
+    const id = variantId(this.selectionResult.variant);
+    const steps = this.widget?.selectedBundle?.steps || [];
+    const stepIndex = steps.findIndex((candidate: any) => candidate?.id === this.currentStep.id);
+    if (!id || stepIndex < 0 || typeof this.widget?.updateProductSelection !== 'function') return;
+    const previousDraft = this.draftKey
+      ? getVariantSelectionDraft(this.widget, this.draftKey)
+      : null;
+    if (this.draftKey) {
+      setVariantSelectionDraft(this.widget, this.draftKey, this.selectionResult.selection);
+    }
+    const updated = this.widget.updateProductSelection(stepIndex, id, this.selectedQuantity);
+    if (updated === false) {
+      if (this.draftKey && previousDraft) {
+        setVariantSelectionDraft(this.widget, this.draftKey, previousDraft);
+      }
       return;
     }
-
-    if (!this.currentProduct || !this.currentStep) {
-      return;
-    }
-
-    const variant = this.selectedVariant || this.currentProduct;
-
-    // Check availability before adding
-    const isAvailable = variant.available !== false &&
-                        variant.availableForSale !== false;
-
-    if (!isAvailable) {
-      return;
-    }
-
-    // Use selectedBundle.steps (not widget.steps which doesn't exist)
-    const steps = this.widget.selectedBundle?.steps || [];
-    const stepIndex = steps.findIndex((s: any)  => s.id === this.currentStep.id);
-
-    if (stepIndex === -1) {
-      return;
-    }
-
-    const productId = variant.variantId || variant.id || this.currentProduct.id;
-    // Call widget's method to add product
-    if (this.widget.updateProductSelection) {
-      this.widget.updateProductSelection(
-        stepIndex,
-        productId,
-        this.selectedQuantity
-      );
-    } else {
-      return;
-    }
-
-    // Close modal
     this.close();
-
-    // Show success feedback
-    this.showSuccessFeedback();
-  }
-
-  /**
-   * Show success feedback after adding product
-   */
-  showSuccessFeedback() {
-    // Use widget's toast manager if available
-    if (this.widget && this.widget.showToast) {
-      this.widget.showToast('Product added to bundle!', 'success');
-    } else {
-    }
+    this.widget?.showToast?.(this.text('productAddedText', 'Product added to bundle!'), 'success');
   }
 }
-
-Object.assign(
-  BundleProductModal.prototype,
-  BundleModalVariantMethods,
-);

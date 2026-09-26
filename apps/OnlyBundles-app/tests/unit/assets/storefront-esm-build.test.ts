@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -14,6 +14,7 @@ describe('storefront ESM build', () => {
 
     const outputs = [
       'bundle-widget-full-page-bundled.js',
+      'bundle-widget-full-page-modal.js',
       'bundle-widget-product-page-bundled.js',
       'wolfpack-bundles-sdk.js',
     ];
@@ -25,5 +26,19 @@ describe('storefront ESM build', () => {
       expect(source).not.toContain('module.exports');
       expect(() => execFileSync(process.execPath, ['--check', outputPath], { stdio: 'pipe' })).not.toThrow();
     }
+  });
+
+  it('emits both FPB runtime assets from the full-page build boundary', () => {
+    const outputDir = mkdtempSync(path.join(tmpdir(), 'wpb-full-page-build-'));
+    execFileSync(process.execPath, ['scripts/build-storefront.mjs', 'full-page'], {
+      cwd: process.cwd(),
+      env: { ...process.env, WPB_STOREFRONT_OUTDIR: outputDir },
+      stdio: 'pipe',
+    });
+
+    expect(readdirSync(outputDir).sort()).toEqual([
+      'bundle-widget-full-page-bundled.js',
+      'bundle-widget-full-page-modal.js',
+    ]);
   });
 });

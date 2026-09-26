@@ -6,7 +6,7 @@
   gap: 0;
   width: 100%;
   margin: 0;
-  padding: clamp(1.375rem, 3vw, 1.5rem) 0 15px;
+  padding: clamp(22px, 3vw, 24px) 0 15px;
   --bw-ppb-summary-rule-color: #cfcfcf;
   border-top: 0;
   background: transparent;
@@ -61,7 +61,7 @@
   align-items: center;
   gap: 6px;
   max-width: 100%;
-  height: clamp(2rem, 3vw, 2.125rem);
+  height: clamp(32px, 3vw, 34px);
   padding: 0 10px;
   border-radius: 999px;
   background: #000000;
@@ -169,7 +169,7 @@
 @media (max-width: 767px) {
   #bundle-builder-app
     .bw-ppb-cascade-selected-toggle-surface {
-    height: clamp(1.625rem, 7vw, 1.75rem);
+    height: clamp(26px, 7vw, 28px);
     gap: clamp(5px, 1.6vw, 7px);
     padding-block: 0;
     padding-inline: clamp(9px, 2.8vw, 12px);
@@ -216,7 +216,7 @@
   width: 100%;
   min-width: 0;
   min-height: 25px;
-  padding-top: clamp(0.5rem, 2.5vw, 0.75rem);
+  padding-top: clamp(8px, 2.5vw, 12px);
   color: #111111;
   font-size: 14px;
   font-weight: 700;
@@ -262,7 +262,7 @@
 
 #bundle-builder-app
   .bw-ppb-cascade-selected-item:last-child {
-  margin-bottom: 2rem;
+  margin-bottom: 32px;
 }
 
 #bundle-builder-app
@@ -480,7 +480,7 @@
     position: sticky;
     bottom: 0;
     z-index: 4;
-    padding: clamp(1.375rem, 3vw, 1.5rem) 4px
+    padding: clamp(22px, 3vw, 24px) 4px
       max(15px, env(safe-area-inset-bottom, 0px));
     background: #ffffff;
   }
@@ -489,7 +489,7 @@
     [data-ppb-drawer-surface="selected-summary"] {
     right: auto;
     left: 50%;
-    width: min(calc(100% - 1rem), 28rem);
+    width: min(calc(100% - 16px), 448px);
     transform: translateX(-50%);
   }
 
@@ -497,7 +497,7 @@
     [data-ppb-drawer-surface="selected-summary"].bw-ppb-cascade-selected-drawer--open {
     height: min(
       var(--bw-ppb-cascade-selected-drawer-height, 0px),
-      min(44dvh, 22rem)
+      min(44dvh, 352px)
     );
   }
 

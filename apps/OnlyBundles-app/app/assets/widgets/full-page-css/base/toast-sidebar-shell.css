@@ -185,7 +185,7 @@
 
 .side-panel-subtitle {
   font-size: 13px;
-  color: var(--bundle-side-panel-text-color, #888888);
+  color: var(--bundle-side-panel-text-color, #595959);
   margin: -10px 0 14px;
   padding: 0;
 }
@@ -193,7 +193,7 @@
 .side-panel-clear-btn {
   background: none;
   border: 1px solid currentColor;
-  color: var(--bundle-side-panel-clear-color, #bd0000);
+  color: var(--bundle-side-panel-clear-color, #a32138);
   min-height: var(--bundle-control-hit-target, 44px);
   padding-inline: var(--bundle-summary-control-inline-padding, 14px);
   font-size: 12px;
@@ -215,7 +215,7 @@
 .side-panel-item-count {
   font-size: 12px;
   font-weight: 500;
-  color: var(--bundle-side-panel-text-color, #888888);
+  color: var(--bundle-side-panel-text-color, #595959);
   padding: 2px 16px 6px;
   letter-spacing: 0.01em;
 }
@@ -462,7 +462,7 @@
 .side-panel-product-qty {
   font-size: 12px;
   font-weight: 700;
-  color: var(--bundle-side-panel-text-color, #888888);
+  color: var(--bundle-side-panel-text-color, #595959);
   margin-left: 2px;
 }
 

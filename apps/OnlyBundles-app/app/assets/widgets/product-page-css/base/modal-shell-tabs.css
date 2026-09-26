@@ -81,7 +81,7 @@
   margin-inline: auto;
   z-index: 1000000;
   width: 100%;
-  max-width: min(100%, 75rem);
+  max-width: min(100%, 1200px);
   height: 90vh;
   max-height: 90vh;
   display: flex;

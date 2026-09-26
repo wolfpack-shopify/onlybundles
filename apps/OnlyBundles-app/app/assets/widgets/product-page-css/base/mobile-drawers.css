@@ -1,8 +1,8 @@
 @media (max-width: 767px) {
   [data-ppb-drawer-surface] {
-    --ppb-drawer-radius: clamp(1rem, 4vw, 1.5rem);
+    --ppb-drawer-radius: clamp(16px, 4vw, 24px);
     --ppb-drawer-border: 1px solid color-mix(in srgb, currentColor 16%, transparent);
-    --ppb-drawer-shadow: 0 -1rem 3rem rgba(0, 0, 0, 0.18);
+    --ppb-drawer-shadow: 0 -16px 48px rgba(0, 0, 0, 0.18);
   }
 
   [data-ppb-drawer-surface="variant-selector"] {
@@ -22,12 +22,12 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 0.5rem;
+    gap: 8px;
     width: 100%;
     min-height: 44px;
-    padding: 0.5rem 0.75rem;
+    padding: 8px 12px;
     border: 1px solid var(--bundle-border-color, #d1d5db);
-    border-radius: 0.5rem;
+    border-radius: 8px;
     background: var(--bundle-bg-color, #ffffff);
     color: inherit;
     font: inherit;
@@ -59,7 +59,7 @@
   body[wpbmix-template-type="PDP_INPAGE"]
     #bundle-builder-app
     .bw-ppb-cascade-selected-list {
-    max-block-size: min(60dvh, 26rem);
+    max-block-size: min(60dvh, 416px);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
   }
@@ -67,11 +67,11 @@
   body[wpbmix-template-type="PDP_INPAGE"]
     #bundle-builder-app
     .bw-selected-row.bw-ppb-cascade-selected-item {
-    --bw-selected-row-image-size: clamp(2.75rem, 18vw, 3.75rem);
-    --bw-selected-row-gap: clamp(0.375rem, 2vw, 0.625rem);
+    --bw-selected-row-image-size: clamp(44px, 18vw, 60px);
+    --bw-selected-row-gap: clamp(6px, 2vw, 10px);
     grid-template-columns:
       var(--bw-selected-row-image-size) minmax(0, 1fr)
-      minmax(2.75rem, max-content);
+      minmax(44px, max-content);
     min-inline-size: 0;
     max-inline-size: 100%;
   }
@@ -144,7 +144,7 @@
     inline-size: 100%;
     block-size: 100dvh;
     min-inline-size: 0;
-    padding-block-start: max(0.75rem, env(safe-area-inset-top, 0px));
+    padding-block-start: max(12px, env(safe-area-inset-top, 0px));
     box-sizing: border-box;
     overflow: hidden;
     overscroll-behavior: contain;
@@ -156,9 +156,9 @@
     position: relative;
     display: grid;
     grid-template-rows: auto minmax(0, 1fr);
-    inline-size: min(100%, 36rem);
+    inline-size: min(100%, 576px);
     max-inline-size: 100%;
-    max-block-size: min(82dvh, 44rem);
+    max-block-size: min(82dvh, 704px);
     min-inline-size: 0;
     min-block-size: 0;
     margin-inline: auto;
@@ -168,19 +168,19 @@
     background: var(--bundle-bg-color, #ffffff);
     border: 1px solid var(--bundle-border-color, #d1d5db);
     border-block-end: 0;
-    border-radius: clamp(1rem, 5vw, 1.5rem) clamp(1rem, 5vw, 1.5rem) 0 0;
-    box-shadow: 0 -1rem 3rem rgba(0, 0, 0, 0.2);
+    border-radius: clamp(16px, 5vw, 24px) clamp(16px, 5vw, 24px) 0 0;
+    box-shadow: 0 -16px 48px rgba(0, 0, 0, 0.2);
   }
 
   .vs-mobile-drawer--standard .vs-mobile-drawer-close {
     position: absolute;
-    inset-block-start: 0.625rem;
-    inset-inline-end: 0.625rem;
+    inset-block-start: 10px;
+    inset-inline-end: 10px;
     z-index: 2;
     display: grid;
     place-items: center;
-    inline-size: 2.75rem;
-    block-size: 2.75rem;
+    inline-size: 44px;
+    block-size: 44px;
     padding: 0;
     border: 0;
     border-radius: 50%;
@@ -190,23 +190,23 @@
   }
 
   .vs-mobile-drawer--standard .vs-mobile-drawer-close svg {
-    inline-size: 1.25rem;
-    block-size: 1.25rem;
+    inline-size: 20px;
+    block-size: 20px;
   }
 
   .vs-mobile-drawer--standard .vs-mobile-drawer-header {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: clamp(0.625rem, 3vw, 0.875rem);
+    gap: clamp(10px, 3vw, 14px);
     min-inline-size: 0;
-    padding: clamp(0.75rem, 4vw, 1rem);
-    padding-inline-end: 4rem;
+    padding: clamp(12px, 4vw, 16px);
+    padding-inline-end: 64px;
     box-sizing: border-box;
   }
 
   .vs-mobile-drawer--standard
     .vs-mobile-drawer-header:has(.vs-mobile-drawer-product-image) {
-    grid-template-columns: clamp(4.5rem, 26vw, 6.5rem) minmax(0, 1fr);
+    grid-template-columns: clamp(72px, 26vw, 104px) minmax(0, 1fr);
   }
 
   .vs-mobile-drawer--standard .vs-mobile-drawer-product-image {
@@ -214,7 +214,7 @@
     inline-size: 100%;
     aspect-ratio: 1;
     object-fit: cover;
-    border-radius: 0.75rem;
+    border-radius: 12px;
   }
 
   .vs-mobile-drawer--standard .vs-mobile-drawer-product-info {
@@ -231,16 +231,16 @@
   }
 
   .vs-mobile-drawer--standard .vs-mobile-drawer-product-title {
-    padding-inline-end: 0.25rem;
-    font-size: clamp(1rem, 4.5vw, 1.125rem);
+    padding-inline-end: 4px;
+    font-size: clamp(16px, 4.5vw, 18px);
     font-weight: 700;
     line-height: 1.35;
     text-align: start;
   }
 
   .vs-mobile-drawer--standard .vs-mobile-drawer-product-price {
-    margin-block-start: 0.25rem;
-    font-size: 0.9375rem;
+    margin-block-start: 4px;
+    font-size: 15px;
     line-height: 1.35;
   }
 
@@ -249,16 +249,16 @@
     grid-template-rows: auto minmax(0, 1fr);
     min-inline-size: 0;
     min-block-size: 0;
-    padding: 0 clamp(0.75rem, 4vw, 1rem) clamp(0.75rem, 4vw, 1rem);
+    padding: 0 clamp(12px, 4vw, 16px) clamp(12px, 4vw, 16px);
     box-sizing: border-box;
     overflow: hidden;
   }
 
   .vs-mobile-drawer--standard .vs-mobile-drawer-title {
     min-inline-size: 0;
-    padding-block: 0.75rem 0.5rem;
+    padding-block: 12px 8px;
     border-block-start: 1px solid var(--bundle-border-color, #e5e7eb);
-    font-size: clamp(1rem, 4.5vw, 1.125rem);
+    font-size: clamp(16px, 4.5vw, 18px);
     font-weight: 600;
     line-height: 1.35;
     overflow-wrap: anywhere;
@@ -276,13 +276,13 @@
 
   .vs-mobile-drawer--standard .vs-mobile-option {
     display: grid;
-    grid-template-columns: clamp(2.75rem, 15vw, 3.25rem) minmax(0, 1fr) max-content;
+    grid-template-columns: clamp(44px, 15vw, 52px) minmax(0, 1fr) max-content;
     align-items: center;
-    gap: clamp(0.5rem, 2.5vw, 0.75rem);
+    gap: clamp(8px, 2.5vw, 12px);
     inline-size: 100%;
     min-inline-size: 0;
-    min-block-size: 3.25rem;
-    padding: 0.375rem 0;
+    min-block-size: 52px;
+    padding: 6px 0;
     box-sizing: border-box;
     border: 0;
     border-block-start: 1px solid var(--bundle-border-color, #e5e7eb);
@@ -302,7 +302,7 @@
     inline-size: 100%;
     aspect-ratio: 1;
     object-fit: cover;
-    border-radius: 0.5rem;
+    border-radius: 8px;
   }
 
   .vs-mobile-drawer--standard .vs-mobile-option-image--empty {
@@ -312,7 +312,7 @@
   .vs-mobile-drawer--standard .vs-mobile-option-label {
     min-inline-size: 0;
     margin: 0;
-    font-size: 0.9375rem;
+    font-size: 15px;
     line-height: 1.35;
     overflow-wrap: anywhere;
   }
@@ -320,7 +320,7 @@
   .vs-mobile-drawer--standard .vs-mobile-option-price {
     min-inline-size: 0;
     margin: 0;
-    font-size: 0.875rem;
+    font-size: 14px;
     line-height: 1.35;
     white-space: nowrap;
   }
@@ -331,11 +331,11 @@
     display: grid;
     grid-template-columns: max-content 1px max-content;
     align-items: center;
-    gap: clamp(0.375rem, 2vw, 0.5rem);
+    gap: clamp(6px, 2vw, 8px);
     inline-size: max-content;
-    max-inline-size: calc(100vw - 2rem);
-    min-block-size: 2rem;
-    padding: 0.25rem clamp(0.625rem, 3vw, 0.75rem);
+    max-inline-size: calc(100vw - 32px);
+    min-block-size: 32px;
+    padding: 4px clamp(10px, 3vw, 12px);
     box-sizing: border-box;
     overflow: hidden;
   }
@@ -360,21 +360,21 @@
   body[wpbmix-template-type="PDP_MODAL"]
     #bundle-builder-modal.bw-bs-panel
     .bw-bs-cart-items {
-    gap: 0.25rem;
+    gap: 4px;
   }
 
   body[wpbmix-template-type="PDP_MODAL"]
     #bundle-builder-modal.bw-bs-panel
     .bw-bs-cart-price {
-    gap: 0.375rem;
+    gap: 6px;
   }
 
   body[wpbmix-template-type="PDP_MODAL"]
     #bundle-builder-modal.bw-bs-panel
     .bw-bs-cart-icon {
     display: block;
-    inline-size: 1.125rem;
-    block-size: 1.125rem;
+    inline-size: 18px;
+    block-size: 18px;
     flex: 0 0 auto;
   }
 
@@ -383,7 +383,7 @@
     .bw-bs-cart-divider {
     display: block;
     inline-size: 1px;
-    block-size: 1.125rem;
+    block-size: 18px;
     background: currentColor;
     opacity: 0.28;
   }
@@ -398,7 +398,7 @@
   [data-ppb-drawer-surface="variant-selector"] .vs-mobile-drawer-sheet {
     grid-template-rows: auto auto minmax(0, 1fr);
     inline-size: 100%;
-    max-block-size: min(72dvh, 36rem);
+    max-block-size: min(72dvh, 576px);
     border: var(--ppb-drawer-border);
     border-block-end: 0;
     border-radius: var(--ppb-drawer-radius) var(--ppb-drawer-radius) 0 0;
@@ -419,8 +419,8 @@
   }
 
   [data-ppb-drawer-surface="variant-selector"] .vs-mobile-drawer-grip {
-    inline-size: clamp(2rem, 10vw, 2.75rem);
-    block-size: 0.25rem;
+    inline-size: clamp(32px, 10vw, 44px);
+    block-size: 4px;
     border-radius: 999px;
     background: currentColor;
     opacity: 0.22;
@@ -428,7 +428,7 @@
 
   [data-ppb-drawer-surface="variant-selector"] .vs-mobile-drawer-header {
     padding-block-start: 0;
-    padding-inline-end: clamp(0.75rem, 4vw, 1rem);
+    padding-inline-end: clamp(12px, 4vw, 16px);
   }
 
 }

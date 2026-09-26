@@ -238,7 +238,7 @@
   right: 0;
   margin-inline: auto;
   width: 100%;
-  max-width: min(100%, 75rem);
+  max-width: min(100%, 1200px);
   height: min(var(--bundle-bottom-sheet-max-height, 765px), 90vh);
   overflow: hidden;
   background: var(--bundle-bs-panel-bg, rgb(244, 249, 249));
@@ -254,13 +254,13 @@
 
 @media (min-width: 1440px) {
   .bw-bs-panel {
-    max-width: min(94vw, 90rem);
+    max-width: min(94vw, 1440px);
   }
 }
 
 @media (min-width: 1800px) {
   .bw-bs-panel {
-    max-width: min(92vw, 105rem);
+    max-width: min(92vw, 1680px);
   }
 }
 

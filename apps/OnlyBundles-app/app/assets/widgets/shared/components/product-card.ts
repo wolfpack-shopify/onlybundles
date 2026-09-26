@@ -65,8 +65,14 @@ export function createSharedProductCardElement(product: any = {}, currentQuantit
   const variantLabel = options.variantAriaLabel || 'Variant';
   const removeLabel = options.removeAriaLabel || 'Remove';
   const soldOutLabel = options.soldOutAriaLabel || 'Out of stock';
-  const openImageLabel = options.openImageLabel || 'Open product details';
-  const openTitleLabel = options.openTitleLabel || 'Open product details';
+  const openImageLabel = resolveProductDetailsLabel(
+    options.openImageLabel || 'Open product details',
+    title,
+  );
+  const openTitleLabel = resolveProductDetailsLabel(
+    options.openTitleLabel || 'Open product details',
+    title,
+  );
   const imageNavPrevLabel = options.imageNavPreviousLabel || options.imageNavLabel || 'Previous image';
   const imageNavNextLabel = options.imageNavNextLabel || 'Next image';
   const seeMoreLabel = options.seeMoreText || 'See more';
@@ -259,6 +265,16 @@ export function resolveProductCardSelectionAriaLabel(label = '', isSelected = fa
   return `${baseLabel} (${isSelected ? 'selected' : 'not selected'})`;
 }
 
+export function resolveProductDetailsLabel(label = '', title = '') {
+  const action = String(label).trim();
+  const productTitle = String(title).trim();
+  if (!action) return productTitle;
+  if (!productTitle || action.toLocaleLowerCase().includes(productTitle.toLocaleLowerCase())) {
+    return action;
+  }
+  return `${action}: ${productTitle}`;
+}
+
 export function getProductImageUrls(product: any = {}) {
   const urls: any[] = [];
   const addUrl = (value: any) => {
@@ -276,6 +292,7 @@ export function getProductImageUrls(product: any = {}) {
 
 function getDisplayTitle(product: any, variantText: any) {
   const parentTitle = typeof product.parentTitle === 'string' ? product.parentTitle.trim() : '';
+  const productTitle = typeof product.productTitle === 'string' ? product.productTitle.trim() : '';
   const rawTitle = typeof product.title === 'string' ? product.title.trim() : '';
 
   if (variantText && parentTitle) return parentTitle;
@@ -285,7 +302,7 @@ function getDisplayTitle(product: any, variantText: any) {
     return rawTitle.slice(0, separatorIndex).trim();
   }
 
-  return parentTitle || rawTitle;
+  return parentTitle || productTitle || (rawTitle === 'Default Title' ? '' : rawTitle);
 }
 
 export function getVariantSummary(product: any = {}) {
@@ -339,7 +356,8 @@ export function getVariantSummary(product: any = {}) {
 
 function createAddButton(selectionKey: string, options: any, runtimeDocument: Document) {
   const disabled = options.addDisabled === true;
-  const text = options.addButtonText || '+';
+  const requestedText = options.addButtonText || '+';
+  const text = disabled && requestedText.trim() === '+' ? '×' : requestedText;
   const addLabel = options.addButtonAriaLabel || 'Add';
   const button = runtimeDocument.createElement('button');
   button.type = 'button';
@@ -349,6 +367,7 @@ function createAddButton(selectionKey: string, options: any, runtimeDocument: Do
   button.setAttribute('aria-pressed', options.isPressed === true ? 'true' : 'false');
   button.disabled = disabled;
   if (disabled) button.setAttribute('aria-disabled', 'true');
+  if (disabled && text === '×') button.dataset.outOfStockIcon = 'true';
   button.textContent = text;
   return button;
 }

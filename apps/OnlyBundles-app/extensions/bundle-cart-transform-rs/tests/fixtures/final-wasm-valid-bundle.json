@@ -1,0 +1,133 @@
+{
+  "presentmentCurrencyRate": "1.0",
+  "localization": {
+    "country": {
+      "isoCode": "US"
+    }
+  },
+  "shop": {
+    "ppbPolicyRevisions": {
+      "value": {
+        "bundle": {
+          "revision": "revision",
+          "pricingMode": "standard",
+          "policy": {
+            "schemaVersion": 2,
+            "bundleId": "bundle",
+            "revision": "revision",
+            "parentVariantId": "gid://shopify/ProductVariant/999",
+            "groups": [
+              {
+                "id": "group",
+                "role": "component",
+                "minQuantity": 3,
+                "maxQuantity": 3
+              }
+            ],
+            "pricing": {
+              "method": "buy_x_get_y",
+              "value": 100,
+              "customerBuys": 2,
+              "customerGets": 1,
+              "discountType": "percentage",
+              "applyDiscountTo": "lowest_priced"
+            },
+            "membershipSets": {
+              "membership-1": [
+                {
+                  "groupId": "group",
+                  "variantSelection": {
+                    "mode": "listed_variants",
+                    "variantIds": [
+                      "gid://shopify/ProductVariant/1"
+                    ]
+                  },
+                  "maxQuantity": 2
+                }
+              ],
+              "membership-2": [
+                {
+                  "groupId": "group",
+                  "variantSelection": {
+                    "mode": "listed_variants",
+                    "variantIds": [
+                      "gid://shopify/ProductVariant/2"
+                    ]
+                  },
+                  "maxQuantity": 2
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "cartTransform": {
+    "runtimeConfiguration": null
+  },
+  "cart": {
+    "lines": [
+      {
+        "id": "gid://shopify/CartLine/bundle-1",
+        "quantity": 2,
+        "bundleDisplayProperties": null,
+        "stepType": null,
+        "selection": {
+          "value": "{\"bundleId\":\"bundle\",\"instanceId\":\"instance\",\"groupId\":\"group\",\"revision\":\"revision\"}"
+        },
+        "sellingPlanAllocation": null,
+        "merchandise": {
+          "__typename": "ProductVariant",
+          "id": "gid://shopify/ProductVariant/1",
+          "weight": 100.0,
+          "weightUnit": "GRAMS",
+          "product": {
+            "id": "gid://shopify/Product/1",
+            "runtimePolicies": {
+              "value": [
+                "membership-1"
+              ]
+            }
+          }
+        },
+        "cost": {
+          "amountPerQuantity": {
+            "amount": "20.00",
+            "currencyCode": "USD"
+          }
+        }
+      },
+      {
+        "id": "gid://shopify/CartLine/bundle-2",
+        "quantity": 1,
+        "bundleDisplayProperties": null,
+        "stepType": null,
+        "selection": {
+          "value": "{\"bundleId\":\"bundle\",\"instanceId\":\"instance\",\"groupId\":\"group\",\"revision\":\"revision\"}"
+        },
+        "sellingPlanAllocation": null,
+        "merchandise": {
+          "__typename": "ProductVariant",
+          "id": "gid://shopify/ProductVariant/2",
+          "weight": 100.0,
+          "weightUnit": "GRAMS",
+          "product": {
+            "id": "gid://shopify/Product/2",
+            "runtimePolicies": {
+              "value": [
+                "membership-2"
+              ]
+            }
+          }
+        },
+        "cost": {
+          "amountPerQuantity": {
+            "amount": "20.00",
+            "currencyCode": "USD"
+          }
+        }
+      }
+    ]
+  }
+}

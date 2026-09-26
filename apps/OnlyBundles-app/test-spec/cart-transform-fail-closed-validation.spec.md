@@ -1,11 +1,11 @@
 ---
 schema_version: 1
 id: cart-transform-fail-closed-validation
-title: Cart Transform Fail-Closed Activation
+title: Cart Transform Graceful-Degradation Activation and Final-WASM Gate
 type: test-spec
 status: active
-summary: Verify every Wolfpack CartTransform blocks cart and checkout operations when Shopify cannot execute bundle pricing.
-last_audited: 2026-07-14
+summary: Verify CartTransform activation degrades gracefully and the canonical build executes Shopify's final optimized WASM.
+last_audited: 2026-09-25
 owners:
   - engineering
 domains:
@@ -14,6 +14,9 @@ systems:
   - cart-transform
 source_paths:
   - app/services/cart-transform-service.server.ts
+  - scripts/build-and-verify-cart-transform.mjs
+  - extensions/bundle-cart-transform-rs/tests/fixtures/final-wasm-ordinary-cart.json
+  - extensions/bundle-cart-transform-rs/tests/fixtures/final-wasm-valid-bundle.json
 related_docs:
   - internal docs/Architecture/Cart Transform Function.md
 tags:
@@ -21,17 +24,20 @@ tags:
   - pricing-safety
 keywords:
   - cart transform timeout
-  - fail closed
+  - graceful degradation
+  - final WASM
   - blockOnFailure
 ---
 
-# Test Spec: Cart Transform Fail-Closed Activation
+# Test Spec: Cart Transform Graceful-Degradation Activation and Final-WASM Gate
 
 **Spec ID:** cart-transform-fail-closed-validation  **Created:** 2026-07-14
 
 ## Purpose
 
-Prevent Shopify from accepting ordinary component pricing when Cart Transform execution fails, times out, or exceeds its resource limits.
+Prevent a Cart Transform runtime failure from blocking all shop cart operations,
+and prevent a non-executable Shopify-processed WASM artifact from passing the
+canonical build command. The stable historical spec ID is retained.
 
 ## Test Cases
 
@@ -39,16 +45,24 @@ Prevent Shopify from accepting ordinary component pricing when Cart Transform ex
 
 | # | Scenario | Input | Expected Output | Notes |
 |---|---|---|---|---|
-| 1 | New transform activation | No CartTransform exists | Create with `blockOnFailure: true` | Shopify blocks cart/checkout when the Function fails. |
-| 2 | Compliant existing transform | Rust transform has `blockOnFailure: true` | Reuse without recreation | Idempotent retry. |
-| 3 | Unsafe existing transform | Rust transform has `blockOnFailure: false` | Delete and recreate with `blockOnFailure: true` | Repairs the prior default safely. |
-| 4 | Stale transform | Transform points to another Function | Delete and recreate with `blockOnFailure: true` | Preserves existing replacement behavior. |
-| 5 | Unsafe transform deletion fails | Delete returns an error | Return failure without creating | Do not leave two transforms or report setup success. |
+| 1 | New transform activation | No CartTransform exists | Create with `blockOnFailure: false` | Function failure does not block ordinary cart operations. |
+| 2 | Compliant existing transform | Rust transform has `blockOnFailure: false` | Reuse without recreation | Idempotent retry. |
+| 3 | Blocking existing transform | Rust transform has `blockOnFailure: true` | Delete and recreate with `blockOnFailure: false` | Repairs the outage-amplifying registration. |
+| 4 | Stale transform | Transform points to another Function | Delete and recreate with `blockOnFailure: false` | Preserves existing replacement behavior. |
+| 5 | Blocking transform deletion fails | Delete returns an error | Return failure without creating | Do not leave two transforms or report setup success. |
 | 6 | Creation fails | No transform exists and create returns an error | Return failure | Do not report setup success. |
+
+### Final-WASM build gate
+
+| # | Scenario | Input | Expected Output | Notes |
+|---|---|---|---|---|
+| 1 | Ordinary Shopify cart | One normal product line | Successful execution with no operations | Detects unconditional traps without transforming unrelated carts. |
+| 2 | Valid bundle | Published policy and three eligible units | Successful execution with a `linesMerge` operation | Proves the optimized artifact still performs bundle work. |
+| 3 | Artifact size | Shopify-processed WASM | At most 256,000 bytes | Checks the deployable artifact, not raw Cargo output. |
 
 ## Acceptance Criteria
 
-- [x] Every newly created CartTransform sets `blockOnFailure: true`.
-- [x] Existing transforms with the unsafe default are repaired idempotently.
+- [x] Every newly created CartTransform sets `blockOnFailure: false`.
+- [x] Existing blocking transforms are repaired idempotently.
 - [x] Existing compliant transforms and normal successful pricing behavior remain unchanged.
-- [x] Focused Jest, related regression tests, Admin GraphQL validation, scoped lint, and Graphify pass.
+- [x] `npm run build:cart-transform` executes the final optimized WASM against ordinary-cart and valid-bundle fixtures.

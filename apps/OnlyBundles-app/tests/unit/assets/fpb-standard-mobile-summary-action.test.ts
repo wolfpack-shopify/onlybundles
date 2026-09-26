@@ -668,6 +668,8 @@ describe('FPB Standard mobile summary action', () => {
 
     expect(summaryToggles).toHaveLength(1);
     expect(summaryToggles[0].tagName).toBe('BUTTON');
+    expect(summaryToggles[0].attributes['aria-label']).toBeUndefined();
+    expect(summaryToggles[0].textContent).toContain('Review your bundle');
     expect(toggleTray).toHaveBeenCalledWith(sheet);
   });
 

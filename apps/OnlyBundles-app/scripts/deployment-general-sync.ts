@@ -6,12 +6,13 @@ import {
   parseDeploymentGeneralSyncEnv,
   runDeploymentGeneralSync,
 } from "../app/services/deployment-general-sync.server";
-import { syncBundleStorefrontNow } from "../app/services/bundles/storefront-sync.server";
+import {
+  prepareShopStorefrontSync,
+  syncBundleStorefrontDataNow,
+} from "../app/services/bundles/storefront-sync.server";
 import { ensureVariantBundleMetafieldDefinitions } from "../app/services/bundles/metafield-sync/operations/definitions.server";
 import { AddOnDiscountFunctionService } from "../app/services/addon-discount-function-service.server";
-import { syncPpbStorefrontRuntime } from "../app/services/ppb-storefront-runtime.server";
 import { syncStorefrontControlsRuntime } from "../app/services/storefront-controls-runtime.server";
-import { syncFpbStorefrontRuntime } from "../app/services/fpb-storefront-runtime.server";
 
 async function main() {
   const summary = await runDeploymentGeneralSync(
@@ -24,17 +25,15 @@ async function main() {
       },
       ensureMetafieldDefinitions: (admin) =>
         ensureVariantBundleMetafieldDefinitions(admin),
-      syncPpbRuntime: (admin, shopDomain) =>
-        syncPpbStorefrontRuntime(
-          admin as any,
+      prepareShopStorefront: (admin, shopDomain) =>
+        prepareShopStorefrontSync({
+          admin: admin as any,
           shopDomain,
-          process.env.STOREFRONT_PROXY_ROOT,
-        ),
-      syncFpbRuntime: (admin, shopDomain) =>
-        syncFpbStorefrontRuntime(admin as any, shopDomain),
+          proxyRoot: process.env.STOREFRONT_PROXY_ROOT,
+        }),
       syncStorefrontControlsRuntime: (admin, shopDomain) =>
         syncStorefrontControlsRuntime(admin as any, shopDomain),
-      syncBundle: syncBundleStorefrontNow as any,
+      syncBundleData: syncBundleStorefrontDataNow as any,
       updateStepProductVariants: async ({ stepProductId, variants }: any) => {
         await db.stepProduct.update({
           where: { id: stepProductId },

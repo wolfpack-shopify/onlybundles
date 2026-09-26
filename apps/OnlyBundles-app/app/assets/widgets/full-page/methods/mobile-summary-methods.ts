@@ -275,7 +275,6 @@ _populateCompactMobileSummaryTray(sheet: any) {
   toggleIcon.setAttribute('aria-hidden', 'true');
   toggleIcon.append(createChevronIcon(document, 'up'));
   countBadge.append(toggleCopy, togglePrices, toggleIcon);
-  countBadge.setAttribute('aria-label', summaryToggleLabel);
   countBadge.setAttribute('aria-expanded', this.compactMobileSummaryTrayExpanded ? 'true' : 'false');
   countBadge.addEventListener('click', toggleSummaryTray);
   dock.appendChild(countBadge);

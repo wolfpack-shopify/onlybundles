@@ -150,6 +150,7 @@ describe("storefront sync runtime token contract", () => {
     expect(mockSyncPpbStorefrontRuntime).toHaveBeenCalledWith(
       expect.any(Object),
       "test-shop.myshopify.com",
+      undefined,
     );
   });
 });

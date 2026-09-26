@@ -78,10 +78,9 @@ function makeDeps() {
     updateStepProductVariants: jest.fn().mockResolvedValue({}),
     getAdmin: jest.fn().mockResolvedValue(admin),
     ensureMetafieldDefinitions: jest.fn().mockResolvedValue(true),
-    syncPpbRuntime: jest.fn().mockResolvedValue(true),
-    syncFpbRuntime: jest.fn().mockResolvedValue(true),
+    prepareShopStorefront: jest.fn().mockResolvedValue(true),
     syncStorefrontControlsRuntime: jest.fn().mockResolvedValue(true),
-    syncBundle: jest.fn().mockResolvedValue({ synced: true }),
+    syncBundleData: jest.fn().mockResolvedValue({ synced: true }),
     setupAddonDiscount: jest.fn().mockResolvedValue({ success: true }),
     setupSubscriptionDiscount: jest.fn().mockResolvedValue({ success: true }),
     setupSubscriptionRecurringDiscount: jest.fn().mockResolvedValue({ success: true }),
@@ -109,7 +108,7 @@ describe("deployment general sync", () => {
 
     expect(result.mode).toBe("disabled");
     expect(deps.prisma.shop.findMany).not.toHaveBeenCalled();
-    expect(deps.syncBundle).not.toHaveBeenCalled();
+    expect(deps.syncBundleData).not.toHaveBeenCalled();
   });
 
   it("replays definitions and save-equivalent bundle sync from persisted rows", async () => {
@@ -125,6 +124,7 @@ describe("deployment general sync", () => {
     expect(result).toMatchObject({
       mode: "apply",
       scannedShops: 2,
+      syncedShops: 2,
       scannedBundles: 2,
       syncedBundles: 2,
       failedBundles: 0,
@@ -145,17 +145,16 @@ describe("deployment general sync", () => {
       },
     });
     expect(deps.ensureMetafieldDefinitions).toHaveBeenCalledTimes(2);
-    expect(deps.syncPpbRuntime).toHaveBeenCalledTimes(2);
-    expect(deps.syncFpbRuntime).toHaveBeenCalledTimes(2);
+    expect(deps.prepareShopStorefront).toHaveBeenCalledTimes(2);
     expect(deps.syncStorefrontControlsRuntime).toHaveBeenCalledTimes(2);
-    expect(deps.syncBundle).toHaveBeenCalledWith({
+    expect(deps.syncBundleData).toHaveBeenCalledWith({
       admin: expect.objectContaining({ graphql: expect.any(Function) }),
       shopDomain: "alpha.myshopify.com",
       bundleId: "bundle-1",
       bundleType: "full_page",
       reason: "sync_bundle",
     });
-    expect(deps.syncBundle).toHaveBeenCalledWith({
+    expect(deps.syncBundleData).toHaveBeenCalledWith({
       admin: expect.objectContaining({ graphql: expect.any(Function) }),
       shopDomain: "beta.myshopify.com",
       bundleId: "bundle-2",
@@ -171,6 +170,40 @@ describe("deployment general sync", () => {
       expect.objectContaining({ graphql: expect.any(Function) }),
       "beta.myshopify.com",
     );
+  });
+
+  it("prepares a shop once before replaying each of its saved bundles", async () => {
+    const deps = makeDeps();
+    deps.prisma.bundle.findMany.mockResolvedValue([
+      {
+        id: "bundle-1",
+        shopId: "alpha.myshopify.com",
+        bundleType: "full_page",
+        personalizationData: null,
+        bundleSubscriptionConfig: null,
+        steps: [],
+      },
+      {
+        id: "bundle-2",
+        shopId: "alpha.myshopify.com",
+        bundleType: "product_page",
+        personalizationData: null,
+        bundleSubscriptionConfig: null,
+        steps: [],
+      },
+    ]);
+
+    await runDeploymentGeneralSync(
+      parseDeploymentGeneralSyncEnv({ WPB_DEPLOYMENT_GENERAL_SYNC: "true" }),
+      deps,
+    );
+
+    expect(deps.prepareShopStorefront).toHaveBeenCalledTimes(2);
+    expect(deps.prepareShopStorefront).toHaveBeenCalledWith(
+      expect.objectContaining({ graphql: expect.any(Function) }),
+      "alpha.myshopify.com",
+    );
+    expect(deps.syncBundleData).toHaveBeenCalledTimes(2);
   });
 
   it("ensures the subscription discount role for an enabled FPB configuration", async () => {
@@ -278,7 +311,7 @@ describe("deployment general sync", () => {
 
   it("records bundle failures and continues syncing other bundles", async () => {
     const deps = makeDeps();
-    deps.syncBundle
+    deps.syncBundleData
       .mockRejectedValueOnce(new Error("metafield write failed"))
       .mockResolvedValueOnce({ synced: true });
 
@@ -291,12 +324,14 @@ describe("deployment general sync", () => {
 
     expect(result.syncedBundles).toBe(1);
     expect(result.failedBundles).toBe(1);
+    expect(result.syncedShops).toBe(1);
+    expect(result.failedShops).toBe(1);
     expect(result.failures).toEqual([{
       shopDomain: "alpha.myshopify.com",
       bundleId: "bundle-1",
       error: "metafield write failed",
     }]);
-    expect(deps.syncBundle).toHaveBeenCalledTimes(2);
+    expect(deps.syncBundleData).toHaveBeenCalledTimes(2);
   });
 
   it("records unsupported persisted bundle types without invoking sync", async () => {
@@ -317,12 +352,12 @@ describe("deployment general sync", () => {
     );
 
     expect(result.failedBundles).toBe(1);
-    expect(deps.syncBundle).not.toHaveBeenCalled();
+    expect(deps.syncBundleData).not.toHaveBeenCalled();
   });
 
   it("records shop setup failures and skips that shop's bundles", async () => {
     const deps = makeDeps();
-    deps.syncFpbRuntime.mockRejectedValueOnce(
+    deps.prepareShopStorefront.mockRejectedValueOnce(
       new Error("runtime sync failed"),
     );
 
@@ -335,7 +370,7 @@ describe("deployment general sync", () => {
 
     expect(result.failedShops).toBe(1);
     expect(result.syncedBundles).toBe(1);
-    expect(deps.syncBundle).not.toHaveBeenCalledWith(
+    expect(deps.syncBundleData).not.toHaveBeenCalledWith(
       expect.objectContaining({ shopDomain: "alpha.myshopify.com" }),
     );
   });
@@ -392,7 +427,7 @@ describe("canonical variant remediation before publication", () => {
     deps.updateStepProductVariants.mockImplementation(async ({ variants }) => {
       row.steps[0].StepProduct[0].variants = variants;
     });
-    deps.syncBundle.mockImplementation(async () => {
+    deps.syncBundleData.mockImplementation(async () => {
       expect(row.steps[0].StepProduct[0].variants).toEqual([
         { variantId: "gid://shopify/ProductVariant/101", quantity: 2 },
       ]);
@@ -417,7 +452,7 @@ describe("canonical variant remediation before publication", () => {
     admin.graphql.mockResolvedValue({ json: async () => payload } as never);
     const result = await runDeploymentGeneralSync({ enabled: true }, deps);
     expect(deps.updateStepProductVariants).not.toHaveBeenCalled();
-    expect(deps.syncBundle).not.toHaveBeenCalled();
+    expect(deps.syncBundleData).not.toHaveBeenCalled();
     expect(result.syncedBundles).toBe(0);
     expect(result.failedBundles).toBe(1);
   });
@@ -426,7 +461,7 @@ describe("canonical variant remediation before publication", () => {
     const { deps } = fixture();
     deps.updateStepProductVariants.mockRejectedValue(new Error("Database unavailable"));
     const result = await runDeploymentGeneralSync({ enabled: true }, deps);
-    expect(deps.syncBundle).not.toHaveBeenCalled();
+    expect(deps.syncBundleData).not.toHaveBeenCalled();
     expect(result.failedBundles).toBe(1);
   });
 

@@ -1,7 +1,10 @@
 export {};
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { VariantSelectorComponent } = require('../../../app/assets/widgets/shared/variant-selector.js');
+const {
+  resolveExactVariantSelection,
+  VariantSelectorComponent,
+} = require('../../../app/assets/widgets/shared/variant-selector.js');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { JSDOM } = require('jsdom');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -13,23 +16,8 @@ const { fullPageProductGridMethods } = require('../../../app/assets/widgets/full
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { BUNDLE_WIDGET } = require('../../../app/assets/widgets/shared/constants.js');
 
-class FakeWrapper {
-  querySelectorAll() {
-    return [];
-  }
-}
-
-class FakeCard {
-  querySelector(selector: string) {
-    if (selector === '.vs-wrapper') {
-      return new FakeWrapper();
-    }
-    return null;
-  }
-}
-
 describe('FPB Standard variant availability', () => {
-  it('keeps unavailable-only primary values visible and disabled', () => {
+  it('keeps unavailable-only primary values visible and selectable', () => {
     const runtimeDocument = new JSDOM('<!doctype html><html><body></body></html>').window.document;
     const view = VariantSelectorComponent.createElement({
       variantId: 'available-small',
@@ -49,11 +37,12 @@ describe('FPB Standard variant availability', () => {
     }, 'Size', runtimeDocument);
 
     expect(view.querySelector('input[value="Small"]')?.hasAttribute('disabled')).toBe(false);
-    expect(view.querySelector('input[value="Large"]')?.hasAttribute('disabled')).toBe(true);
+    expect(view.querySelector('input[value="Large"]')?.hasAttribute('disabled')).toBe(false);
+    expect(view.querySelector('input[value="Large"]')?.getAttribute('aria-label')).toContain('out of stock');
   });
 
-  it('ignores unavailable-only primary variant selections', () => {
-    const product = {
+  it('resolves unavailable exact selections without replacing them', () => {
+    const product: any = {
       variantId: 'available-small',
       available: true,
       price: 1200,
@@ -78,15 +67,12 @@ describe('FPB Standard variant availability', () => {
         },
       ],
     };
-    const onVariantChange = jest.fn();
-
-    VariantSelectorComponent._selectPrimary(new FakeCard(), product, 1, 'Large', onVariantChange);
-
+    product.options = ['Size'];
+    expect(resolveExactVariantSelection(product, { Size: 'Large' })).toMatchObject({
+      status: 'unavailable',
+      variant: { id: 'sold-out-large' },
+    });
     expect(product.variantId).toBe('available-small');
-    expect(product.available).toBe(true);
-    expect(product.quantityAvailable).toBe(3);
-    expect(product.currentlyNotInStock).toBe(false);
-    expect(onVariantChange).not.toHaveBeenCalled();
   });
 
   it('treats tracked zero-stock variants as out of stock only when inventory tracking is enabled', () => {
@@ -251,7 +237,7 @@ describe('FPB Standard variant availability', () => {
     });
   });
 
-  it('omits explicitly unavailable variants from individual product expansion', () => {
+  it('preserves explicitly unavailable variants in individual product expansion', () => {
     const normalized = fullPageProductProcessingMethods.processProductsForStep.call({
       extractId: (id: string) => String(id || '').split('/').pop(),
       shouldExpandStepProductsDuringLoad: () => true,
@@ -289,7 +275,8 @@ describe('FPB Standard variant availability', () => {
       ],
     }], { displayVariantsAsIndividual: true });
 
-    expect(normalized.map((product: any) => product.variantId)).toEqual(['456', '101']);
+    expect(normalized.map((product: any) => product.variantId)).toEqual(['456', '789', '101']);
+    expect(normalized.find((product: any) => product.variantId === '789')?.available).toBe(false);
   });
 
   it('preserves product descriptions for the product detail modal', () => {
@@ -344,7 +331,7 @@ describe('FPB Standard variant availability', () => {
     expect(normalized[0].descriptionHtml).toBe('<p>Soft <strong>cotton</strong> product description.</p>');
   });
 
-  it('omits grouped products with no sellable variants when inventory tracking is enabled', () => {
+  it('preserves grouped products with no sellable variants for exact out-of-stock selection', () => {
     const normalized = fullPageProductProcessingMethods.processProductsForStep.call({
       extractId: (id: string) => String(id || '').split('/').pop(),
       shouldExpandStepProductsDuringLoad: () => false,
@@ -369,7 +356,8 @@ describe('FPB Standard variant availability', () => {
       ],
     }], { displayVariantsAsIndividual: false });
 
-    expect(normalized).toEqual([]);
+    expect(normalized).toHaveLength(1);
+    expect(normalized[0]).toMatchObject({ available: false, variantId: '456' });
   });
 
   it('enriches cached products missing descriptions before modal normalization', async () => {
@@ -484,7 +472,8 @@ describe('FPB Standard variant availability', () => {
       expect((global as any).fetch).toHaveBeenCalledWith(
         expect.stringContaining('/apps/product-bundles/api/storefront-products'),
       );
-      expect(context.stepProductData[0]).toEqual([]);
+      expect(context.stepProductData[0]).toHaveLength(1);
+      expect(context.stepProductData[0][0]).toMatchObject({ available: false, variantId: '456' });
     } finally {
       (global as any).window = previousWindow;
       (global as any).fetch = previousFetch;
@@ -615,14 +604,15 @@ describe('FPB Standard variant availability', () => {
       expect((global as any).fetch).toHaveBeenCalledWith(
         expect.stringContaining('/apps/product-bundles/api/storefront-products'),
       );
-      expect(context.stepProductData[0]).toEqual([]);
+      expect(context.stepProductData[0]).toHaveLength(1);
+      expect(context.stepProductData[0][0]).toMatchObject({ available: false, variantId: '456' });
     } finally {
       (global as any).window = previousWindow;
       (global as any).fetch = previousFetch;
     }
   });
 
-  it('omits tracked zero-stock variants during product grid expansion', () => {
+  it('preserves tracked zero-stock variants during individual product expansion', () => {
     const expanded = fullPageProductGridMethods.expandProductsByVariant.call({
       isVariantSelectableForInventory: fullPageProductProcessingMethods.isVariantSelectableForInventory,
       isInventoryTrackingOnAddToCartEnabled: fullPageProductProcessingMethods.isInventoryTrackingOnAddToCartEnabled,
@@ -651,8 +641,12 @@ describe('FPB Standard variant availability', () => {
       ],
     }], true);
 
-    expect(expanded).toHaveLength(1);
+    expect(expanded).toHaveLength(2);
     expect(expanded[0]).toEqual(expect.objectContaining({
+      variantId: 'gid://shopify/ProductVariant/456',
+      available: false,
+    }));
+    expect(expanded[1]).toEqual(expect.objectContaining({
       variantId: 'gid://shopify/ProductVariant/789',
       price: 3500,
       available: true,
@@ -681,7 +675,7 @@ describe('FPB Standard variant availability', () => {
     expect(normalized[0].imageUrl).toBe(BUNDLE_WIDGET.PLACEHOLDER_IMAGE);
   });
 
-  it('omits an already-expanded card when runtime inventory marks its variant unavailable', () => {
+  it('preserves an already-expanded card when runtime inventory marks its variant unavailable', () => {
     const expanded = fullPageProductGridMethods.expandProductsByVariant.call({
       getRuntimeVariantInventory: () => ({
         available: false,
@@ -699,7 +693,10 @@ describe('FPB Standard variant availability', () => {
       available: true,
     }], true);
 
-    expect(expanded).toEqual([]);
+    expect(expanded).toEqual([expect.objectContaining({
+      variantId: 'gid://shopify/ProductVariant/456',
+      available: false,
+    })]);
   });
 
   it('uses runtime inventory by variant id when the card DTO has stale stock fields', () => {

@@ -15,6 +15,7 @@
 import db from "../../../db.server";
 import { AppLogger } from "../../../lib/logger";
 import { getCachedShopifyShopGid, recordBusinessEvent } from "../../app-events.server";
+import { cleanupShopData } from "../../shop-data-cleanup.server";
 import type { WebhookProcessResult } from "../types";
 
 /**
@@ -39,98 +40,15 @@ export async function handleAppUninstalled(
 
     const shopifyShopGid = await getCachedShopifyShopGid(shopDomain);
 
-    // Step 1: Delete all bundles (cascades to steps, step products, pricing)
-    const deletedBundles = await db.bundle.deleteMany({
-      where: { shopId: shopDomain },
+    const cleanup = await cleanupShopData(shopDomain, {
+      currentWebhookEventId,
+      purgeAnalytics: false,
     });
 
     AppLogger.info("Deleted bundles", {
       component: "webhook-processor",
       operation: "handleAppUninstalled",
-    }, { shop: shopDomain, count: deletedBundles.count });
-
-    // Step 2: Delete sessions
-    await db.session.deleteMany({
-      where: { shop: shopDomain },
-    });
-
-    // Step 3: Delete design settings
-    try {
-      await db.designSettings.deleteMany({
-        where: { shopId: shopDomain },
-      });
-    } catch (e: any) {
-      // Non-critical - log and continue
-      AppLogger.warn("Failed to delete design settings", {
-        component: "webhook-processor",
-        operation: "handleAppUninstalled",
-      }, { shop: shopDomain, error: e });
-    }
-
-    // Step 4: Delete queued jobs
-    try {
-      await db.queuedJob.deleteMany({
-        where: { shopId: shopDomain },
-      });
-    } catch (e: any) {
-      AppLogger.warn("Failed to delete queued jobs", {
-        component: "webhook-processor",
-        operation: "handleAppUninstalled",
-      }, { shop: shopDomain, error: e });
-    }
-
-    // Step 5: Delete compliance records
-    try {
-      await db.complianceRecord.deleteMany({
-        where: { shop: shopDomain },
-      });
-    } catch (e: any) {
-      AppLogger.warn("Failed to delete compliance records", {
-        component: "webhook-processor",
-        operation: "handleAppUninstalled",
-      }, { shop: shopDomain, error: e });
-    }
-
-    // Step 6: Delete webhook events
-    try {
-      await db.webhookEvent.deleteMany({
-        where: {
-          shopDomain,
-          ...(currentWebhookEventId ? { id: { not: currentWebhookEventId } } : {})
-        },
-      });
-    } catch (e: any) {
-      AppLogger.warn("Failed to delete webhook events", {
-        component: "webhook-processor",
-        operation: "handleAppUninstalled",
-      }, { shop: shopDomain, error: e });
-    }
-
-    // Step 7: Delete old business events. Revenue analytics are retained in
-    // OrderAttribution and BundleEngagement; those tables are intentionally not
-    // touched by uninstall cleanup.
-    try {
-      await db.businessEvent.deleteMany({
-        where: { shopDomain },
-      });
-    } catch (e: any) {
-      AppLogger.warn("Failed to delete business events", {
-        component: "webhook-processor",
-        operation: "handleAppUninstalled",
-      }, { shop: shopDomain, error: e });
-    }
-
-    // Step 8: Delete shop record (cascades to subscriptions)
-    try {
-      await db.shop.deleteMany({
-        where: { shopDomain },
-      });
-    } catch (e: any) {
-      AppLogger.warn("Failed to delete shop record", {
-        component: "webhook-processor",
-        operation: "handleAppUninstalled",
-      }, { shop: shopDomain, error: e });
-    }
+    }, { shop: shopDomain, count: cleanup.bundles });
 
     await recordBusinessEvent({
       eventHandle: "app_uninstalled",
@@ -148,11 +66,11 @@ export async function handleAppUninstalled(
     AppLogger.info("App uninstall cleanup completed", {
       component: "webhook-processor",
       operation: "handleAppUninstalled",
-    }, { shop: shopDomain, bundlesDeleted: deletedBundles.count });
+    }, { shop: shopDomain, bundlesDeleted: cleanup.bundles });
 
     return {
       success: true,
-      message: `App uninstalled, cleaned up ${deletedBundles.count} bundles and all shop data`,
+      message: `App uninstalled, cleaned up ${cleanup.bundles} bundles and all shop data`,
     };
   } catch (error: any) {
     AppLogger.error("Error handling app uninstall", {

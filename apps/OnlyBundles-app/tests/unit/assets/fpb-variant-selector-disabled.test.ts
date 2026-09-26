@@ -104,10 +104,10 @@ describe('FPB disabled variant-selector behavior', () => {
 
     card.dispatchAdd();
 
-    expect(open).toHaveBeenCalledWith(groupedProduct, {}, {
+    expect(open).toHaveBeenCalledWith(groupedProduct, {}, expect.objectContaining({
       initialImageIndex: 0,
-      readOnly: false,
-    });
+      trigger: expect.anything(),
+    }));
     expect(updateProductSelection).not.toHaveBeenCalled();
   });
 });

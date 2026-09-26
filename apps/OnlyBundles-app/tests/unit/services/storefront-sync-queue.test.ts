@@ -101,6 +101,8 @@ describe("storefront sync direct flow", () => {
       status: "active",
       name: "Daily Essentials",
       description: null,
+      bundleDesignTemplate: "FBP_SIDE_FOOTER",
+      bundleDesignPresetId: "STANDARD",
       shopifyProductId: "gid://shopify/Product/1",
       shopifyProductHandle: "daily-essentials",
       steps: [],
@@ -131,7 +133,55 @@ describe("storefront sync direct flow", () => {
       skipped: false,
       synced: true,
     });
+    const { syncPpbStorefrontRuntime } = require("../../../app/services/ppb-storefront-runtime.server");
+    const { syncFpbStorefrontRuntime } = require("../../../app/services/fpb-storefront-runtime.server");
+    expect(syncFpbStorefrontRuntime).toHaveBeenCalledTimes(1);
+    expect(syncPpbStorefrontRuntime).not.toHaveBeenCalled();
     expect(getDb().bundle.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("rejects a missing bundle before preparing shop storefront state", async () => {
+    const { CartTransformService } = require("../../../app/services/cart-transform-service.server");
+    getDb().bundle.findUnique.mockResolvedValueOnce(null);
+
+    await expect(syncBundleStorefrontNow({
+      admin: { graphql: jest.fn() } as any,
+      shopDomain: "test.myshopify.com",
+      bundleId: "missing-bundle",
+      bundleType: "full_page",
+      reason: "sync_bundle",
+    })).rejects.toThrow("Bundle not found");
+
+    expect(CartTransformService.completeSetup).not.toHaveBeenCalled();
+  });
+
+  it("does not publish shop runtime for a bundle without a parent product", async () => {
+    const { CartTransformService } = require("../../../app/services/cart-transform-service.server");
+    const { syncFpbStorefrontRuntime } = require("../../../app/services/fpb-storefront-runtime.server");
+    const { syncThemeColors } = require("../../../app/services/theme-colors.server");
+    getDb().bundle.findUnique.mockResolvedValueOnce({
+      id: "bundle-1",
+      publicNumber: 1,
+      shopId: "test.myshopify.com",
+      bundleType: "full_page",
+      bundleDesignTemplate: "FBP_SIDE_FOOTER",
+      bundleDesignPresetId: "STANDARD",
+      shopifyProductId: null,
+      steps: [],
+      pricing: null,
+    });
+
+    await syncBundleStorefrontNow({
+      admin: { graphql: jest.fn() } as any,
+      shopDomain: "test.myshopify.com",
+      bundleId: "bundle-1",
+      bundleType: "full_page",
+      reason: "sync_bundle",
+    });
+
+    expect(CartTransformService.completeSetup).toHaveBeenCalledTimes(1);
+    expect(syncFpbStorefrontRuntime).not.toHaveBeenCalled();
+    expect(syncThemeColors).not.toHaveBeenCalled();
   });
 
   it("ensures the parent product contract during PPB storefront sync", async () => {
@@ -164,6 +214,47 @@ describe("storefront sync direct flow", () => {
         id: "bundle-1",
         bundleType: "product_page",
       }),
+    }));
+    const { syncPpbStorefrontRuntime } = require("../../../app/services/ppb-storefront-runtime.server");
+    const { syncFpbStorefrontRuntime } = require("../../../app/services/fpb-storefront-runtime.server");
+    expect(syncPpbStorefrontRuntime).toHaveBeenCalledTimes(1);
+    expect(syncFpbStorefrontRuntime).not.toHaveBeenCalled();
+  });
+
+  it("persists the canonical Standard selection before publishing an obsolete FPB selection", async () => {
+    getDb().bundle.findUnique.mockResolvedValueOnce({
+      id: "bundle-1",
+      publicNumber: 1,
+      shopId: "test.myshopify.com",
+      bundleType: "full_page",
+      bundleDesignTemplate: "FBP_SIDE_FOOTER",
+      bundleDesignPresetId: "DEFAULT",
+      status: "active",
+      name: "Daily Essentials",
+      description: null,
+      shopifyProductId: "gid://shopify/Product/1",
+      shopifyProductHandle: "daily-essentials",
+      steps: [],
+      pricing: null,
+    });
+
+    await syncBundleStorefrontNow({
+      admin: { graphql: jest.fn() } as any,
+      shopDomain: "test.myshopify.com",
+      bundleId: "bundle-1",
+      bundleType: "full_page",
+      reason: "sync_bundle",
+    });
+
+    expect(getDb().bundle.update).toHaveBeenCalledWith({
+      where: { id: "bundle-1" },
+      data: {
+        bundleDesignTemplate: "FBP_SIDE_FOOTER",
+        bundleDesignPresetId: "STANDARD",
+      },
+    });
+    expect(ensureBundleParentProduct).toHaveBeenCalledWith(expect.objectContaining({
+      bundle: expect.objectContaining({ bundleDesignPresetId: "STANDARD" }),
     }));
   });
 

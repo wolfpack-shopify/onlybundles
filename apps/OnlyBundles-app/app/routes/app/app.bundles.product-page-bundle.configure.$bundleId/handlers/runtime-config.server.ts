@@ -3,7 +3,6 @@ import { buildOfferDecisionMarker } from "../../../../lib/offer-policy-decision"
 import { buildCountdownRuntimeConfig } from "../../../../lib/bundle-countdown";
 import { AppLogger } from "../../../../lib/logger";
 import { updateBundleProductMetafields } from "../../../../services/bundles/metafield-sync/operations/bundle-product.server";
-import { formatStepCategoryForRuntime } from "../../../../lib/bundle-config/category-runtime";
 import { BundleStatus, BundleType } from "../../../../constants/bundle";
 import { safeJsonParse } from "../../../../services/bundles/bundle-configure-handlers.server";
 import { parsePricingRule } from "../../../../lib/pricing-rule-parser";
@@ -89,30 +88,6 @@ function pushUniqueCollection(
   target.push(normalized);
 }
 
-function normalizeSyncCategories(step: any): Array<Record<string, unknown>> {
-  const stepProducts = Array.isArray(step.StepProduct) ? step.StepProduct : [];
-  return (Array.isArray(step.StepCategory) ? step.StepCategory : []).map(
-    (category: any, index: number) => {
-      const formatted = formatStepCategoryForRuntime(
-        category,
-        index,
-        stepProducts
-      );
-      return {
-        ...formatted,
-        products: Array.isArray(formatted.products) ? formatted.products : [],
-        collections: Array.isArray(formatted.collections)
-          ? formatted.collections
-              .map((value: Parameters<typeof normalizeSyncCollection>[0]) =>
-                normalizeSyncCollection(value)
-              )
-              .filter(Boolean)
-          : [],
-      };
-    }
-  );
-}
-
 function buildSyncOptimizedSteps(steps: any[]): Array<Record<string, unknown>> {
   return (steps || []).map((step: any) => {
     const products: Array<Record<string, unknown>> = [];
@@ -130,8 +105,6 @@ function buildSyncOptimizedSteps(steps: any[]): Array<Record<string, unknown>> {
       : []) {
       pushUniqueCollection(collections, seenCollectionIds, collection);
     }
-
-    const categories = normalizeSyncCategories(step);
 
     return {
       id: step.id,
@@ -153,7 +126,7 @@ function buildSyncOptimizedSteps(steps: any[]): Array<Record<string, unknown>> {
       products,
       collections,
       StepProduct: Array.isArray(step.StepProduct) ? step.StepProduct : [],
-      StepCategory: categories,
+      StepCategory: Array.isArray(step.StepCategory) ? step.StepCategory : [],
       isFreeGift: step.isFreeGift === true,
       freeGiftName: step.freeGiftName ?? null,
       isDefault: step.isDefault === true,

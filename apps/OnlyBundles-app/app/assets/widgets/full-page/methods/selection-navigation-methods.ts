@@ -1,7 +1,9 @@
 import { CurrencyManager } from '../../shared/currency-manager.js';
 import { PricingCalculator } from '../../shared/pricing-calculator.js';
-import { calculateBundleDiscountForPurchaseOption } from '../../shared/subscription-storefront-methods.js';
-import { calculateBundleTotalForPurchaseOption } from '../../shared/subscription-storefront-methods.js';
+import {
+  calculateBundleDiscountForPurchaseOption,
+  calculateBundleTotalForPurchaseOption,
+} from '../../shared/subscription-storefront-methods.js';
 import { ToastManager } from '../../shared/toast-manager.js';
 import { ConditionValidator } from '../../shared/condition-validator.js';
 import {
@@ -168,7 +170,7 @@ updateProductSelection(stepIndex: string|number, productId: string|number, newQu
     const { available, outOfStock } = this.getVariantAvailable(stepIndex, productId);
     if (outOfStock) {
       ToastManager.show('This item is out of stock.');
-      return;
+      return false;
     }
     if (available !== null && available > 0 && quantity > available) {
       quantity = available;
@@ -178,7 +180,7 @@ updateProductSelection(stepIndex: string|number, productId: string|number, newQu
 
   // Validate step conditions
     if (!this.validateStepCondition(stepIndex, productId, quantity)) {
-      return;
+      return false;
     }
 
   const currentQuantity = this.selectedProducts[stepIndex]?.[productId] || 0;
@@ -189,7 +191,7 @@ updateProductSelection(stepIndex: string|number, productId: string|number, newQu
   );
   if (!productQuantityCheck.allowed) {
     ToastManager.show('Maximum allowed quantity per product is ' + productQuantityCheck.limit + '.');
-    return;
+    return false;
   }
 
   // Update selection
@@ -254,6 +256,7 @@ updateProductSelection(stepIndex: string|number, productId: string|number, newQu
     before: discountTierBefore,
     after: captureDiscountTierState(this),
   });
+  return true;
 },
 
 _shouldRenderProductSlots() {
@@ -301,8 +304,13 @@ syncProductQuantityIncreaseState(increaseButton: any, quantity: any) {
     'removeProductFromFooterText',
     'Remove this product',
   ) || 'Remove this product';
+  const normalizedStepName = typeof step?.name === 'string' && step.name.trim().length > 0
+    ? step.name
+    : typeof step?.title === 'string' && step.title.trim().length > 0
+      ? step.title
+      : 'step';
   const removeLabel = removeLabelTemplate
-    .replace('{{stepName}}', step?.title || 'step')
+    .replace('{{stepName}}', normalizedStepName)
     .replace('{{quantity}}', String(quantity));
   const decreaseLabel = sanitizeAria(
     this._resolveText?.('quantityDecreaseText', 'Decrease quantity') || 'Decrease quantity',

@@ -252,6 +252,38 @@ describe('PPB shared card quantity selector state', () => {
     expect(increment?.getAttribute('aria-disabled')).toBe('true');
   });
 
+  it('refreshes accessible quantity and decrement labels on existing controls', () => {
+    const { scope, action } = createSharedProductCard();
+    global.document = {
+      createElement(tagName: string) {
+        return new FakeElement(tagName);
+      },
+    } as unknown as Document;
+    const context = {
+      container: scope,
+      elements: { modal: { classList: { contains: () => false } } },
+      selectedBundle: { steps: [{}] },
+      _resolveText: (_key: string, fallback: string) => fallback,
+      getVariantAvailable: () => ({ available: null, outOfStock: false }),
+    };
+
+    ProductPageSelectionMethods.updateProductQuantityDisplay.call(
+      context,
+      0,
+      'variant-1',
+      1,
+    );
+    ProductPageSelectionMethods.updateProductQuantityDisplay.call(
+      context,
+      0,
+      'variant-1',
+      2,
+    );
+
+    expect(action.querySelector('.inline-qty-display')?.getAttribute('aria-label')).toBe('Quantity: 2');
+    expect(findButtonByText(action, '−')?.getAttribute('aria-label')).toBe('Decrease quantity Amber Essence');
+  });
+
   it('replaces modal quantity controls with Added xN at a configured maximum', () => {
     const { scope, card, action } = createSharedProductCard();
     scope.classList.add('bw-bs-panel--open');

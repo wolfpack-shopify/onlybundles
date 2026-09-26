@@ -5,8 +5,8 @@
 @import "./base/steps-header-banners.css";
 @import "./base/search-category-product-grid.css";
 @import "./base/product-actions-loading.css";
-@import "./base/product-modal-shell.css";
 @import "./base/product-modal-controls.css";
+@import "./base/product-modal-shell.css";
 @import "./base/toast-sidebar-shell.css";
 @import "./base/sidebar-totals-discounts.css";
 @import "./base/floating-badge-sidebar-progress.css";

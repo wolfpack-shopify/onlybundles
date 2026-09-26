@@ -5,7 +5,7 @@ title: Product Card Layout Contract
 type: architecture
 status: authoritative
 summary: Defines stable and display-safe storefront product-card layout and content boundaries.
-last_audited: 2026-09-25
+last_audited: 2026-09-26
 owners:
   - engineering
 domains:
@@ -92,12 +92,13 @@ This is a hard requirement:
 - Standard, Classic, and Compact use one shared vertical-card track contract for those mixed rows: a bounded two-line identity track, followed by selector, pricing, and action tracks. Horizontal keeps its native media/content split but uses the same stable region ownership and ordering inside the content track.
 - Variant selectors use the Direction A adaptive intrinsic matrix contract. Every Shopify option value remains directly present in source order; inline groups wrap in normal flow and never hide values behind `+N`, use a horizontal rail, or own a nested scroller.
 - Every dimension presented as a non-dropdown control is a separately labeled native radio group. Repeated cards, details surfaces, and picker copies receive instance-scoped control IDs and group names so selecting one copy cannot affect another.
-- Unavailable values remain visible with unchanged target geometry. FPB retains
-  its native disabled value semantics. PPB lets the shopper complete the exact
-  option combination, then reports the unavailable result through the disabled
-  card action instead of silently selecting a different combination.
+- Unavailable values remain visible, selectable, and unchanged in target
+  geometry. FPB and PPB let the shopper complete the exact option combination,
+  then report an unavailable or nonexistent result through the disabled card
+  or modal action instead of silently selecting a different combination.
 - Selector targets retain a minimum `44px` interaction size. Long labels wrap within their intrinsic control, while dropdowns fill the available details width. Selection, focus, and unavailable treatments may not change control geometry.
-- FPB and PPB use the same persisted category modes: Dropdown, Pills, Color swatches, and Image swatches. In a two-dimensional FPB pill mode, an explicitly configured primary dimension remains the visible radio group; when the merchant has not configured one, the dimension with the fewest distinct values becomes visible and ties retain Shopify option order. Swatch modes keep the canonically mapped Shopify dimension visible. Every additional dimension uses a labeled native select. Dropdown mode remains one complete-variant selector. This bounds selector height without hiding Shopify values or adding another state engine.
+- FPB and PPB use the same persisted category modes: Dropdown, Pills, Color swatches, and Image swatches. Dropdown mode renders one native select per Shopify option dimension. In pill mode, an explicitly configured primary dimension remains the visible radio group; when the merchant has not configured one, the dimension with the fewest distinct values becomes visible and ties retain Shopify option order. Swatch modes keep one complete canonically mapped Shopify dimension visible. Every additional dimension uses a placeholder-based native select. This bounds selector height without hiding Shopify values or adding another state engine.
+- A grouped FPB product starts with blank draft options unless it restores one exact committed variant. Selector state resolves to `incomplete`, `available`, `unavailable`, or `nonexistent`; it never auto-selects a first variant, changes a sibling option, or moves quantity between variant IDs. The parent media and base price remain visible for incomplete and nonexistent states, while an exact unavailable variant may supply its own media and price. Each exact selected variant owns its own quantity.
 - Across all FPB templates, each configured option dimension owns a separate full-width row. Pill dimensions distribute their controls across that row and wrap only when the card can no longer preserve the minimum interaction target; a secondary select must never compete with the primary pill or swatch group in a parallel column.
 - On mobile FPB cards, every option group fills the shared selector region and begins at the same inline edge. Compact secondary selects must not add an indent relative to the primary pill or swatch group.
 - A configured selector spans the card's complete price/action grid before pricing begins. Do not size it as a percentage of the first price column; let CSS Grid stretch the spanning region so option values receive all available card width.
@@ -144,6 +145,7 @@ This is a hard requirement:
 - Keep PPB/inpage and PPB/modal states non-expanding on `selected` and hover-expanded transitions.
 - Keep merchant product descriptions out of compact FPB and PPB product cards. Preserve `description` and `descriptionHtml` in runtime product data for the FPB product-details modal and existing product payload consumers.
 - In the product-details modal, render descriptions display-safe: sanitize Shopify HTML through the modal contract, escape plain-text fallbacks, and avoid trimming or normalizing merchant copy.
+- The FPB product-details modal is actionable in Standard, Classic, Compact, and Horizontal. It uses the same selector owner and a modal-local draft until Add or Update succeeds. A committed exact variant opens at its current quantity and updates only that variant; a newly resolved exact variant starts at one. Native dialog focus, dismissal, and exact-trigger restoration are part of this contract.
 - Product title/description are merchant-owned values; do not normalize case/spacing/punctuation in runtime.
 - Render those values with text APIs (`textContent`/`innerText`) rather than HTML assignment to avoid XSS and avoid forcing normalization.
 - If new content must appear on selection, render it outside the row-level card height envelope (popover, drawer, footer/action panel, details panel, etc.).
@@ -263,17 +265,19 @@ is `75px` with a `15px` gap, and the products region begins vertical
 scrolling when a fourth line item is present. This capacity rule does not apply
 to inline slots or the mobile summary tray.
 
-FPB component geometry is independent of the host theme's document root font
-size. Fixed interaction targets, card tracks, summary rows, and bounded clamp
-limits use explicit component tokens; container-owned responsiveness continues
-to use intrinsic layout and container-relative units. The widget never changes
-the storefront `html` or `body` font size.
+FPB, PPB, and shared storefront component geometry is independent of the host
+theme's document root font size. Fixed interaction targets, card tracks,
+summary rows, drawer and modal bounds, and bounded clamp limits use explicit
+component values or tokens; container-owned responsiveness continues to use
+intrinsic layout and container-relative units. The widgets never change the
+storefront `html` or `body` font size.
 
 Typography precedence is merchant custom font first through
-`--wpb-controls-font-family`, then the host theme's inherited family. FPB owns
-font sizes, weights, line heights, and layout geometry, so a theme may change the
-typeface without scaling cards, summaries, or controls. Native form controls
-inherit this family instead of falling back to the browser default.
+`--wpb-controls-font-family`, then the host theme's inherited family. FPB, PPB,
+and shared storefront components own font sizes, weights, line heights, and
+layout geometry, so a theme may change the typeface without scaling cards,
+summaries, drawers, modals, or controls. Native form controls inherit this
+family instead of falling back to the browser default.
 
 When Product Slots is disabled, Standard, Classic, Compact, and Horizontal route
 desktop selected-product line items through the same shared row renderer. Preset

@@ -85,7 +85,7 @@ describe("PPB parent-product sync", () => {
     expect(response.status).toBe(404);
   });
 
-  it("uses the shared parent and preserves category runtime data", async () => {
+  it("uses the shared parent and passes category source data to the canonical publisher", async () => {
     const admin = {} as any;
     const response = await handleSyncProduct(admin, session, "bundle-1", new FormData());
     const body = await response.json() as any;
@@ -102,7 +102,7 @@ describe("PPB parent-product sync", () => {
     }));
     const runtimeConfig = mockUpdateParent.mock.calls[0][2];
     expect(runtimeConfig.steps[0].StepCategory[0].products[0]).toEqual(
-      expect.objectContaining({ selectionId: "gid://shopify/Product/3" }),
+      expect.objectContaining({ id: "gid://shopify/Product/3" }),
     );
   });
 

@@ -102,7 +102,7 @@ function deriveProductOptionNames(product: any) {
   const explicitOptions = (Array.isArray(product?.options) ? product.options : [])
     .map((option: any)  => {
       if (typeof option === 'string') return option;
-      return option?.name || option;
+      return option?.name ? option : null;
     })
     .filter(Boolean);
   if (explicitOptions.length > 0) return explicitOptions;
@@ -881,6 +881,7 @@ processProductsForStep(products: any, step: any) {
       option1: getVariantSelectedOptionValue(v, 1),
       option2: getVariantSelectedOptionValue(v, 2),
       option3: getVariantSelectedOptionValue(v, 3),
+      selectedOptions: Array.isArray(v.selectedOptions) ? v.selectedOptions : [],
       image: v.image || null
     };
   };
@@ -891,14 +892,13 @@ processProductsForStep(products: any, step: any) {
 
   return normalizedProducts.flatMap(product => {
     if (this.shouldExpandStepProductsDuringLoad(step) && product.variants && product.variants.length > 0) {
-      // Display each variant as separate product - filter out unavailable variants
-      // Preserve parent product reference for variant selection in modal
+      // Display each configured variant as a separate product, including unavailable variants.
+      // Preserve parent product reference for product details in the shared dialog.
       const processedVariants = (product.variants || []).map(normalizeVariant).filter(Boolean);
 
       const processedOptions = deriveProductOptionNames(product);
 
       return product.variants
-        .filter((variant: any)  => this.isVariantSelectableForInventory(variant))
         .map((variant: any)  => {
           const variantId = variantLookupKey(variant);
           if (!variantId) return null;
@@ -938,6 +938,7 @@ processProductsForStep(products: any, step: any) {
             // Preserve parent product data for variant selection in modal
             parentProductId: normalizeProductLookupId(product),
             parentTitle: product.title,
+            selectedOptions: Array.isArray(variant.selectedOptions) ? variant.selectedOptions : [],
             variants: processedVariants,
             options: processedOptions,
             images: product.images || (product.imageUrl ? [{ src: product.imageUrl }] : []),
@@ -948,12 +949,6 @@ processProductsForStep(products: any, step: any) {
         .filter(Boolean);
     } else {
       const defaultVariant = this.getFirstAvailableVariant(product);
-      const trackInventoryOnAddToCart = typeof this.isInventoryTrackingOnAddToCartEnabled === 'function'
-        ? this.isInventoryTrackingOnAddToCartEnabled()
-        : fullPageProductProcessingMethods.isInventoryTrackingOnAddToCartEnabled.call(this);
-      if (trackInventoryOnAddToCart && Array.isArray(product?.variants) && product.variants.length > 0 && !defaultVariant) {
-        return [];
-      }
       const activeVariant = defaultVariant || (Array.isArray(product?.variants) && product.variants.length > 0 ? product.variants[0] : null);
       const defaultRuntimeInventory = activeVariant
         && typeof this.getRuntimeVariantInventory === 'function'
@@ -965,15 +960,15 @@ processProductsForStep(products: any, step: any) {
 
       // Storefront API: prioritize variant image, fallback to product featured image.
       // product.imageUrl — set by API path; product.featuredImage/images — metafield cache format.
-      const imageUrl = defaultVariantSource?.image?.src
-        || defaultVariantSource?.image?.url
-        || (typeof defaultVariantSource?.image === 'string' ? defaultVariantSource.image : null)
-        || defaultVariantSource?.imageUrl
-        || product.imageUrl
+      const imageUrl = product.imageUrl
         || product.featuredImage?.url
         || product.images?.[0]?.url
         || product.images?.[0]?.src
         || product.images?.[0]?.originalSrc
+        || defaultVariantSource?.image?.src
+        || defaultVariantSource?.image?.url
+        || (typeof defaultVariantSource?.image === 'string' ? defaultVariantSource.image : null)
+        || defaultVariantSource?.imageUrl
         || BUNDLE_WIDGET.PLACEHOLDER_IMAGE;
 
       // Process variants array for variant selection in modal
@@ -995,9 +990,7 @@ processProductsForStep(products: any, step: any) {
         id: productId,
         title: product.title,
         imageUrl,
-        price: defaultVariantSource
-          ? toCents(defaultVariantSource.price)
-          : toCents(product.price),
+        price: product.price != null ? toCents(product.price) : toCents(defaultVariantSource?.price),
         currencyCode: typeof defaultVariantSource?.currencyCode === 'string'
           ? defaultVariantSource.currencyCode
           : (typeof product.currencyCode === 'string' ? product.currencyCode : null),

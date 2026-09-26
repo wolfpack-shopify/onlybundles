@@ -8,7 +8,7 @@ import { build } from 'esbuild';
 
 const rootDir = join(dirname(fileURLToPath(import.meta.url)), '..');
 const outputDir = process.env.WPB_STOREFRONT_OUTDIR || join(rootDir, 'extensions/bundle-builder/assets');
-const widgetVersion = '24.2.3';
+const widgetVersion = '24.2.4';
 
 const targets = {
   'full-page': {
@@ -46,9 +46,12 @@ const targets = {
 };
 
 export async function buildStorefront(requestedTarget = 'all') {
-  const selectedTargets = requestedTarget === 'all'
-    ? Object.entries(targets)
-    : [[requestedTarget, targets[requestedTarget]]];
+  const requestedTargetNames = requestedTarget === 'all'
+    ? Object.keys(targets)
+    : requestedTarget === 'full-page'
+      ? ['full-page', 'full-page-modal']
+      : [requestedTarget];
+  const selectedTargets = requestedTargetNames.map((name) => [name, targets[name]]);
 
   if (selectedTargets.some(([, target]) => !target)) {
     throw new Error(`Unknown storefront build target: ${requestedTarget}`);

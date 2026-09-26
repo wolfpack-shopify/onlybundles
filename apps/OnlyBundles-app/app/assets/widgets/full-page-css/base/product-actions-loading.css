@@ -88,6 +88,10 @@
 }
 
 .product-card.is-out-of-stock {
+  opacity: 1;
+}
+
+.product-card.is-out-of-stock .bw-product-card__media {
   opacity: 0.58;
   filter: grayscale(1);
 }
@@ -185,6 +189,21 @@
   display: grid;
   gap: clamp(4.8px, 1cqi, 8px);
   min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.vs-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .vs-option-group-label {
@@ -279,10 +298,10 @@
   text-align: left;
 }
 
-.vs-radio-control[data-unavailable="true"] {
+.vs-radio-control[data-availability="unavailable"],
+.vs-radio-control[data-availability="nonexistent"] {
   opacity: 0.48;
   text-decoration: line-through;
-  cursor: not-allowed;
 }
 
 @media (prefers-reduced-motion: reduce) {

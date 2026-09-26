@@ -11,6 +11,8 @@ jest.mock('../../../app/db.server', () => ({
         bundleType: 'full_page',
         status: 'active',
         name: 'Targeted bundle',
+        bundleDesignTemplate: 'FBP_SIDE_FOOTER',
+        bundleDesignPresetId: 'STANDARD',
         shopifyProductId: null,
         steps: [],
         pricing: null,

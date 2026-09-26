@@ -5,7 +5,7 @@ title: Widget Architecture
 type: architecture
 status: authoritative
 summary: FPB and PPB bootstrap, Shopify-hosted settings, feature-gated app embeds, market pricing, and fail-closed hydration architecture.
-last_audited: 2026-09-24
+last_audited: 2026-09-26
 owners:
   - engineering
 domains:
@@ -96,7 +96,7 @@ keywords:
 
 | Widget                 | Source file                                | Bundle output                                                            | Shopify block                                       |
 | ---------------------- | ------------------------------------------ | ------------------------------------------------------------------------ | --------------------------------------------------- |
-| Full-Page Bundle (FPB) | `app/assets/bundle-widget-full-page.ts`    | `extensions/bundle-builder/assets/bundle-widget-full-page-bundled.js`    | `bundle-app-embed.liquid` on the app-proxy document |
+| Full-Page Bundle (FPB) | `app/assets/bundle-widget-full-page.ts`    | `extensions/bundle-builder/assets/bundle-widget-full-page-bundled.js` plus lazy `bundle-widget-full-page-modal.js` | `bundle-app-embed.liquid` on the app-proxy document |
 | Product-Page (PDP)     | `app/assets/bundle-widget-product-page.ts` | `extensions/bundle-builder/assets/bundle-widget-product-page-bundled.js` | `bundle-product-page.liquid`                        |
 
 Shared runtime modules live under `app/assets/widgets/shared/`. Controllers, method modules, and template modules import each shared primitive directly from its owning module. The removed `bundle-widget-components` compatibility barrel must not be recreated: direct ownership lets esbuild close every method over real lexical bindings and prevents browser-only free-global failures. TypeScript entry points under `app/storefront/` import the required runtime graph, and esbuild resolves, tree-shakes, minifies, and emits browser IIFEs. Storefronts never load raw ESM source files.
@@ -129,40 +129,33 @@ The shared picker is an 85dvh bottom sheet with three regions: a non-scrolling h
 
 All four PPB templates and all four FPB templates resolve grouped-variant presentation from the active
 category's canonical `variantSelectorMode`: Dropdown, Pills, Color swatches, or
-Image swatches. Each Shopify option dimension owns one visible label and one
-selector group in canonical option order. Dropdown groups use labeled native
-selects; groups presented as non-dropdown controls use uniquely named native
-radios. In a multi-dimensional Color swatches or Image swatches configuration,
-a dimension without the requested canonical Shopify swatch kind uses one
-labeled native select while mapped dimensions retain the configured swatch
-radios. Explicit Dropdown and Pills modes remain unchanged. Repeated card,
-modal, and picker instances receive instance-scoped IDs and group names.
-Unavailable values remain present and disabled rather than being filtered for
-fit. Color and image swatches use Shopify Storefront API
+Image swatches. Dropdown mode renders one placeholder-based native select per
+Shopify option dimension. Pills render one primary radio dimension and native
+selects for the remaining dimensions. Color and image modes render one complete
+canonically mapped swatch dimension as radios and the remaining dimensions as
+native selects. Repeated card, modal, and picker instances receive
+instance-scoped IDs and group names. Every option value remains selectable;
+the exact completed combination, rather than an individual control, determines
+action availability. Color and image swatches use Shopify Storefront API
 `ProductOptionValue.swatch` data matched through each variant's
 `selectedOptions`. Missing Shopify swatches retain a neutral labeled
-presentation for a single swatch dimension; in multi-dimensional swatch mode an
-entirely unmapped dimension uses the compact native-select presentation. The
-runtime does not infer colors or substitute variant images.
-The FPB product-details modal uses the same canonical resolver, so color-like
-labels such as `Black` remain text controls unless Shopify supplies a swatch.
-Cached product snapshots that lack canonical option values and selected options
-are rehydrated before a swatch selector renders. Optional color tooltips are
-described to keyboard focus, clamp/flip at viewport edges on precise pointers,
-and are replaced by a
-persistent selected-value label on coarse/mobile pointers. The existing
-delegated change path updates the active card variant, price, image, and
-inventory context; Add remains the bundle-selection mutation. The modal focus
-trap queries native interactive controls as one combined selector so results
-stay in document order and variant radios remain keyboard reachable. A variant
-rerender restores focus to the replacement selected radio without scrolling,
-preserving arrow-key exploration and its focus tooltip.
+presentation instead of inventing color data. The runtime never infers colors
+from names or substitutes variant images for Shopify swatches.
+
+The shared exact resolver returns `incomplete`, `available`, `unavailable`, or
+`nonexistent`. Draft option state is scoped by step, category, and parent
+product. It starts blank unless restoring an exact committed selection, never
+changes another option, and never migrates quantity between variant IDs.
+Incomplete and nonexistent states retain parent media and base price;
+unavailable exact variants retain their exact media and price while disabling
+the action. Products configured as individual variant cards bypass the selector
+and preserve unavailable variants with an Out of stock action.
 
 FPB persists those modes through the existing `StepCategory` fields and emits
 them in the storefront category contract. For a two-dimensional pill or swatch
 mode, the primary or canonically mapped dimension remains a visible native-radio
 group and every additional dimension becomes one labeled native select. FPB
-Dropdown mode retains complete-variant selection and its existing mobile policy.
+Dropdown mode retains one native select per dimension and stays inline at every viewport.
 The shared product-card renderer always creates a selector region; when any card
 in the current grid renders a configured selector, sibling cards reserve that
 region alongside their independent media, identity, price, and action regions.
@@ -170,10 +163,10 @@ The renderer owns one semantic and visual order for every selector mode:
 selector controls precede the variant price, which precedes the Add or quantity
 action. Template CSS may change card direction or action geometry, but cannot
 move pricing or the primary action ahead of the selector region.
-Every FPB control keeps unavailable variants or values present with disabled semantics.
-Presentation changes delegate exactly one update through the existing product
-card or product-details owner, which remains responsible for variant identity,
-price, image, inventory, quantity clamping, summary state, and Add eligibility.
+Every FPB option value remains selectable. Presentation changes update draft
+state only; the product card or product-details owner remains responsible for
+exact variant identity, price, image, inventory, per-variant quantity, summary
+state, and Add eligibility.
 
 Horizontal/Vertical modal cards keep these grouped-variant selectors inline at
 every viewport. Product images and titles are informational and do not open a
@@ -337,11 +330,17 @@ placeholder markup cannot override its presentation.
 Source module names should describe their storefront responsibility. Avoid mechanical names such as `chunk-01.js` or `part-01.css`; those hide ownership and make stale widget code harder to spot.
 
 The FPB-only Bundle Product Modal owns the product image carousel, name,
-description, variant controls when needed, quantity, and Add To Box. Direct
+description, variant controls when needed, quantity, and Add or Update action
+in Standard, Classic, Compact, and Horizontal. It is a native `dialog`: opening
+moves focus to its visible close control; close, Escape, and backdrop dismissal
+restore the exact card trigger and the document's previous scroll styles. The
+modal keeps its variant draft local until the action succeeds and updates only
+the exact resolved variant quantity. Direct
 product and collection hydration preserve up to 50 Shopify product images in
 source order. One image renders without navigation; multiple distinct images
 enable previous/next controls on desktop and horizontal swipe navigation in the
-mobile drawer. The same shared component owns both responsive surfaces.
+mobile dialog. Multiple images also expose a keyboard-operable thumbnail strip.
+The same shared component owns both responsive surfaces.
 When explicit-step data and collection hydration produce the same selectable
 variant, deduplication merges the records instead of keeping the first payload
 unchanged. The merged record preserves the richer image gallery, description,
@@ -351,7 +350,20 @@ compact single-image record is also hydrated through the existing storefront
 products endpoint before rendering; product identifiers may arrive in `id`,
 `selectionId`, or `productId`, and must resolve to the same product lookup key.
 
-Because the FPB product-details overlay is mounted under `document.body`, its responsive surface is viewport-owned rather than widget-container-owned. FPB product cards explicitly opt into the shared card's image/title details affordance; PPB cards do not render that affordance or construct the product-details overlay.
+The FPB product-details dialog mounts inside the widget root so it inherits
+scoped storefront tokens while native top-layer behavior remains viewport-owned.
+Its app-owned geometry and explicit type sizes use root-independent units so
+themes that set `html` to a 10px `rem` scale render the same dialog dimensions
+as themes with a 16px root; the widget never overrides the theme root size.
+FPB product cards explicitly opt into the shared card's image/title details
+affordance; PPB cards do not construct the product-details dialog.
+
+That host-root independence applies to every light-DOM storefront surface, not
+only the FPB dialog. PPB cards, selectors, pickers, drawers, sticky actions, and
+shared badges or purchase options use explicit app-owned type and geometry
+values while retaining container- and viewport-relative units for responsive
+behavior. Both widgets expose a `44px` control-target token at their roots and
+never compensate by changing the theme's document font size.
 
 While product details are open, the storefront document root and body are both
 scroll-locked. The modal or drawer remains the only vertical scroll owner, and

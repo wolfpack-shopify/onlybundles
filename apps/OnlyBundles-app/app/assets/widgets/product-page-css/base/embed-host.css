@@ -1,13 +1,13 @@
 .wpb-ppb-embed {
   box-sizing: border-box;
   display: grid;
-  gap: clamp(0.75rem, 1.5vw, 1.25rem);
+  gap: clamp(12px, 1.5vw, 20px);
   inline-size: 100%;
-  margin-block: clamp(1rem, 2.5vw, 2rem);
+  margin-block: clamp(16px, 2.5vw, 32px);
 }
 .wpb-ppb-embed__header {
   display: grid;
-  gap: clamp(0.25rem, 0.75vw, 0.5rem);
+  gap: clamp(4px, 0.75vw, 8px);
 }
 
 .wpb-ppb-embed__title,
@@ -18,7 +18,7 @@
 .wpb-ppb-embed__title {
   color: currentColor;
   font: inherit;
-  font-size: clamp(1.25rem, 2.2vw, 1.75rem);
+  font-size: clamp(20px, 2.2vw, 28px);
   font-weight: 650;
   line-height: 1.2;
 }

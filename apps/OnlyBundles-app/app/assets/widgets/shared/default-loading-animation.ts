@@ -14,8 +14,8 @@
  *
  * @returns {HTMLDivElement} A spinner element
  */
-export function createDefaultLoadingAnimation() {
-  const spinner = document.createElement('div');
+export function createDefaultLoadingAnimation(runtimeDocument: Document = document) {
+  const spinner = runtimeDocument.createElement('div');
   spinner.className = 'bundle-loading-overlay__spinner';
   spinner.setAttribute('role', 'status');
   spinner.setAttribute('aria-label', 'Loading');

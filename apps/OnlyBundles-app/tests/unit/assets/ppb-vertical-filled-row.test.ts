@@ -21,17 +21,18 @@ describe('SelectedSlotTitle', () => {
     expect(resolveSelectedSlotTitle('Short title', false)).toBe('Short title');
   });
 
-  it('keeps a filled Vertical slot inert so only its remove action mutates the row', () => {
+  it('opens a filled Vertical slot in an explicit one-unit replacement context', () => {
     const originalDocument = global.document;
     global.document = createFakeDocument() as unknown as Document;
     const openModal = jest.fn();
 
     try {
-      const widget = {
+      const widget: any = {
         selectedBundle: {
           steps: [{ conditionValue: 1, conditionOperator: 'equal_to' }],
         },
         _usesVerticalModalSlotLayout: () => true,
+        _isProductPageModalSlotTemplate: () => true,
         openModal,
         removeProductFromSelection: jest.fn(),
       };
@@ -44,32 +45,37 @@ describe('SelectedSlotTitle', () => {
       }, 0);
 
       const replacementControl = card.children.find((child: any) => (
-        child.tagName === 'BUTTON' && child.getAttribute('aria-label') === longTitle
+        child.tagName === 'BUTTON' && child.getAttribute('aria-label') === `Change ${longTitle}`
       ));
 
-      expect(replacementControl).toBeUndefined();
-      card.dispatch('click');
-      expect(openModal).not.toHaveBeenCalled();
+      expect(replacementControl).toBeDefined();
+      replacementControl.dispatch('click');
+      expect(widget._modalSlotReplacementTarget).toEqual({
+        stepIndex: 0,
+        selectionKey: 'variant-1',
+        quantity: 1,
+      });
+      expect(openModal).toHaveBeenCalledWith(0, replacementControl);
     } finally {
       global.document = originalDocument;
     }
   });
 
-  it('replaces the targeted filled-slot selection before exact-one validation', () => {
-    const selections: Record<string, number> = { 'variant-1': 1 };
+  it('replaces only one unit of the targeted filled-slot selection', () => {
+    const selections: Record<string, number> = { 'variant-1': 2, 'variant-2': 1 };
     const setSelectedQuantity = jest.fn((_stepIndex: number, key: string, quantity: number) => {
       selections[key] = quantity;
     });
     const validateStepCondition = jest.fn((_stepIndex: number, key: string, quantity: number) => (
       Object.entries(selections).reduce((total, [selectionKey, selectedQuantity]: any) => (
         total + (selectionKey === key ? 0 : selectedQuantity)
-      ), quantity) <= 1
+      ), quantity) <= 3
     ));
     const context = {
       selectedProducts: [selections],
       selectedBundle: { steps: [{}] },
       stepProductData: [[{ id: 'variant-2' }]],
-      _modalSlotReplacementTarget: { stepIndex: 0, selectionKey: 'variant-1' },
+      _modalSlotReplacementTarget: { stepIndex: 0, selectionKey: 'variant-1', quantity: 1 },
       normalizeSelectionKey: (value: string) => value,
       _getDirectDefaultRequiredQuantity: () => null,
       getVariantAvailable: () => ({ available: null, outOfStock: false }),
@@ -90,12 +96,74 @@ describe('SelectedSlotTitle', () => {
       elements: {},
     } as any;
 
+    ProductPageSelectionMethods.updateProductSelection.call(context, 0, 'variant-2', 2);
+
+    expect(validateStepCondition).toHaveBeenCalledWith(0, 'variant-2', 2);
+    expect(selections).toEqual({ 'variant-1': 1, 'variant-2': 2 });
+    expect(context.updateProductQuantityDisplay).toHaveBeenCalledWith(0, 'variant-1', 1);
+    expect(context._modalSlotReplacementTarget).toBeNull();
+  });
+
+  it('adds a sibling variant without removing the already selected variant', () => {
+    const selections: Record<string, number> = { 'variant-1': 2 };
+    const context = {
+      selectedProducts: [selections],
+      selectedBundle: { steps: [{}] },
+      stepProductData: [[{ id: 'product-1', variants: [{ id: 'variant-1' }, { id: 'variant-2' }] }]],
+      _modalSlotReplacementTarget: null,
+      normalizeSelectionKey: (value: string) => value,
+      _getDirectDefaultRequiredQuantity: () => null,
+      getVariantAvailable: () => ({ available: null, outOfStock: false }),
+      getSelectedQuantity: (_stepIndex: number, key: string) => selections[key] || 0,
+      validateStepCondition: jest.fn(() => true),
+      setSelectedQuantity: jest.fn((_stepIndex: number, key: string, quantity: number) => {
+        selections[key] = quantity;
+      }),
+      updateProductQuantityDisplay: jest.fn(),
+      _renderDirectDefaultProducts: jest.fn(),
+      renderModalTabs: jest.fn(),
+      updateModalNavigation: jest.fn(),
+      updateModalFooterMessaging: jest.fn(),
+      updateAddToCartButton: jest.fn(),
+      updateFooterMessaging: jest.fn(),
+      _syncFreeGiftSlotCard: jest.fn(),
+      findProductBySelectionKey: () => ({ id: 'product-1' }),
+      _usesCascadeStepFlow: () => false,
+      _maybeAutoAddAfterLastStep: jest.fn(),
+      elements: {},
+    } as any;
+
     ProductPageSelectionMethods.updateProductSelection.call(context, 0, 'variant-2', 1);
 
-    expect(validateStepCondition).toHaveBeenCalledWith(0, 'variant-2', 1);
-    expect(selections).toEqual({ 'variant-1': 0, 'variant-2': 1 });
-    expect(context.updateProductQuantityDisplay).toHaveBeenCalledWith(0, 'variant-1', 0);
-    expect(context._modalSlotReplacementTarget).toBeNull();
+    expect(selections).toEqual({ 'variant-1': 2, 'variant-2': 1 });
+    expect(context.updateProductQuantityDisplay).not.toHaveBeenCalledWith(0, 'variant-1', 0);
+  });
+
+  it('restores the source quantity when one-unit replacement validation fails', () => {
+    const selections: Record<string, number> = { 'variant-1': 2, 'variant-2': 1 };
+    const context = {
+      selectedProducts: [selections],
+      selectedBundle: { steps: [{}] },
+      stepProductData: [[{ id: 'product-1', variants: [{ id: 'variant-1' }, { id: 'variant-2' }] }]],
+      _modalSlotReplacementTarget: { stepIndex: 0, selectionKey: 'variant-1', quantity: 1 },
+      normalizeSelectionKey: (value: string) => value,
+      _getDirectDefaultRequiredQuantity: () => null,
+      getVariantAvailable: () => ({ available: null, outOfStock: false }),
+      getSelectedQuantity: (_stepIndex: number, key: string) => selections[key] || 0,
+      validateStepCondition: jest.fn(() => false),
+      setSelectedQuantity: jest.fn((_stepIndex: number, key: string, quantity: number) => {
+        selections[key] = quantity;
+      }),
+    } as any;
+
+    ProductPageSelectionMethods.updateProductSelection.call(context, 0, 'variant-2', 2);
+
+    expect(selections).toEqual({ 'variant-1': 2, 'variant-2': 1 });
+    expect(context._modalSlotReplacementTarget).toEqual({
+      stepIndex: 0,
+      selectionKey: 'variant-1',
+      quantity: 1,
+    });
   });
 });
 

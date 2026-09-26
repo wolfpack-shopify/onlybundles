@@ -35,7 +35,7 @@
     border-radius: 999px;
     background: #fff;
     color: #000;
-    font-family: Assistant, sans-serif;
+    font-family: inherit;
     font-size: 15px;
     font-weight: 700;
     line-height: 1.2;
@@ -52,7 +52,7 @@
 
   .fpb-preset-classic .sidebar-content > .category-tabs .category-tab .tab-label {
     color: inherit;
-    font-family: Assistant, sans-serif;
+    font-family: inherit;
     font-size: 15px;
     font-weight: 700;
     line-height: 1.2;
@@ -86,7 +86,7 @@
     display: grid;
     grid-template-columns: repeat(
       auto-fit,
-      minmax(min(100%, 13rem), 1fr)
+      minmax(min(100%, 208px), 1fr)
     );
     gap: var(--classic-grid-gap);
     justify-content: center;
@@ -120,15 +120,15 @@
 
   .fpb-preset-classic .sidebar-content .fpb-addon-discount-badge {
     position: absolute;
-    inset-block-start: 0.75rem;
+    inset-block-start: 12px;
     inset-inline-end: 0;
     z-index: 2;
-    padding: 0.0625rem 0.4375rem;
-    border-radius: 0.3125rem 0 0 0.3125rem;
+    padding: 1px 7px;
+    border-radius: 5px 0 0 5px;
     background: var(--bundle-add-btn-color, #000);
     color: var(--bundle-button-text-color, #fff);
-    font-family: Assistant, sans-serif;
-    font-size: 0.6875rem;
+    font-family: inherit;
+    font-size: 11px;
     font-weight: 700;
     line-height: 1.8;
     letter-spacing: 0;
@@ -197,9 +197,8 @@
       var(--bundle-global-primary-text, currentColor)
     );
     font-size: 14px;
-    line-height: 18px;
+    line-height: 1.285714;
     font-weight: 700;
-    text-align: left;
     text-align: start;
     letter-spacing: 0;
     overflow: hidden;
@@ -295,7 +294,7 @@
       var(--classic-icon-action-track);
     grid-template-rows: none;
     grid-auto-rows: var(--classic-action-visual-height);
-    gap: 0.3125rem;
+    gap: 5px;
     width: 100%;
     margin: 0;
     padding: 0;
@@ -478,9 +477,9 @@
     .product-card-action
     .inline-quantity-controls {
     grid-template-columns:
-      var(--bundle-control-hit-target, 2.75rem)
+      var(--bundle-control-hit-target, 44px)
       minmax(0, 1fr)
-      var(--bundle-control-hit-target, 2.75rem);
+      var(--bundle-control-hit-target, 44px);
     width: 100%;
     min-width: 0;
     max-width: none;
@@ -494,15 +493,15 @@
     .product-add-btn {
     width: var(
       --classic-action-visual-height,
-      var(--classic-icon-button-size, 2.25rem)
+      var(--classic-icon-button-size, 36px)
     );
     min-width: var(
       --classic-action-visual-height,
-      var(--classic-icon-button-size, 2.25rem)
+      var(--classic-icon-button-size, 36px)
     );
     height: var(
       --classic-action-visual-height,
-      var(--classic-icon-button-size, 2.25rem)
+      var(--classic-icon-button-size, 36px)
     );
     padding: 0;
     border-radius: var(--bundle-add-btn-radius, 5px);
@@ -647,13 +646,13 @@
       --bundle-inline-qty-text,
       var(--bundle-button-text-color, #ffffff)
     );
-    font-family: Assistant, sans-serif;
+    font-family: inherit;
     box-shadow: none;
     border-radius: var(--fpb-card-quantity-selector-radius, 5px);
     display: grid;
     grid-template-columns:
       minmax(0, 1fr)
-      minmax(2rem, 1.18fr)
+      minmax(32px, 1.18fr)
       minmax(0, 1fr);
     gap: 0;
     align-items: center;
@@ -702,6 +701,6 @@
       .fpb-preset-classic
     )
     .bundle-modal-add-btn {
-    bottom: max(0.75rem, env(safe-area-inset-bottom));
+    bottom: max(12px, env(safe-area-inset-bottom));
   }
 }

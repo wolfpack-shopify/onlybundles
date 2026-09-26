@@ -18,6 +18,7 @@ export interface FpbTemplateDialogProps {
     closeSelectTemplateModal: () => void;
     fullPageBundleStyles: Record<string, string>;
     handleTemplateNext: () => void;
+    handleTemplateSyncRequired: () => void;
     handleTemplatePreview: (
       onPreviewOpened: (previewUrl: string) => void
     ) => void | Promise<void>;
@@ -31,6 +32,7 @@ export interface FpbTemplateDialogProps {
     templateFetcher: { state: string };
     templateModalStep: TemplateModalStep;
     templateSaveError: string | null;
+    templateSyncRequired: boolean;
     themeEditorUrl: string | null;
     isFreePlan?: boolean;
   };
@@ -43,6 +45,7 @@ export function FpbTemplateDialog({ template }: FpbTemplateDialogProps) {
   const {
     fullPageBundleStyles,
     handleTemplateNext,
+    handleTemplateSyncRequired,
     handleTemplatePreview,
     isPreviewBundleLoading,
     isSelectTemplateModalOpen,
@@ -54,6 +57,7 @@ export function FpbTemplateDialog({ template }: FpbTemplateDialogProps) {
     templateFetcher,
     templateModalStep,
     templateSaveError,
+    templateSyncRequired,
     themeEditorUrl,
     closeSelectTemplateModal,
     isFreePlan,
@@ -115,7 +119,18 @@ export function FpbTemplateDialog({ template }: FpbTemplateDialogProps) {
                         )}
                         tone="critical"
                       >
-                        {templateSaveError}
+                        <s-stack direction="block" gap="small">
+                          <s-text>{templateSaveError}</s-text>
+                          {templateSyncRequired ? (
+                            <s-button
+                              variant="secondary"
+                              icon="refresh"
+                              onClick={handleTemplateSyncRequired}
+                            >
+                              {translateAdmin("adminAttributes.syncBundle")}
+                            </s-button>
+                          ) : null}
+                        </s-stack>
                       </s-banner>
                     </s-box>
                   ) : null}
@@ -155,7 +170,7 @@ export function FpbTemplateDialog({ template }: FpbTemplateDialogProps) {
                               src={tpl.image}
                               alt={tpl.label}
                               aspectRatio="4/3"
-                              objectFit="cover"
+                              objectFit="contain"
                               loading="eager"
                             />
                           </span>
@@ -359,7 +374,18 @@ export function FpbTemplateDialog({ template }: FpbTemplateDialogProps) {
                         )}
                         tone="critical"
                       >
-                        {templateSaveError}
+                        <s-stack direction="block" gap="small">
+                          <s-text>{templateSaveError}</s-text>
+                          {templateSyncRequired ? (
+                            <s-button
+                              variant="secondary"
+                              icon="refresh"
+                              onClick={handleTemplateSyncRequired}
+                            >
+                              {translateAdmin("adminAttributes.syncBundle")}
+                            </s-button>
+                          ) : null}
+                        </s-stack>
                       </s-banner>
                     </s-box>
                   ) : null}

@@ -195,7 +195,7 @@
   grid-row: 1;
   align-self: end;
   justify-self: end;
-  max-width: min(7rem, 100%);
+  max-width: min(112px, 100%);
   font-size: 12px;
   line-height: 1.2;
   font-weight: 600;
@@ -209,7 +209,7 @@
   grid-row: 3;
   align-self: start;
   justify-self: end;
-  max-width: min(7rem, 100%);
+  max-width: min(112px, 100%);
   font-size: 11px;
   line-height: 1.2;
   font-weight: 400;

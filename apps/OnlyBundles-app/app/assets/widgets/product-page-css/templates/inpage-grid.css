@@ -81,14 +81,6 @@
   padding: 28px 0 20px;
 }
 
-@container ppb-grid-step (max-width: 45rem) {
-  .bw-ppb-grid-product-grid:has(
-      .ppb-variant-selector-wrapper[data-option-dimension-count="2"]
-    ) {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 .bw-ppb-grid-product-grid
   .ppb-variant-selector-wrapper[data-option-dimension-count="2"] {
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -126,12 +118,9 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 15px;
   width: 100%;
-  max-height: min(480px, 70vh);
   grid-auto-rows: max-content;
   padding: 0 8px 15px;
   box-sizing: border-box;
-  overflow: hidden auto;
-  scrollbar-gutter: stable;
   align-items: stretch;
   align-content: start;
   justify-items: stretch;
@@ -361,14 +350,21 @@
   user-select: none;
 }
 
-@media (max-width: 480px) {
+@container ppb-inpage (max-width: 453px) {
   .bw-ppb-inpage-step-grid,
   .bw-ppb-grid-product-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    max-height: none;
-    overflow: visible;
   }
+}
 
+@container ppb-inpage (max-width: 302px) {
+  .bw-ppb-inpage-step-grid,
+  .bw-ppb-grid-product-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
   .bw-ppb-grid-product-grid .product-add-btn {
     font-size: 12px;
   }

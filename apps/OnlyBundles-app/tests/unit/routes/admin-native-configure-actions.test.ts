@@ -697,4 +697,50 @@ describe("native configure actions", () => {
     expect(removeProduct).toHaveBeenCalledWith("product-1");
     expect(removeCollection).toHaveBeenCalledWith("collection-1");
   });
+
+  it("shows the exact selected variants in the selected-products modal", () => {
+    flushSync(() => {
+      root.render(
+        React.createElement(SelectedProductsPanel, {
+          products: [
+            {
+              id: "gid://shopify/Product/100",
+              title: "Amber Essence",
+              variants: [
+                {
+                  id: "gid://shopify/ProductVariant/201",
+                  title: "30ML",
+                },
+                {
+                  id: "gid://shopify/ProductVariant/203",
+                  title: "90ML",
+                },
+              ],
+            },
+          ],
+          draggedProductIndex: null,
+          handlePickProducts: jest.fn(),
+          hidePolarisModal: jest.fn(),
+          modalId: "products-modal",
+          modalRef: React.createRef(),
+          removeProduct: jest.fn(),
+          reorderProduct: jest.fn(),
+          setDraggedProductIndex: jest.fn(),
+          showPolarisModal: jest.fn(),
+          styles: new Proxy<Record<string, string>>(
+            {},
+            { get: (_target, property) => String(property) }
+          ),
+        })
+      );
+    });
+
+    const renderedText = Array.from(
+      container.querySelectorAll<HTMLElement>("s-text")
+    ).map((element) => element.textContent);
+
+    expect(renderedText).toEqual(
+      expect.arrayContaining(["Amber Essence", "30ML", "90ML"])
+    );
+  });
 });

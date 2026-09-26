@@ -120,11 +120,13 @@ describe('ProductPageWidgetMiscMethods loading overlay', () => {
 
     ProductPageWidgetMiscMethods.showLoadingOverlay.call(widget, null, { bootstrap: true });
     expect(container.dataset.wpbBootstrapLoading).toBe('true');
+    expect(container.getAttribute('aria-busy')).toBe('true');
 
     ProductPageWidgetMiscMethods.hideLoadingOverlay.call(widget);
     jest.advanceTimersByTime(180);
 
     expect(container.dataset.wpbBootstrapLoading).toBeUndefined();
+    expect(container.getAttribute('aria-busy')).toBe('false');
   });
 });
 

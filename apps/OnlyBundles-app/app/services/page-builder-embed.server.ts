@@ -64,15 +64,11 @@ export async function resolvePageBuilderEmbed(
   if (!resolveOfferSchedule(bundle.offerPolicy ?? {}, now).effective) return null;
   if (!resolveOfferCountryEligibility(bundle.offerPolicy, request.countryCode)) return null;
 
-  if (request.bundleType === "product_page") {
-    return { bundle, loadingScreen: null };
-  }
-
   const designSettings = await database.designSettings.findUnique({
     where: {
       shopId_bundleType: {
         shopId: shopDomain,
-        bundleType: "full_page",
+        bundleType: request.bundleType,
       },
     },
     select: { generalSettings: true },

@@ -1,2 +1,4 @@
 @import "../full-page-css/base/bootstrap-reservation.css";
+@import "../product-page-css/base/bootstrap-loading.css";
+@import "./loading-overlay.css";
 @import "./cart-tier-progress.css";

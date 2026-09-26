@@ -72,7 +72,7 @@ body:has(.layout-sidebar[data-fpb-design-preset="CLASSIC"], .fpb-preset-classic)
   body:has(.layout-sidebar[data-fpb-design-preset="CLASSIC"], .fpb-preset-classic)
     .bundle-modal-overlay.active[data-read-only="true"]
     .bundle-modal-container {
-    width: min(100%, 72rem);
+    width: min(100%, 1152px);
     max-width: var(--classic-product-modal-max-width);
     max-height: calc(100dvh - (var(--classic-product-modal-gutter) * 2));
     padding: clamp(1.5rem, 3vw, 2.5rem);

@@ -56,7 +56,7 @@
     border-radius: 999px;
     background: #fff;
     color: #000;
-    font-family: Assistant, sans-serif;
+    font-family: inherit;
     font-size: 16px;
     line-height: 1.2;
     font-weight: 700;
@@ -79,7 +79,7 @@
 
   .fpb-preset-classic .category-tab .tab-label {
     color: inherit;
-    font-family: Assistant, sans-serif;
+    font-family: inherit;
     font-size: 16px;
     font-weight: 700;
     line-height: 1.2;
@@ -147,15 +147,15 @@
 
   .fpb-preset-classic .sidebar-content .fpb-addon-discount-badge {
     position: absolute;
-    inset-block-start: 1rem;
+    inset-block-start: 16px;
     inset-inline-end: 0;
     z-index: 2;
-    padding: 0.125rem 0.5rem;
-    border-radius: 0.3125rem 0 0 0.3125rem;
+    padding: 2px 8px;
+    border-radius: 5px 0 0 5px;
     background: var(--bundle-add-btn-color, #000);
     color: var(--bundle-button-text-color, #fff);
-    font-family: Assistant, sans-serif;
-    font-size: 0.75rem;
+    font-family: inherit;
+    font-size: 12px;
     font-weight: 700;
     line-height: 1.8;
     letter-spacing: 0;
@@ -191,9 +191,8 @@
       var(--bundle-global-primary-text, currentColor)
     );
     font-size: 16px;
-    line-height: 22px;
+    line-height: 1.375;
     font-weight: 700;
-    text-align: left;
     text-align: start;
     letter-spacing: 0;
     overflow: hidden;
@@ -454,7 +453,7 @@
       var(--classic-icon-action-track);
     grid-template-rows: none;
     grid-auto-rows: var(--classic-action-visual-height);
-    gap: 0.3125rem;
+    gap: 5px;
     width: 100%;
     min-width: 0;
     height: auto;
@@ -562,15 +561,15 @@
     .product-add-btn {
     width: var(
       --classic-action-visual-height,
-      var(--classic-icon-button-size, 2.25rem)
+      var(--classic-icon-button-size, 36px)
     );
     min-width: var(
       --classic-action-visual-height,
-      var(--classic-icon-button-size, 2.25rem)
+      var(--classic-icon-button-size, 36px)
     );
     height: var(
       --classic-action-visual-height,
-      var(--classic-icon-button-size, 2.25rem)
+      var(--classic-icon-button-size, 36px)
     );
     padding: 0;
     border-radius: var(--bundle-add-btn-radius, 5px);
@@ -648,8 +647,8 @@
     display: -webkit-box;
     grid-row: 1;
     height: auto;
-    min-height: 2.75rem;
-    max-height: 2.75rem;
+    min-height: 44px;
+    max-height: 44px;
     text-align: left;
     align-content: center;
     overflow: hidden;
@@ -737,12 +736,12 @@
       --bundle-inline-qty-text,
       var(--bundle-button-text-color, #ffffff)
     );
-    font-family: Assistant, sans-serif;
+    font-family: inherit;
     border-radius: var(--fpb-card-quantity-selector-radius, 5px);
     display: grid;
     grid-template-columns:
       minmax(0, 1fr)
-      minmax(2rem, 1.18fr)
+      minmax(32px, 1.18fr)
       minmax(0, 1fr);
     gap: 0;
     align-items: center;

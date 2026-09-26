@@ -1,223 +1,132 @@
-/**
- * Unit tests -- PPB Select Template metafield sync
- */
-
 import { handleUpdateBundleDesignTemplate } from "../../../app/routes/app/app.bundles.product-page-bundle.configure.$bundleId/handlers/design-template.server";
-import { updateBundleProductMetafields } from "../../../app/services/bundles/metafield-sync/operations/bundle-product.server";
+import {
+  BundleTemplateSnapshotConflictError,
+  BundleTemplateSnapshotUnavailableError,
+  syncBundleTemplateSnapshot,
+} from "../../../app/services/bundles/metafield-sync/operations/bundle-template.server";
 
 jest.mock("../../../app/db.server", () => ({
   __esModule: true,
-  default: {
-    bundle: { findUnique: jest.fn(), update: jest.fn() },
-  },
+  default: { bundle: { findUnique: jest.fn(), update: jest.fn() } },
 }));
 
 jest.mock("../../../app/services/subscriptions/subscription-service.server", () => ({
   resolveShopEntitlements: jest.fn().mockResolvedValue({
-    entitlements: {
-      planCode: "GROWTH",
-      billingInterval: "MONTHLY",
-      limits: { publicBundles: null, enabledSteps: null },
-      capabilities: {
-        premiumTemplates: true,
-        advancedDesign: true,
-        advancedAnalytics: true,
-        prioritySupport: true,
-        unlimitedDrafts: true,
-      },
-    },
+    entitlements: { capabilities: { premiumTemplates: true } },
   }),
 }));
 
-jest.mock("../../../app/services/subscriptions/design-entitlement-state.server", () => ({
-  shopUsesAdvancedDesign: jest.fn().mockResolvedValue(false),
-}));
+jest.mock("../../../app/services/bundles/metafield-sync/operations/bundle-template.server", () => {
+  const actual = jest.requireActual(
+    "../../../app/services/bundles/metafield-sync/operations/bundle-template.server",
+  );
+  return { ...actual, syncBundleTemplateSnapshot: jest.fn() };
+});
 
-jest.mock("../../../app/services/subscriptions/bundle-entitlement-gate.server", () => ({
-  assertTemplateSelectionAllowed: jest.fn(),
-  updateBundleWithPublicationGate: jest.fn((input) => input.database.bundle.update({
-    where: { id: input.bundleId, shopId: input.shopDomain },
-    data: input.data,
-    ...(input.include ? { include: input.include } : {}),
-  })),
-}));
+const db = require("../../../app/db.server").default;
+const mockSync = syncBundleTemplateSnapshot as jest.MockedFunction<
+  typeof syncBundleTemplateSnapshot
+>;
+const admin = { graphql: jest.fn() } as any;
+const session = { shop: "test-shop.myshopify.com" } as any;
 
-jest.mock("../../../app/lib/logger", () => ({
-  AppLogger: {
-    info: jest.fn(),
-    debug: jest.fn(),
-    warn: jest.fn(),
-    error: jest.fn(),
-    startTimer: jest.fn(() => jest.fn()),
-  },
-}));
-
-jest.mock("../../../app/services/bundles/metafield-sync/operations/bundle-product.server", () => ({
-  updateBundleProductMetafields: jest.fn().mockResolvedValue(undefined),
-  updateComponentProductMetafields: jest.fn().mockResolvedValue(undefined),
-}));
-
-jest.mock("../../../app/services/theme-colors.server", () => ({
-  syncThemeColors: jest.fn().mockResolvedValue(undefined),
-}));
-
-jest.mock("../../../app/services/widget-installation/widget-installation-core.server", () => ({
-  WidgetInstallationService: {
-    validateProductBundleWidgetSetup: jest.fn(),
-  },
-}));
-
-jest.mock("../../../app/lib/css-sanitizer", () => ({
-  processCss: jest.fn((css: string) => ({
-    sanitizedCss: css,
-    isValid: true,
-    warnings: [],
-    syntaxErrors: [],
-  })),
-}));
-
-const getDb = () => require("../../../app/db.server").default;
-
-const MOCK_ADMIN = {
-  graphql: jest.fn(),
-} as any;
-
-const MOCK_SESSION = {
-  shop: "test-shop.myshopify.com",
-} as any;
-
-function makeForm(fields: Record<string, string>) {
-  const fd = new FormData();
-  for (const [key, value] of Object.entries(fields)) {
-    fd.append(key, value);
-  }
-  return fd;
+function form(template: string, preset: string) {
+  const data = new FormData();
+  data.set("bundleDesignTemplate", template);
+  data.set("bundleDesignPresetId", preset);
+  return data;
 }
 
-describe("PPB Select Template metafield sync", () => {
+describe("PPB Select Template targeted snapshot sync", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    getDb().bundle.findUnique.mockResolvedValue({
-      id: "bundle-1",
-      status: "active",
-      steps: [{ enabled: true }],
-      bundleSubscriptionConfig: null,
+    db.bundle.findUnique.mockResolvedValue({
+      bundleDesignTemplate: "PDP_MODAL",
+      bundleDesignPresetId: "VERTICAL_SLOTS",
+      shopifyProductId: "gid://shopify/Product/123",
     });
+    db.bundle.update.mockResolvedValue({ id: "bundle-1" });
+    mockSync.mockResolvedValue({ updated: true });
   });
 
-  it("rewrites bundle product metafields with the saved template config", async () => {
-    getDb().bundle.update.mockResolvedValue({
-      id: "bundle-1",
-      name: "Product Page Bundle",
-      description: "Description",
-      status: "active",
-      templateName: null,
-      bundleType: "product_page",
-      shopifyProductId: "gid://shopify/Product/123",
-      bundleDesignTemplate: "PDP_INPAGE",
-      bundleDesignPresetId: "LIST",
-      defaultProductsData: { isDefaultProductsEnabled: true },
-      bundleTextConfig: { bundleSummary: { title: "Summary", subTitle: "Sub" } },
-      validateQuantityPerProduct: { isEnabled: true, allowedQuantity: 1 },
-      useSingleStepCategoriesAsBundleSteps: false,
-      steps: [
-        {
-          id: "step-1",
-          name: "Step 1",
-          position: 1,
-          minQuantity: 1,
-          maxQuantity: 1,
-          StepProduct: [{ productId: "gid://shopify/Product/456", title: "Component" }],
-          StepCategory: [],
-          collections: [],
-        },
-      ],
-      pricing: {
-        enabled: true,
-        method: "buy_x_get_y",
-        rules: [{
-          id: "rule-1",
-          conditionType: "quantity",
-          conditionValue: 2,
-          customerBuys: 2,
-          customerGets: 1,
-          discountValue: 100,
-        }],
-        messages: {},
+  it("updates only the template columns and targeted storefront snapshot", async () => {
+    const response = await handleUpdateBundleDesignTemplate(
+      admin,
+      session,
+      "bundle-1",
+      form("PDP_INPAGE", "LIST"),
+    );
+
+    expect(db.bundle.findUnique).toHaveBeenCalledWith({
+      where: { id: "bundle-1", shopId: session.shop },
+      select: {
+        bundleDesignTemplate: true,
+        bundleDesignPresetId: true,
+        shopifyProductId: true,
       },
     });
-
-    const response = await handleUpdateBundleDesignTemplate(
-      MOCK_ADMIN,
-      MOCK_SESSION,
-      "bundle-1",
-      makeForm({
-        bundleDesignTemplate: "PDP_INPAGE",
-        bundleDesignPresetId: "LIST",
-      }),
-    );
-    const body = await response.json();
-
-    expect(body.success).toBe(true);
-    expect(getDb().bundle.update).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: "bundle-1", shopId: "test-shop.myshopify.com" },
+    expect(db.bundle.update).toHaveBeenCalledWith({
+      where: { id: "bundle-1", shopId: session.shop },
       data: {
         bundleDesignTemplate: "PDP_INPAGE",
         bundleDesignPresetId: "LIST",
       },
-    }));
-
-    expect(updateBundleProductMetafields).toHaveBeenCalledWith(
-      MOCK_ADMIN,
-      "gid://shopify/Product/123",
-      expect.objectContaining({
-        bundleDesignTemplate: "PDP_INPAGE",
-        bundleDesignPresetId: "LIST",
-        defaultProductsData: { isDefaultProductsEnabled: true },
-        bundleTextConfig: { bundleSummary: { title: "Summary", subTitle: "Sub" } },
-        validateQuantityPerProduct: { isEnabled: true, allowedQuantity: 1 },
-      }),
-    );
+    });
+    expect(mockSync).toHaveBeenCalledWith({
+      admin,
+      bundleProductId: "gid://shopify/Product/123",
+      bundleId: "bundle-1",
+      bundleType: "product_page",
+      bundleDesignTemplate: "PDP_INPAGE",
+      bundleDesignPresetId: "LIST",
+    });
+    await expect(response.json()).resolves.toEqual({ success: true });
   });
 
-  it("rewrites PPB modal preset into bundle product metafields", async () => {
-    getDb().bundle.update.mockResolvedValue({
-      id: "bundle-1",
-      name: "Product Page Bundle",
-      description: "Description",
-      status: "active",
-      templateName: null,
-      bundleType: "product_page",
-      shopifyProductId: "gid://shopify/Product/123",
-      bundleDesignTemplate: "PDP_MODAL",
-      bundleDesignPresetId: "HORIZONTAL_SLOTS",
-      defaultProductsData: {},
-      bundleTextConfig: {},
-      validateQuantityPerProduct: { isEnabled: false, allowedQuantity: 1 },
-      useSingleStepCategoriesAsBundleSteps: false,
-      steps: [],
-      pricing: null,
-    });
+  it("skips the database write but verifies the snapshot for an identical request", async () => {
+    await handleUpdateBundleDesignTemplate(
+      admin,
+      session,
+      "bundle-1",
+      form("PDP_MODAL", "VERTICAL_SLOTS"),
+    );
+
+    expect(db.bundle.update).not.toHaveBeenCalled();
+    expect(mockSync).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns explicit Sync Bundle recovery when the snapshot is unavailable", async () => {
+    mockSync.mockRejectedValueOnce(new BundleTemplateSnapshotUnavailableError());
 
     const response = await handleUpdateBundleDesignTemplate(
-      MOCK_ADMIN,
-      MOCK_SESSION,
+      admin,
+      session,
       "bundle-1",
-      makeForm({
-        bundleDesignTemplate: "PDP_MODAL",
-        bundleDesignPresetId: "HORIZONTAL_SLOTS",
-      }),
+      form("PDP_INPAGE", "GRID"),
     );
-    const body = await response.json();
 
-    expect(body.success).toBe(true);
-    expect(updateBundleProductMetafields).toHaveBeenCalledWith(
-      MOCK_ADMIN,
-      "gid://shopify/Product/123",
-      expect.objectContaining({
-        bundleDesignTemplate: "PDP_MODAL",
-        bundleDesignPresetId: "HORIZONTAL_SLOTS",
-      }),
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({
+      success: false,
+      syncRequired: true,
+      templatePersisted: true,
+    }));
+  });
+
+  it("returns a retryable conflict without marking the snapshot for full sync", async () => {
+    mockSync.mockRejectedValueOnce(new BundleTemplateSnapshotConflictError());
+
+    const response = await handleUpdateBundleDesignTemplate(
+      admin,
+      session,
+      "bundle-1",
+      form("PDP_INPAGE", "GRID"),
     );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual(expect.objectContaining({
+      success: false,
+      error: expect.stringContaining("changed"),
+    }));
   });
 });

@@ -317,7 +317,7 @@ SDK sources → `npm run build:sdk`:
 
 **Build commands:**
 ```bash
-npm run build:widgets           # all widget bundles + minify
+npm run build:widgets           # all widget JavaScript bundles
 npm run build:widgets:full-page
 npm run build:widgets:product-page
 npm run build:sdk
@@ -337,26 +337,26 @@ node --check apps/OnlyBundles-app/app/assets/bundle-widget-components.js
 
 ---
 
-## 🗜️ Asset Minification
+## 🎨 CSS Asset Build
 
-Always edit raw source CSS files, then run minifier:
+Always edit raw source CSS files, then assemble the deployable extension assets:
 
 Raw sources:
 - `apps/OnlyBundles-app/app/assets/widgets/full-page-css/bundle-widget-full-page.css`
 - `apps/OnlyBundles-app/app/assets/widgets/product-page-css/bundle-widget.css`
 
-Minified output (deploy target):
+Generated output (deploy target):
 - `apps/OnlyBundles-app/extensions/bundle-builder/assets/bundle-widget-full-page.css`
 - `apps/OnlyBundles-app/extensions/bundle-builder/assets/bundle-widget.css`
 
 | Change type | Command |
 |---|---|
 | JS bundle changes | `npm run build:widgets` |
-| CSS-only changes | `npm run minify:assets css` |
-| Both CSS and JS | `npm run build:widgets && npm run minify:assets css` |
-| All assets | `npm run minify:assets` |
+| CSS-only changes | `npm run build:css` |
+| Both CSS and JS | `npm run build:widgets && npm run build:css` |
 
-Script exits non-zero if any CSS file exceeds Shopify's **100,000 B** app-block asset limit.
+Shopify's CDN minifies valid CSS at delivery time. The repository build only
+resolves local CSS imports into readable theme-extension assets.
 
 ---
 
@@ -373,7 +373,7 @@ Increment `WIDGET_VERSION` in `apps/OnlyBundles-app/scripts/build-storefront.mjs
 **Steps before every widget deploy:**
 1. Increment `WIDGET_VERSION`
 2. `npm run build:widgets`
-3. `npm run minify:assets css`
+3. `npm run build:css`
 4. Commit source + bundled files
 5. Run `npm run deploy:prod` or `npm run deploy:sit`
 6. Wait 2–10 min for Shopify CDN cache propagation

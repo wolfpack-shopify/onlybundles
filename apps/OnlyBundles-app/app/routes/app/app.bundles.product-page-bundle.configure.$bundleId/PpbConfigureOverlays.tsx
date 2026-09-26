@@ -31,6 +31,7 @@ export function PpbConfigureOverlays({ flow }: { flow: PpbConfigureFlow }) {
       <PpbSelectTemplateDialog
         closeSelectTemplateDialog={flow.closeSelectTemplateDialog}
         handleTemplateNext={flow.handleTemplateNext}
+        handleTemplateSyncRequired={flow.handleTemplateSyncRequired}
         handleTemplatePreview={flow.handleTemplatePreview}
         isPreviewBundleLoading={flow.isPreviewBundleLoading}
         isSelectTemplateModalOpen={flow.isSelectTemplateModalOpen}
@@ -42,6 +43,7 @@ export function PpbConfigureOverlays({ flow }: { flow: PpbConfigureFlow }) {
         templateFetcher={flow.templateFetcher}
         templateModalStep={flow.templateModalStep}
         templateSaveError={flow.templateSaveError}
+        templateSyncRequired={flow.templateSyncRequired}
         themeEditorUrl={flow.themeEditorUrl}
         isFreePlan={flow.isFreePlan}
       />

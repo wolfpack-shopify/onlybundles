@@ -50,6 +50,10 @@ class FakeElement {
     this.children.push(child);
   }
 
+  append(...children: FakeElement[]) {
+    children.forEach(child => this.appendChild(child));
+  }
+
   addEventListener(eventName: string, listener: (event: any) => void) {
     this.listeners[eventName] = this.listeners[eventName] || [];
     this.listeners[eventName].push(listener);
@@ -101,7 +105,8 @@ class FakeElement {
 
   matches(selector: string): boolean {
     if (selector.startsWith('.')) {
-      return this.classList.contains(selector.slice(1));
+      const className = selector.slice(1);
+      return this.classList.contains(className) || this.className.split(/\s+/).includes(className);
     }
 
     const dataProductId = selector.match(/^\[data-product-id="(.+)"\]$/);
@@ -124,6 +129,10 @@ function createSharedProductCard() {
   card.dataset.productId = 'variant-1';
   card.setAttribute('aria-label', 'Open product details (not selected)');
   card.setAttribute('aria-pressed', 'false');
+
+  const title = new FakeElement('div', 'product-title');
+  title.textContent = 'Amber Essence';
+  card.appendChild(title);
 
   const action = new FakeElement('div', 'bw-product-card__action product-card-action');
   const addButton = new FakeElement('button', 'bw-product-card__add-button product-add-btn');
@@ -185,6 +194,9 @@ describe('PPB shared card quantity selector state', () => {
     expect(addButton.removed).toBe(true);
     expect(quantityControls).not.toBeNull();
     expect(quantityDisplay?.textContent).toBe('2');
+    expect(quantityControls?.getAttribute('role')).toBe('group');
+    expect(findButtonByText(action, '−')?.getAttribute('aria-label')).toBe('Decrease quantity Amber Essence');
+    expect(findButtonByText(action, '+')?.getAttribute('aria-label')).toBe('Increase quantity Amber Essence');
     expect(card.classList.contains('bw-product-card--selected')).toBe(true);
     expect(card.attributes.get('aria-pressed')).toBeUndefined();
     expect(card.attributes.get('aria-label')).toBe('Open product details (selected)');
@@ -320,15 +332,25 @@ describe('PPB shared card quantity selector state', () => {
     expect(updates).toEqual([[0, 'variant-1', 2]]);
   });
 
-  it('applies radio swatch changes through the delegated variant update path', () => {
-    const productGrid = new FakeElement('div');
-    (productGrid as any).parentNode = { replaceChild: jest.fn() };
+  it('keeps radio swatch changes in the variant draft before the customer adds it', () => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { JSDOM } = require('jsdom');
+    const dom = new JSDOM('<!doctype html><html><body><div class="modal bw-bs-panel--open"></div></body></html>');
+    const previousDocument = global.document;
+    global.document = dom.window.document;
     const product = {
       id: 'product-1',
       variantId: 'variant-1',
       selectionId: 'variant-1',
+      options: [{ name: 'Color', optionValues: [{ name: 'Navy' }, { name: 'Soft pink' }] }],
       variants: [
-        { id: 'variant-1', title: 'Navy', available: true, price: 10 },
+        {
+          id: 'variant-1',
+          title: 'Navy',
+          available: true,
+          price: 10,
+          selectedOptions: [{ name: 'Color', value: 'Navy' }],
+        },
         {
           id: 'variant-2',
           title: 'Soft pink',
@@ -336,51 +358,41 @@ describe('PPB shared card quantity selector state', () => {
           price: 12,
           quantityAvailable: 4,
           image: { src: 'https://cdn.example/pink.jpg' },
+          selectedOptions: [{ name: 'Color', value: 'Soft pink' }],
         },
       ],
     };
     const renderModalProducts = jest.fn();
-    const updateModalNavigation = jest.fn();
-    const updateModalFooterMessaging = jest.fn();
-    const rerenderedInput = {
-      value: 'variant-2',
-      focus: jest.fn(),
+    const controller: any = {
+      selectedBundle: { steps: [{ categories: [{ variantSelectorMode: 'pill' }] }] },
+      selectedProducts: [{}],
+      activeInpageCategoryIndexes: { 0: 0 },
+      _ppbVariantDrafts: {},
+      normalizeSelectionKey: (value: unknown) => String(value),
+      isInventoryTrackingOnAddToCartEnabled: () => false,
+      _resolveText: (_key: string, fallback: string) => fallback,
+      elements: {
+        modal: dom.window.document.querySelector('.modal'),
+      },
+      renderModalProducts,
     };
 
-    ProductPageModalMethods.attachProductEventHandlers.call({
-      selectedBundle: { steps: [{}] },
-      stepProductData: [[product]],
-      elements: {
-        modal: {
-          querySelectorAll: () => [rerenderedInput],
-        },
-      },
-      findProductBySelectionKey: () => product,
-      getSelectedQuantity: () => 0,
-      renderModalProducts,
-      updateModalNavigation,
-      updateModalFooterMessaging,
-    }, productGrid, 0);
+    try {
+      const selector = ProductPageModalMethods.renderVariantSelector.call(controller, product, 0);
+      const input = selector.querySelector('input[value="Soft pink"]');
+      input.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
 
-    const input = new FakeElement('input', 'ppb-variant-selector-input');
-    input.dataset.baseProductId = 'product-1';
-    (input as any).value = 'variant-2';
-    const changeEvent = { target: input, stopPropagation: jest.fn() };
-    productGrid.listeners.change[0](changeEvent);
-
-    expect(changeEvent.stopPropagation).toHaveBeenCalled();
-    expect(product).toEqual(expect.objectContaining({
-      variantId: 'variant-2',
-      selectionId: 'variant-2',
-      variantTitle: 'Soft pink',
-      price: 12,
-      quantityAvailable: 4,
-      imageUrl: 'https://cdn.example/pink.jpg',
-    }));
-    expect(renderModalProducts).toHaveBeenCalledWith(0);
-    expect(updateModalNavigation).toHaveBeenCalled();
-    expect(updateModalFooterMessaging).toHaveBeenCalled();
-    expect(rerenderedInput.focus).toHaveBeenCalledTimes(1);
+      expect(controller._ppbVariantDrafts[0]['product-1']).toEqual({
+        selectedOptions: [{ name: 'Color', value: 'Soft pink' }],
+      });
+      expect(renderModalProducts).toHaveBeenCalledWith(0);
+      expect(product).toEqual(expect.objectContaining({
+        variantId: 'variant-1',
+        selectionId: 'variant-1',
+      }));
+    } finally {
+      global.document = previousDocument;
+    }
   });
 
   it('keeps PPB product images informational without opening product details', () => {

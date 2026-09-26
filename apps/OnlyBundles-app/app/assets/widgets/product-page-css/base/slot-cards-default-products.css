@@ -131,7 +131,8 @@
   width: 80px;
   height: 80px;
   border-radius: 0;
-  background: var(--bundle-empty-slot-visual-bg, #ff9790);
+  background-color: var(--bundle-empty-slot-visual-bg, #e5e7eb);
+  color: var(--bundle-empty-slot-visual-color, #111111);
   background-size: cover;
   background-repeat: no-repeat;
   background-position: center;

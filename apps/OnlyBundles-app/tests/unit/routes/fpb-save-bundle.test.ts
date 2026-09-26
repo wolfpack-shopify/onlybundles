@@ -393,6 +393,48 @@ describe("FPB handleSaveBundle — no shopifyProductId (skips metafields)", () =
     expect(body.message).toBe("Updated Successfully!");
   });
 
+  it("rejects an incomplete canonical swatch mapping before persistence", async () => {
+    MOCK_ADMIN.graphql.mockResolvedValueOnce({
+      json: async () => ({
+        data: {
+          product: {
+            id: "gid://shopify/Product/777",
+            options: [{
+              name: "Color",
+              optionValues: [
+                { name: "Navy", swatch: { color: "#001f3f", image: null } },
+                { name: "Red", swatch: null },
+              ],
+            }],
+          },
+        },
+      }),
+    });
+    const response = await handleSaveBundle(
+      MOCK_ADMIN,
+      MOCK_SESSION,
+      "bundle-1",
+      makeFormData({
+        stepsData: JSON.stringify(makeStepsData({
+          StepCategory: [{
+            id: "category-1",
+            name: "Shirts",
+            products: [{ id: "gid://shopify/Product/777" }],
+            collections: [],
+            variantSelectorMode: "color_swatch",
+          }],
+        })),
+      }),
+    );
+    const body = await response.json() as any;
+
+    expect(response.status).toBe(400);
+    expect(body.fieldErrors).toEqual([expect.objectContaining({
+      path: "steps.step-1.categories.category-1.variantSelectorMode",
+    })]);
+    expect(getDb().bundle.update).not.toHaveBeenCalled();
+  });
+
   it("persists a valid provider-neutral subscription configuration", async () => {
     const config = makeSubscriptionConfig();
 

@@ -28,8 +28,17 @@ describe("pre-commit critical hook planner", () => {
     expect(plan.lintFiles).not.toContain("prisma.config.ts");
     expect(plan.syntaxFiles).toContain("apps/OnlyBundles-app/app/assets/widgets/full-page/methods/step-footer-methods.js");
     expect(plan.widgetBuildTargets).toEqual(["full-page"]);
-    expect(plan.shouldMinifyCss).toBe(true);
+    expect(plan.shouldBuildCss).toBe(true);
     expect(plan.shouldRunGraphify).toBe(true);
+  });
+
+  it("tracks every CSS asset produced by the storefront CSS build", () => {
+    expect(core.GENERATED_FILES.has(
+      "apps/OnlyBundles-app/extensions/bundle-builder/assets/bundle-widget-bootstrap.css",
+    )).toBe(true);
+    expect(core.GENERATED_FILES.has(
+      "apps/OnlyBundles-app/extensions/bundle-builder/assets/bundle-widget-full-page-responsive.css",
+    )).toBe(true);
   });
 
   it("blocks partially staged checked files", () => {

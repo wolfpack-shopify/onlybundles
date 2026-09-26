@@ -25,6 +25,7 @@ describe('PPB selected-slot content', () => {
     })).toEqual({
       title: 'Obsidian Earrings',
       variantTitle: 'Gold',
+      variantAriaLabel: 'Variant: Gold',
       priceText: '$829.00',
       compareAtPriceText: '$999.00',
     });
@@ -39,6 +40,7 @@ describe('PPB selected-slot content', () => {
     })).toEqual({
       title: 'Obsidian Earrings',
       variantTitle: '',
+      variantAriaLabel: '',
       priceText: '$829.00',
       compareAtPriceText: '',
     });
@@ -59,6 +61,20 @@ describe('PPB selected-slot content', () => {
   it('keeps a long Horizontal title intact for CSS-owned clamping', () => {
     const title = '14k Dangling Obsidian Earrings';
     expect(resolveSelectedSlotTitle(title, false)).toBe(title);
+  });
+
+  it('uses a compact visible summary and dimension names for assistive technology', () => {
+    expect(resolveSelectedSlotContent({
+      title: 'Classic T-shirt',
+      selectedOptions: [
+        { name: 'Color', value: 'Navy' },
+        { name: 'Size', value: 'Large' },
+      ],
+      price: 2500,
+    })).toEqual(expect.objectContaining({
+      variantTitle: 'Navy / Large',
+      variantAriaLabel: 'Color: Navy, Size: Large',
+    }));
   });
 });
 export {};

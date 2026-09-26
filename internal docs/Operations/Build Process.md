@@ -5,7 +5,7 @@ title: Build Process
 type: operations
 status: authoritative
 summary: Global Shopify CLI, Function, asset, lint, and pre-commit requirements for deployable application and storefront builds.
-last_audited: 2026-09-19
+last_audited: 2026-09-24
 owners:
   - engineering
 domains:
@@ -18,7 +18,7 @@ source_paths:
   - apps/OnlyBundles-app/scripts/build-discount-function.mjs
   - apps/OnlyBundles-app/extensions/bundle-cart-transform-rs/Cargo.toml
   - apps/OnlyBundles-app/extensions/bundle-discount-function/shopify.extension.toml
-  - apps/OnlyBundles-app/scripts/minify-assets.js
+  - apps/OnlyBundles-app/scripts/build-css-assets.js
   - apps/OnlyBundles-app/scripts/rebuild-graphify.mjs
   - apps/OnlyBundles-app/scripts/rebuild-graphify-core.cjs
   - .graphifyignore
@@ -34,7 +34,7 @@ tags:
 keywords:
   - global Shopify CLI
   - widget bundles
-  - css minification
+  - css asset build
 ---
 
 # Build Process
@@ -123,7 +123,14 @@ npm run build:widgets:product-page # PDP only
 
 **Both source AND bundled files must be committed.**
 
-`apps/OnlyBundles-app/scripts/build-storefront.mjs` is the only JavaScript asset producer. esbuild follows ESM imports from each entry and emits minified IIFEs; `apps/OnlyBundles-app/scripts/minify-assets.js` owns CSS only. Widget controllers and method modules import shared primitives directly from `apps/OnlyBundles-app/app/assets/widgets/shared/`; do not introduce compatibility barrels or rely on browser globals to satisfy module dependencies. Do not add manual module arrays, import stripping, source concatenation, or a second JS minification pass.
+`apps/OnlyBundles-app/scripts/build-storefront.mjs` is the only JavaScript asset producer. esbuild follows ESM imports from each entry and emits minified ES2020 IIFEs. `apps/OnlyBundles-app/scripts/build-css-assets.js` resolves local CSS imports into readable theme-extension assets without minifying them. Widget controllers and method modules import shared primitives directly from `apps/OnlyBundles-app/app/assets/widgets/shared/`; do not introduce compatibility barrels or rely on browser globals to satisfy module dependencies. Do not add manual module arrays, import stripping, source concatenation, or a second JavaScript minification pass.
+
+Keep the existing JavaScript minification in the esbuild bundle. Shopify only
+guarantees automatic JavaScript minification for valid ES5 syntax, while these
+deployable bundles target ES2020 and the same build step already owns bundling
+and tree-shaking. The [Theme Store rule against submitting minified first-party
+theme assets](https://shopify.dev/docs/storefronts/themes/store/requirements)
+applies to themes, not to this theme app extension.
 
 Keep split source modules semantically named by responsibility. Mechanical split names such as `chunk-01.js` or `part-01.css` are not acceptable long-term source structure.
 
@@ -217,26 +224,33 @@ size controls are the release profile, narrow GraphQL input, compact signed
 authorization fields, and avoiding heavyweight collections when bounded
 Function inputs already have stable cart-line indices or small lists.
 
-## CSS Size Limit
+## CSS Asset Build
 
-Shopify enforces **100,000 B** on app block CSS assets.
+[Shopify's platform](https://shopify.dev/docs/storefronts/themes/best-practices/performance/platform)
+automatically minifies valid CSS when serving storefront assets and serves the
+original only when minification would make it larger. [Theme app extension
+guidance](https://shopify.dev/docs/apps/build/online-store/theme-app-extensions/configuration)
+suggests keeping schema-referenced CSS under 100 KB compressed; this is not a
+100,000-byte raw-file enforcement rule. The largest current readable generated
+assets are about 19 KB gzip.
+
+Run the import-only build after changing storefront CSS:
 
 ```bash
-wc -c apps/OnlyBundles-app/extensions/bundle-builder/assets/*.css
+npm run build:css
 ```
 
-Do not fix an oversized file by making source CSS unreadable. Reduce the base asset by deleting unused/conflicting selectors and moving template-specific CSS into separately generated extension assets. Current split assets:
+Keep source and generated CSS readable. Reduce an oversized asset by deleting
+unused/conflicting selectors or moving template-specific CSS into separately
+generated extension assets along real ownership boundaries. Current split assets:
 
 | Base asset | Template assets |
 |---|---|
 | `bundle-widget-full-page.css` | `bundle-widget-full-page-standard.css`, `bundle-widget-full-page-classic.css`, `bundle-widget-full-page-compact.css`, `bundle-widget-full-page-horizontal.css` |
 | `bundle-widget.css` | `bundle-widget-product-page-cascade.css`, `bundle-widget-product-page-cognive.css`, `bundle-widget-product-page-modal.css` |
 
-`apps/OnlyBundles-app/scripts/minify-assets.js` validates every generated CSS asset against Shopify's limit.
-
-### Selector minification gotcha
-
-Do not write a descendant selector as `.parent :is(.child-a, .child-b)` in storefront source CSS. The current minifier can remove the descendant combinator and emit `.parent:is(...)`, which changes the selector to target one element matching both sides. Use explicit descendant selectors, or a combinator such as `.parent > :is(...)` when direct-child semantics are correct. Compound selectors such as `.parent:is(.variant-a, .variant-b)` are safe when they intentionally target the same element.
+The builder does not transform selectors, whitespace, or comments. Shopify owns
+delivery minification through its CDN.
 
 ## Linting
 

@@ -32,6 +32,7 @@ export function usePpbTemplateUiState({ bundle }: { bundle: any }) {
   const [templateSaveError, setTemplateSaveError] = useState<string | null>(
     null
   );
+  const [templateSyncRequired, setTemplateSyncRequired] = useState(false);
   const lastTemplateRequestRef = useRef<{
     template: string | null;
     presetId: string | null;
@@ -75,6 +76,8 @@ export function usePpbTemplateUiState({ bundle }: { bundle: any }) {
     selectTemplateOpenButtonRef,
     templateSaveError,
     setTemplateSaveError,
+    templateSyncRequired,
+    setTemplateSyncRequired,
     lastTemplateRequestRef,
     lastTemplateResponseRef,
     templateSubmissionStartedRef,

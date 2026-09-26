@@ -232,3 +232,66 @@ describe('shared product card reading order', () => {
     expect(priceRegion!.compareDocumentPosition(actionRegion!) & follows).toBe(follows);
   });
 });
+
+describe('shared product card variant row', () => {
+  const renderVariantCard = (quantity: number, variantTitle?: string) => {
+    const document = new JSDOM('<!doctype html>').window.document;
+    return createSharedProductCardElement(
+      {
+        selectionId: 'variant-navy',
+        parentProductId: 'product-shirt',
+        parentTitle: 'Everyday T-Shirt',
+        title: variantTitle ? `Everyday T-Shirt - ${variantTitle}` : 'Everyday T-Shirt',
+        variantTitle,
+        price: 3000,
+        currencyCode: 'USD',
+      },
+      quantity,
+      { display: { code: 'USD' } },
+      { document, addButtonText: 'Add' },
+    );
+  };
+
+  it.each([0, 1])('renders one meaningful variant row when quantity is %i', (quantity) => {
+    const card = renderVariantCard(quantity, 'Navy / Large');
+    const variantRows = card.querySelectorAll('[data-bw-card-variant-row="true"]');
+
+    expect(variantRows).toHaveLength(1);
+    expect(variantRows[0].textContent).toBe('Navy / Large');
+    expect(card.textContent).toContain('Everyday T-Shirt');
+  });
+
+  it('renders selected option values visibly and exposes their dimension names accessibly', () => {
+    const document = new JSDOM('<!doctype html>').window.document;
+    const card = createSharedProductCardElement(
+      {
+        selectionId: 'variant-navy-large',
+        parentProductId: 'product-shirt',
+        parentTitle: 'Everyday T-Shirt',
+        title: 'Everyday T-Shirt',
+        selectedOptions: [
+          { name: 'Color', value: 'Navy' },
+          { name: 'Size', value: 'Large' },
+        ],
+        price: 3000,
+        currencyCode: 'USD',
+      },
+      0,
+      { display: { code: 'USD' } },
+      { document, addButtonText: 'Add' },
+    );
+    const row = card.querySelector('[data-bw-card-variant-row="true"]');
+
+    expect(row?.textContent).toBe('Navy / Large');
+    expect(row?.getAttribute('aria-label')).toBe('Color: Navy, Size: Large');
+  });
+
+  it.each([undefined, '', 'Default Title'])(
+    'renders no variant row for %p variant metadata',
+    (variantTitle) => {
+      const card = renderVariantCard(0, variantTitle);
+
+      expect(card.querySelector('[data-bw-card-variant-row="true"]')).toBeNull();
+    },
+  );
+});

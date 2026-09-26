@@ -474,33 +474,7 @@
   user-select: none;
 }
 
-@media (max-width: 749px) {
-  #bundle-builder-app
-    .bw-ppb-cascade-product-list {
-    --bw-ppb-cascade-product-action-width: 90px;
-  }
-
-  #bundle-builder-app
-    .bw-ppb-cascade-product-row
-    .product-add-btn,
-  #bundle-builder-app
-    .bw-ppb-cascade-product-row
-    .bw-quantity-control__value {
-    font-size: 12px;
-  }
-
-  #bundle-builder-app
-    .bw-ppb-cascade-product-row
-    .product-add-btn {
-    line-height: normal;
-  }
-
-  #bundle-builder-app
-    .bw-ppb-cascade-product-row
-    .bw-quantity-control__value {
-    line-height: 21.6px;
-  }
-
+@media (max-width: 767px) {
   #bundle-builder-app
   .bw-ppb-cascade-footer {
     position: sticky;

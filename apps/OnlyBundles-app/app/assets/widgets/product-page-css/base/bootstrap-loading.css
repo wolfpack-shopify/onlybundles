@@ -1,0 +1,26 @@
+.bundle-widget-container[data-bundle-type="product_page"] {
+  position: relative;
+}
+
+.bundle-widget-container[data-bundle-type="product_page"] .bundle-loading-overlay {
+  position: absolute;
+  inset: 0;
+  inline-size: 100%;
+  block-size: 100%;
+  min-inline-size: var(--bundle-ppb-loading-overlay-min-width, 180px);
+  min-block-size: var(--bundle-ppb-loading-overlay-min-height, 180px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100000;
+  background: var(--wpb-loading-screen-bg, #ffffff);
+}
+
+#bundle-builder-app[data-bundle-type="product_page"][data-wpb-bootstrap-loading="true"] {
+  min-block-size: var(--bundle-ppb-loading-overlay-min-height, 180px);
+}
+
+#bundle-builder-app[data-bundle-type="product_page"][data-wpb-bootstrap-loading="true"]
+  > :not(.bundle-loading-overlay) {
+  visibility: hidden;
+}

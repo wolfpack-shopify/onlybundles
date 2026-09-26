@@ -91,9 +91,10 @@ describe("Template Modal Entitlement Redirection", () => {
       expect(submit).not.toHaveBeenCalled();
     });
 
-    it("submits template fetcher normally when next is clicked on the standard template on Free plan", () => {
+    it("advances without submitting when the selected template is already saved", () => {
       const setIsSelectTemplateModalOpen = jest.fn();
       const setEntitlementFailure = jest.fn();
+      const setTemplateModalStep = jest.fn();
       const submit = jest.fn();
 
       const controller = usePpbModalAndTemplateController({
@@ -104,6 +105,7 @@ describe("Template Modal Entitlement Redirection", () => {
           shopify: {} as any,
           setEntitlementFailure,
           isFreePlan: true,
+          appEmbedEnabled: true,
         } as any,
         display: {
           discountVariablesModalRef: { current: null },
@@ -123,8 +125,9 @@ describe("Template Modal Entitlement Redirection", () => {
           setIsSyncModalOpen: jest.fn(),
           setPendingDesignPresetId: jest.fn(),
           setPendingDesignTemplate: jest.fn(),
-          setTemplateModalStep: jest.fn(),
+          setTemplateModalStep,
           setTemplateSaveError: jest.fn(),
+          setTemplateSyncRequired: jest.fn(),
           templateFetcher: { submit } as any,
           templateSubmissionStartedRef: { current: false },
         } as any,
@@ -140,7 +143,8 @@ describe("Template Modal Entitlement Redirection", () => {
 
       expect(setIsSelectTemplateModalOpen).not.toHaveBeenCalledWith(false);
       expect(setEntitlementFailure).not.toHaveBeenCalled();
-      expect(submit).toHaveBeenCalled();
+      expect(submit).not.toHaveBeenCalled();
+      expect(setTemplateModalStep).toHaveBeenCalledWith("confirm");
     });
   });
 
@@ -166,6 +170,7 @@ describe("Template Modal Entitlement Redirection", () => {
         setIsPreparingPlacementTemplates: jest.fn(),
         setTemplateModalStep: jest.fn(),
         setTemplateSaveError,
+        setTemplateSyncRequired: jest.fn(),
         setIsSelectTemplateModalOpen,
         templateFetcher: {
           state: "idle",
@@ -207,6 +212,62 @@ describe("Template Modal Entitlement Redirection", () => {
       );
       expect(setTemplateSaveError).toHaveBeenCalledWith(null);
     });
+
+    it("retains the saved selection and exposes Sync Bundle recovery for a missing snapshot", () => {
+      const setBundleDesignPresetId = jest.fn();
+      const setBundleDesignTemplate = jest.fn();
+      const setTemplateSaveError = jest.fn();
+      const setTemplateSyncRequired = jest.fn();
+      const templateState = {
+        lastTemplateRequestRef: {
+          current: { template: "PDP_INPAGE", presetId: "GRID" },
+        },
+        lastTemplateResponseRef: { current: null },
+        pendingPlacementModalRef: { current: false },
+        setBundleDesignPresetId,
+        setBundleDesignTemplate,
+        setIsPreparingPlacementTemplates: jest.fn(),
+        setTemplateModalStep: jest.fn(),
+        setTemplateSaveError,
+        setTemplateSyncRequired,
+        setIsSelectTemplateModalOpen: jest.fn(),
+        templateFetcher: {
+          state: "idle",
+          data: {
+            success: false,
+            error: "The storefront copy needs to be synchronized.",
+            syncRequired: true,
+            templatePersisted: true,
+          },
+        } as any,
+        templateSubmissionStartedRef: { current: true },
+      };
+
+      usePpbFetcherEffects({
+        base: {
+          appEmbedEnabled: true,
+          fetcher: { data: null, state: "idle" } as any,
+          lastProcessedFetcherDataRef: { current: null },
+          setEntitlementFailure: jest.fn(),
+          setOperationAlert: jest.fn(),
+          shopify: { toast: { show: jest.fn() } } as any,
+        } as any,
+        templateState,
+        visibility: {} as any,
+        settings: {} as any,
+        sharedHandlers: {} as any,
+        saveHandlers: {} as any,
+      });
+
+      for (const cb of effectCallbacks) cb();
+
+      expect(setBundleDesignTemplate).toHaveBeenCalledWith("PDP_INPAGE");
+      expect(setBundleDesignPresetId).toHaveBeenCalledWith("GRID");
+      expect(setTemplateSaveError).toHaveBeenCalledWith(
+        "The storefront copy needs to be synchronized.",
+      );
+      expect(setTemplateSyncRequired).toHaveBeenCalledWith(true);
+    });
   });
 
   describe("FPB handleTemplateNext Client Guard & Server Response Guard", () => {
@@ -245,6 +306,7 @@ describe("Template Modal Entitlement Redirection", () => {
         setPendingDesignTemplate: jest.fn(),
         setTemplateModalStep: jest.fn(),
         setTemplateSaveError,
+        setTemplateSyncRequired: jest.fn(),
         setEntitlementFailure,
         isFreePlan: true,
         stepsState: { steps: [] } as any,
@@ -304,10 +366,12 @@ describe("Template Modal Entitlement Redirection", () => {
         setBundleDesignPresetId: jest.fn(),
         setBundleDesignTemplate: jest.fn(),
         setIsSelectTemplateModalOpen,
+        setIsSyncModalOpen: jest.fn(),
         setPendingDesignPresetId: jest.fn(),
         setPendingDesignTemplate: jest.fn(),
         setTemplateModalStep: jest.fn(),
         setTemplateSaveError,
+        setTemplateSyncRequired: jest.fn(),
         setEntitlementFailure,
         isFreePlan: true,
         stepsState: { steps: [] } as any,

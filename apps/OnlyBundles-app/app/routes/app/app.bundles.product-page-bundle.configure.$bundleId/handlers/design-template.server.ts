@@ -3,15 +3,14 @@ import type { Session } from "@shopify/shopify-api";
 import type { ShopifyAdmin } from "../../../../shopify.server";
 import db from "../../../../db.server";
 import { parseBundleDesignTemplate } from "./parsers";
-import { updateSyncMetafields } from "./runtime-config.server";
-import { BundleStatus } from "../../../../constants/bundle";
 import { resolveShopEntitlements } from "../../../../services/subscriptions/subscription-service.server";
-import { shopUsesAdvancedDesign } from "../../../../services/subscriptions/design-entitlement-state.server";
+import { assertTemplateSelectionAllowed } from "../../../../services/subscriptions/bundle-entitlement-gate.server";
+import { EntitlementDeniedError, isFreeTemplate } from "../../../../lib/subscriptions/entitlements";
 import {
-  assertTemplateSelectionAllowed,
-  updateBundleWithPublicationGate,
-} from "../../../../services/subscriptions/bundle-entitlement-gate.server";
-import { EntitlementDeniedError } from "../../../../lib/subscriptions/entitlements";
+  BundleTemplateSnapshotConflictError,
+  BundleTemplateSnapshotUnavailableError,
+  syncBundleTemplateSnapshot,
+} from "../../../../services/bundles/metafield-sync/operations/bundle-template.server";
 
 export async function handleUpdateBundleDesignTemplate(
   _admin: ShopifyAdmin,
@@ -22,74 +21,83 @@ export async function handleUpdateBundleDesignTemplate(
   const { bundleDesignTemplate, bundleDesignPresetId } =
     parseBundleDesignTemplate(formData);
 
-  const entitlementContext = await resolveShopEntitlements({
-    shopDomain: session.shop,
-    forceRefresh: true,
-  });
-
-  try {
-    assertTemplateSelectionAllowed({
-      bundleType: "PRODUCT_PAGE",
-      designTemplate: bundleDesignTemplate,
-      designPresetId: bundleDesignPresetId,
-      entitlements: entitlementContext?.entitlements ?? null,
-    });
-  } catch (error) {
-    if (error instanceof EntitlementDeniedError) {
-      return json(
-        {
-          success: false,
-          error: "The selected template requires the Growth plan.",
-          entitlementFailure: error.toJSON(),
-        },
-        { status: 403 },
-      );
-    }
-    throw error;
-  }
-
   const currentBundle = await db.bundle.findUnique({
     where: { id: bundleId, shopId: session.shop },
-    include: { steps: true },
+    select: {
+      bundleDesignTemplate: true,
+      bundleDesignPresetId: true,
+      shopifyProductId: true,
+    },
   });
-  if (!currentBundle) return json({ success: false, error: "Bundle not found" }, { status: 404 });
-  const publicBundle = currentBundle.status === BundleStatus.ACTIVE
-    || currentBundle.status === BundleStatus.UNLISTED;
+  if (!currentBundle) {
+    return json({ success: false, error: "Bundle not found" }, { status: 404 });
+  }
 
-  const updatedBundle = await updateBundleWithPublicationGate<any>({
-    database: db,
-    shopDomain: session.shop,
-    bundleId,
-    candidate: {
+  const selectionChanged =
+    currentBundle.bundleDesignTemplate !== bundleDesignTemplate
+    || currentBundle.bundleDesignPresetId !== bundleDesignPresetId;
+
+  if (selectionChanged) {
+    const freeTemplate = isFreeTemplate({
       bundleType: "PRODUCT_PAGE",
-      status: currentBundle.status.toUpperCase() as "ACTIVE" | "UNLISTED" | "DRAFT" | "ARCHIVED",
-      enabledStepCount: currentBundle.steps.filter((step) => step.enabled).length,
       designTemplate: bundleDesignTemplate,
       designPresetId: bundleDesignPresetId,
-      usesAdvancedDesign: entitlementContext ? await shopUsesAdvancedDesign(session.shop) : false,
-      usesBundleSubscriptions: Boolean(currentBundle.bundleSubscriptionConfig),
-      usesCustomCode: false,
-    },
-    entitlements: entitlementContext?.entitlements ?? null,
-    data: { bundleDesignTemplate, bundleDesignPresetId },
-    include: {
-      steps: {
-        include: {
-          StepProduct: { orderBy: { position: "asc" } },
-          StepCategory: { orderBy: { sortOrder: "asc" } },
-        },
-        orderBy: { position: "asc" },
-      },
-      pricing: true,
-    },
-  });
+    });
+    const entitlementContext = freeTemplate
+      ? null
+      : await resolveShopEntitlements({ shopDomain: session.shop });
 
-  if (updatedBundle.shopifyProductId) {
-    await updateSyncMetafields(
-      _admin,
-      updatedBundle.shopifyProductId,
-      updatedBundle,
-    );
+    try {
+      assertTemplateSelectionAllowed({
+        bundleType: "PRODUCT_PAGE",
+        designTemplate: bundleDesignTemplate,
+        designPresetId: bundleDesignPresetId,
+        entitlements: entitlementContext?.entitlements ?? null,
+      });
+    } catch (error) {
+      if (error instanceof EntitlementDeniedError) {
+        return json(
+          {
+            success: false,
+            error: "The selected template requires the Growth plan.",
+            entitlementFailure: error.toJSON(),
+          },
+          { status: 403 },
+        );
+      }
+      throw error;
+    }
+
+    await db.bundle.update({
+      where: { id: bundleId, shopId: session.shop },
+      data: { bundleDesignTemplate, bundleDesignPresetId },
+    });
+  }
+
+  if (currentBundle.shopifyProductId) {
+    try {
+      await syncBundleTemplateSnapshot({
+        admin: _admin,
+        bundleProductId: currentBundle.shopifyProductId,
+        bundleId,
+        bundleType: "product_page",
+        bundleDesignTemplate,
+        bundleDesignPresetId,
+      });
+    } catch (error) {
+      if (error instanceof BundleTemplateSnapshotUnavailableError) {
+        return json({
+          success: false,
+          error: error.message,
+          syncRequired: true,
+          templatePersisted: true,
+        }, { status: 409 });
+      }
+      if (error instanceof BundleTemplateSnapshotConflictError) {
+        return json({ success: false, error: error.message }, { status: 409 });
+      }
+      throw error;
+    }
   }
 
   return json({ success: true });

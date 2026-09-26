@@ -20,11 +20,21 @@ getVariantAvailable(stepIndex: string|number, variantId: any) {
   if (!product) {
     return { available: null, outOfStock: false, acceptsBackorder: false };
   }
-  if (product.available === false) {
+  const normalizedVariantId = this.normalizeSelectionKey(variantId);
+  const matchedVariant = Array.isArray(product.variants)
+    ? product.variants.find((variant: any) => (
+        this.normalizeSelectionKey(variant?.selectionId || variant?.id || '')
+        === normalizedVariantId
+      ))
+    : null;
+  const inventoryOwner = matchedVariant || product;
+  if (inventoryOwner.available === false) {
     return { available: 0, outOfStock: true, acceptsBackorder: false };
   }
-  const qty = typeof product.quantityAvailable === 'number' ? product.quantityAvailable : null;
-  const backorder = product.currentlyNotInStock === true;
+  const qty = typeof inventoryOwner.quantityAvailable === 'number'
+    ? inventoryOwner.quantityAvailable
+    : null;
+  const backorder = inventoryOwner.currentlyNotInStock === true;
   const trackInventoryOnAddToCart = typeof this.isInventoryTrackingOnAddToCartEnabled === 'function'
     ? this.isInventoryTrackingOnAddToCartEnabled()
     : ProductPageSelectionDataMethods.isInventoryTrackingOnAddToCartEnabled.call(this);
@@ -44,7 +54,7 @@ findProductBySelectionKey(products: any[], selectionKey: any) {
   return products.find((product: any) => (
     String(product?.selectionId || '') === normalized
     || (Array.isArray(product?.variants) && product.variants.some((variant: any)  => (
-      this.normalizeSelectionKey(variant?.selectionId || '') === normalized
+      this.normalizeSelectionKey(variant?.selectionId || variant?.id || '') === normalized
     )))
   )) || null;
 },
@@ -226,7 +236,7 @@ getDiscountInfoWithSelectedAddonDiscount(discountInfo: any, totalPrice: number) 
 },
 
   getAllSelectedProductsData() {
-    const allProducts: { stepIndex: any; variantId: string; selectionId: string; quantity: unknown; title: any; parentTitle: any; variantTitle: any; imageUrl: any; image: any; price: any; productId: any; isDefault: any; isFreeGift: any; addonDisplayFree: boolean; }[] = [];
+    const allProducts: { stepIndex: any; variantId: string; selectionId: string; quantity: unknown; title: any; parentTitle: any; variantTitle: any; selectedOptions: any[]; imageUrl: any; image: any; price: any; productId: any; isDefault: any; isFreeGift: any; addonDisplayFree: boolean; }[] = [];
 
   this.selectedBundle.steps.forEach((step: any, stepIndex: string|number) => {
     const stepSelections = this.selectedProducts[stepIndex] || {};
@@ -242,7 +252,7 @@ getDiscountInfoWithSelectedAddonDiscount(discountInfo: any, totalPrice: number) 
 
         const matchedVariant = Array.isArray(product.variants)
           ? product.variants.find((candidateVariant: any) => (
-              this.normalizeSelectionKey(candidateVariant?.selectionId || '')
+              this.normalizeSelectionKey(candidateVariant?.selectionId || candidateVariant?.id || '')
               === normalizedVariantId
             ))
           : null;
@@ -270,6 +280,9 @@ getDiscountInfoWithSelectedAddonDiscount(discountInfo: any, totalPrice: number) 
               : (product.title || 'Untitled Product'),
             parentTitle: product.parentTitle || product.title || 'Untitled Product',
             variantTitle,
+            selectedOptions: Array.isArray(variantData.selectedOptions)
+              ? variantData.selectedOptions.map((option: any) => ({ ...option }))
+              : [],
             imageUrl,
             image: imageUrl,
             price,
@@ -287,8 +300,7 @@ getDiscountInfoWithSelectedAddonDiscount(discountInfo: any, totalPrice: number) 
 },
 
 // Expand products with multiple variants into separate product entries
-// Each variant becomes its own card showing "Product Title - Variant Name"
-// This matches the full-page widget behavior for consistent UX
+// Each configured variant becomes its own exact-selection card.
 expandProductsByVariant(products: any[]) {
   return products.flatMap((product: any)  => {
     // If product already has a parentProductId, it was already expanded
@@ -296,27 +308,35 @@ expandProductsByVariant(products: any[]) {
       return [product];
     }
 
-    // If product has multiple variants, expand into separate cards
-    if (product.variants && product.variants.length > 1) {
+    if (Array.isArray(product.variants) && product.variants.length > 0) {
       return product.variants
-        .filter((variant: any)  => variant.available !== false) // Only show available variants
         .map((variant: any)  => {
           // Use variant image if available, fallback to product image
           const imageUrl = variant.image?.src || variant.image || product.imageUrl || BUNDLE_WIDGET.PLACEHOLDER_IMAGE;
 
+          const selectionId = variant.selectionId || variant.id;
+          const variantTitle = variant.title === 'Default Title' ? '' : variant.title;
           return {
             ...product,
             id: variant.id,
-            title: variant.title === 'Default Title' ? product.title : `${product.title} - ${variant.title}`,
-            variantTitle: variant.title === 'Default Title' ? '' : variant.title,
+            title: product.parentTitle || product.title,
+            variantTitle,
+            selectedOptions: Array.isArray(variant.selectedOptions)
+              ? variant.selectedOptions.map((option: any) => ({ ...option }))
+              : [],
             imageUrl,
             price: typeof variant.price === 'number' ? variant.price : (parseFloat(variant.price || '0') * 100),
             compareAtPrice: variant.compareAtPrice ? (typeof variant.compareAtPrice === 'number' ? variant.compareAtPrice : parseFloat(variant.compareAtPrice) * 100) : null,
-            variantId: variant.selectionId,
-            selectionId: variant.selectionId,
+            quantityAvailable: typeof variant.quantityAvailable === 'number'
+              ? variant.quantityAvailable
+              : null,
+            currentlyNotInStock: variant.currentlyNotInStock === true,
+            variantId: selectionId,
+            selectionId,
             available: variant.available !== false,
-            parentProductId: product.id,
-            parentTitle: product.title,
+            baseProductId: product.id || product.productId,
+            parentProductId: product.productId || product.id,
+            parentTitle: product.parentTitle || product.title,
             // Remove variants array from individual cards to prevent showing variant selector
             variants: null
           };

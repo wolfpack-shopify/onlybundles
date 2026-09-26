@@ -12,6 +12,7 @@ export type PpbSelectTemplateDialogProps = Pick<
   PpbConfigureFlow,
   | "closeSelectTemplateDialog"
   | "handleTemplateNext"
+  | "handleTemplateSyncRequired"
   | "handleTemplatePreview"
   | "isPreviewBundleLoading"
   | "isSelectTemplateModalOpen"
@@ -23,6 +24,7 @@ export type PpbSelectTemplateDialogProps = Pick<
   | "templateFetcher"
   | "templateModalStep"
   | "templateSaveError"
+  | "templateSyncRequired"
   | "themeEditorUrl"
 > & {
   isFreePlan?: boolean;
@@ -31,6 +33,7 @@ export type PpbSelectTemplateDialogProps = Pick<
 export function PpbSelectTemplateDialog({
   closeSelectTemplateDialog,
   handleTemplateNext,
+  handleTemplateSyncRequired,
   handleTemplatePreview,
   isPreviewBundleLoading,
   isSelectTemplateModalOpen,
@@ -42,6 +45,7 @@ export function PpbSelectTemplateDialog({
   templateFetcher,
   templateModalStep,
   templateSaveError,
+  templateSyncRequired,
   themeEditorUrl,
   isFreePlan,
 }: PpbSelectTemplateDialogProps) {
@@ -105,7 +109,18 @@ export function PpbSelectTemplateDialog({
                         )}
                         tone="critical"
                       >
-                        {templateSaveError}
+                        <s-stack direction="block" gap="small">
+                          <s-text>{templateSaveError}</s-text>
+                          {templateSyncRequired ? (
+                            <s-button
+                              variant="secondary"
+                              icon="refresh"
+                              onClick={handleTemplateSyncRequired}
+                            >
+                              {translateAdmin("adminAttributes.syncBundle")}
+                            </s-button>
+                          ) : null}
+                        </s-stack>
                       </s-banner>
                     </s-box>
                   ) : null}
@@ -151,7 +166,7 @@ export function PpbSelectTemplateDialog({
                               src={templateOption.image}
                               alt={templateOption.label}
                               aspectRatio="4/3"
-                              objectFit="cover"
+                              objectFit="contain"
                             />
                           </span>
                           <span
@@ -355,7 +370,18 @@ export function PpbSelectTemplateDialog({
                         )}
                         tone="critical"
                       >
-                        {templateSaveError}
+                        <s-stack direction="block" gap="small">
+                          <s-text>{templateSaveError}</s-text>
+                          {templateSyncRequired ? (
+                            <s-button
+                              variant="secondary"
+                              icon="refresh"
+                              onClick={handleTemplateSyncRequired}
+                            >
+                              {translateAdmin("adminAttributes.syncBundle")}
+                            </s-button>
+                          ) : null}
+                        </s-stack>
                       </s-banner>
                     </s-box>
                   ) : null}

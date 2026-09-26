@@ -22,12 +22,6 @@
   gap: 28px;
 }
 
-html:has([data-fpb-design-preset]),
-body:has([data-fpb-design-preset]) {
-  overflow-x: clip;
-  background: #f1f1f1;
-}
-
 [data-fpb-design-preset] {
   background: #f1f1f1;
 }
@@ -380,111 +374,6 @@ body:has([data-fpb-design-preset]) {
   border-radius: 5px;
 }
 
-@container fpb-shell (max-width: 799px) {
-  .vs-mobile-drawer--standard {
-    position: fixed;
-    inset: 0;
-    z-index: 9999;
-    display: grid;
-    align-items: end;
-    background: rgba(0, 0, 0, 0.5);
-    color: #000;
-    font-family: inherit;
-  }
-
-  .vs-mobile-drawer--standard .vs-mobile-drawer-sheet {
-    position: relative;
-    width: 100%;
-    max-height: 80vh;
-    overflow: visible;
-    background: #fff;
-    border: thin solid #b0adad;
-    border-radius: 20px 20px 0 0;
-  }
-
-  .vs-mobile-drawer--standard .vs-mobile-drawer-header {
-    display: grid;
-    grid-template-columns: 116px minmax(0, 1fr);
-    gap: 10px;
-    padding: 10px;
-    background: #fff;
-    border-radius: 20px 20px 0 0;
-  }
-
-  .vs-mobile-drawer--standard .vs-mobile-drawer-product-image {
-    width: 116px;
-    height: 116px;
-    object-fit: cover;
-  }
-
-  .vs-mobile-drawer--standard .vs-mobile-drawer-product-info {
-    align-self: center;
-    min-width: 0;
-  }
-
-  .vs-mobile-drawer--standard .vs-mobile-drawer-product-title,
-  .vs-mobile-drawer--standard .vs-mobile-drawer-product-price {
-    margin: 0;
-    color: #000;
-    font-size: 18px;
-    font-weight: 700;
-    line-height: 28.8px;
-  }
-
-  .vs-mobile-drawer--standard .vs-mobile-drawer-body {
-    padding: 10px;
-    background: #fff;
-  }
-
-  .vs-mobile-drawer--standard .vs-mobile-drawer-title {
-    color: #000;
-    font-size: 20px;
-    font-weight: 400;
-    line-height: 36px;
-  }
-
-  .vs-mobile-drawer--standard .vs-mobile-options {
-    display: grid;
-    max-height: calc(80vh - 196px);
-    overflow-y: auto;
-  }
-
-  .vs-mobile-drawer--standard .vs-mobile-option {
-    display: grid;
-    grid-template-columns: 50px minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 8px;
-    min-height: 55px;
-    padding: 5px;
-    background: transparent;
-    border: 0;
-    color: #000;
-    font: inherit;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .vs-mobile-drawer--standard .vs-mobile-option[aria-disabled="true"] {
-    opacity: 0.45;
-    cursor: default;
-  }
-
-  .vs-mobile-drawer--standard .vs-mobile-option-image {
-    width: 50px;
-    height: 45px;
-    object-fit: cover;
-  }
-
-  .vs-mobile-drawer--standard .vs-mobile-option-label,
-  .vs-mobile-drawer--standard .vs-mobile-option-price {
-    margin: 0;
-    color: #000;
-    font-size: 16px;
-    font-weight: 400;
-    line-height: 28.8px;
-  }
-}
-
 .layout-sidebar[data-fpb-design-preset="STANDARD"]
   .sidebar-content
   .fpb-addon-discount-badge {
@@ -705,7 +594,7 @@ body:has([data-fpb-design-preset]) {
   .layout-sidebar[data-fpb-design-preset="STANDARD"]
     .sidebar-content
     .product-price-strike {
-    color: #8d8d8d;
+    color: var(--bundle-product-strike-price-color, #595959);
     font-size: 14px;
   }
 
@@ -927,7 +816,7 @@ body:has([data-fpb-design-preset]) {
   .layout-sidebar[data-fpb-design-preset="STANDARD"]
     .sidebar-content
     .product-price-strike {
-    color: #8d8d8d;
+    color: var(--bundle-product-strike-price-color, #595959);
     font-size: 14px;
     text-decoration: line-through;
   }

@@ -32,6 +32,11 @@ function cssValue(value: unknown, fallback: string): string {
   return String(value);
 }
 
+function productStrikePriceColor(value: unknown, fallback: string): string {
+  const color = cssValue(value, fallback);
+  return color.toLowerCase() === '#8d8d8d' ? '#595959' : color;
+}
+
 function cssPx(value: unknown, fallback: string): string {
   if (value === null || value === undefined || value === '') return fallback;
   if (typeof value === 'number') return `${value}px`;
@@ -217,7 +222,7 @@ export function generateCSSVariables(ctx: CSSGenerationContext): string {
   --bundle-product-cards-per-row: ${s.productCardsPerRow || 4};
   --bundle-product-title-display: ${s.productTitleVisibility !== false ? 'block' : 'none'};
   --bundle-product-price-bg-color: ${s.productPriceBgColor || '#F0F8F0'};
-  --bundle-product-strike-price-color: ${s.productStrikePriceColor || globalSecondaryText};
+  --bundle-product-strike-price-color: ${productStrikePriceColor(s.productStrikePriceColor, globalSecondaryText)};
   --bundle-product-strike-font-size: ${s.productStrikeFontSize || 14}px;
   --bundle-product-strike-font-weight: ${s.productStrikeFontWeight || 400};
   --bundle-product-final-price-color: ${s.productFinalPriceColor || globalPrimaryText};

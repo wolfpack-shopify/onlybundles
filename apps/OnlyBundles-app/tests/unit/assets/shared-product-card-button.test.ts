@@ -28,6 +28,20 @@ describe('shared product card add button', () => {
     expect(addButton?.textContent).toBe('Add +');
   });
 
+  it('uses a neutral cross for a disabled plus-only out-of-stock action', () => {
+    const card = createCard(
+      { selectionId: 'variant-1', title: 'Sold out product', price: 1000 },
+      0,
+      { addButtonText: '+', addButtonAriaLabel: 'Out of stock', addDisabled: true },
+    );
+    const addButton = card.querySelector('button[data-product-id]');
+
+    expect(addButton?.textContent).toBe('×');
+    expect(addButton?.getAttribute('aria-label')).toBe('Out of stock Sold out product');
+    expect(addButton?.getAttribute('data-out-of-stock-icon')).toBe('true');
+    expect((addButton as HTMLButtonElement).disabled).toBe(true);
+  });
+
   it('passes localized modal card labels and aria text', () => {
     const card = createCard(
       { selectionId: 'variant-1', title: 'Test product', price: 1000, variantTitle: 'Red' }, 0, {
@@ -44,7 +58,13 @@ describe('shared product card add button', () => {
       }
     );
 
-    ['Open localized image', 'Open localized title', 'Variante: Red', 'Quantity FR controls', 'Ajouter Test product']
+    [
+      'Open localized image: Test product',
+      'Open localized title: Test product',
+      'Variante: Red',
+      'Quantity FR controls',
+      'Ajouter Test product',
+    ]
       .forEach((label) => expect(card.querySelector(`[aria-label="${label}"]`)).not.toBeNull());
   });
 
@@ -97,8 +117,29 @@ describe('shared product card add button', () => {
     );
     expect(card.tabIndex).toBe(0);
     expect(card.getAttribute('role')).toEqual('group');
-    expect(card.getAttribute('aria-label')).toEqual('Open product details (not selected)');
+    expect(card.getAttribute('aria-label')).toEqual('Open product details: Accessible product (not selected)');
+    expect(card.querySelector('[data-bw-product-media="true"]')?.getAttribute('aria-label'))
+      .toBe('Open product details: Accessible product');
+    expect(card.querySelector('.bw-product-card__title')?.getAttribute('aria-label'))
+      .toBe('Open product details: Accessible product');
     expect(card.hasAttribute('aria-pressed')).toBe(false);
+  });
+
+  it('uses the parent product title when a default variant title leaks into product data', () => {
+    const card = createCard(
+      {
+        selectionId: 'variant-default',
+        title: 'Default Title',
+        productTitle: 'Purely Cashews Roasted',
+        price: 1000,
+      },
+      0,
+      { productDetailsEnabled: true },
+    );
+
+    expect(card.querySelector('.bw-product-card__title')?.textContent).toBe('Purely Cashews Roasted');
+    expect(card.getAttribute('aria-label'))
+      .toBe('Open product details: Purely Cashews Roasted (not selected)');
   });
 
   it('keeps product media informational when product details are disabled', () => {

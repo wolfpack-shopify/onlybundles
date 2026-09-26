@@ -4,8 +4,8 @@ id: storefront-outage-resilience
 title: Storefront Outage Resilience
 type: architecture
 status: authoritative
-summary: Defines the Shopify-hosted PPB snapshot, direct Storefront API hydration, and fail-closed purchase authorization used when Wolfpack services are unavailable.
-last_audited: 2026-09-08
+summary: Defines the Shopify-hosted PPB snapshot, direct Storefront API hydration, purchase authorization, and Cart Transform degradation used during service failures.
+last_audited: 2026-09-25
 owners:
   - engineering
 domains:
@@ -78,8 +78,11 @@ line tokens. Each line token binds shop, bundle, policy revision, product or
 variant, semantic role, aggregate maximum quantity, and maximum add-on
 percentage. Cart Transform and Discount Functions validate signatures and the
 current shop policy revision. They reject stale, altered, mismatched, or
-split-line over-quantity submissions. Cart Transform remains
-`blockOnFailure=true`.
+split-line over-quantity submissions. Cart Transform uses
+`blockOnFailure=false`, so a Function runtime failure does not take down
+ordinary cart operations across the shop. In that failure mode Shopify can
+retain unmodified, undiscounted component lines; signed policy validation still
+owns benefits whenever the Function executes successfully.
 
 The authorization signer consumes only the canonical public runtime product
 shape (`steps[].products` and `steps[].categories`). The sync owner passes the

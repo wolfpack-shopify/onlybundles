@@ -1,5 +1,8 @@
 export {};
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { JSDOM } = require('jsdom');
+
 jest.mock('../../../app/assets/widgets/shared/toast-manager.js', () => ({
   ToastManager: { show: jest.fn() },
 }));
@@ -21,6 +24,42 @@ class FakeButton {
 }
 
 describe('FPB per-product quantity-limit controls', () => {
+  it('normalizes incremental remove labels through step name then title', () => {
+    const originalDocument = globalThis.document;
+    const dom = new JSDOM(`<!doctype html><html><body>
+      <article data-product-id="variant-1" aria-label="Open product details">
+        <h3 class="product-title">Test product</h3>
+        <div class="product-card-action"><button class="product-add-btn"></button></div>
+      </article>
+    </body></html>`);
+    Object.defineProperty(globalThis, 'document', { configurable: true, value: dom.window.document });
+    const context: any = {
+      container: dom.window.document.body,
+      selectedBundle: {
+        steps: [{ name: 'Build a box', title: 'Legacy title' }],
+        validateQuantityPerProduct: { isEnabled: false, allowedQuantity: 1 },
+      },
+      usesSelectedQuantityBadge: () => false,
+      _resolveText: (key: string, fallback: string) => key === 'removeProductFromFooterText'
+        ? 'Remove {{stepName}} at {{quantity}}'
+        : fallback,
+      syncProductQuantityIncreaseState: fullPageSelectionNavigationMethods.syncProductQuantityIncreaseState,
+    };
+
+    try {
+      fullPageSelectionNavigationMethods.updateProductQuantityDisplay.call(context, 0, 'variant-1', 1);
+      expect(dom.window.document.querySelector('.qty-decrease')?.getAttribute('aria-label'))
+        .toBe('Remove Build a box at 1 Test product');
+
+      context.selectedBundle.steps[0].name = '';
+      fullPageSelectionNavigationMethods.updateProductQuantityDisplay.call(context, 0, 'variant-1', 1);
+      expect(dom.window.document.querySelector('.qty-decrease')?.getAttribute('aria-label'))
+        .toBe('Remove Legacy title at 1 Test product');
+    } finally {
+      Object.defineProperty(globalThis, 'document', { configurable: true, value: originalDocument });
+    }
+  });
+
   it('disables the increment control at the configured limit without hardcoding the limit', () => {
     const button = new FakeButton();
     const context = {

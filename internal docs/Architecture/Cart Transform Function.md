@@ -5,7 +5,7 @@ title: Cart Transform Function
 type: architecture
 status: authoritative
 summary: Shopify bundle Function runtime, build ownership, and the coordinated migration from signed tokens to app-owned policy metafields.
-last_audited: 2026-09-20
+last_audited: 2026-09-25
 owners:
   - engineering
 domains:
@@ -195,7 +195,12 @@ missing/forged codes, and revoked revisions.
 Build ownership and stale Shopify preview recovery are documented in
 [[Operations/Build Process]]. Shopify CLI owns ABI adaptation and final
 optimization; do not restore the broad panic-snipping pass that caused an
-immediate WASM trap. Deployment remains a manual gate.
+immediate WASM trap. `npm run build:cart-transform` is the mandatory Function
+build gate: after Shopify CLI produces the final optimized artifact, the command
+checks its size and executes that artifact against an ordinary-cart fixture and
+a valid-bundle fixture. Either execution failure, an unexpected ordinary-cart
+operation, a missing bundle merge, or an oversized artifact fails the build.
+Deployment remains a manual gate.
 
 ## Shopify references
 

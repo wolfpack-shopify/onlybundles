@@ -2,9 +2,9 @@
   display: grid;
   grid-template-columns: repeat(
     auto-fit,
-    minmax(6.5rem, 1fr)
+    minmax(104px, 1fr)
   );
-  gap: clamp(0.25rem, 1cqi, 0.5rem);
+  gap: clamp(4px, 1cqi, 8px);
   align-items: start;
   min-inline-size: 0;
   overflow: visible;
@@ -17,7 +17,7 @@
 
 .ppb-variant-selector-group {
   display: grid;
-  gap: clamp(0.3rem, 1cqi, 0.5rem);
+  gap: clamp(4.8px, 1cqi, 8px);
   min-inline-size: 0;
   overflow: visible;
 }
@@ -25,7 +25,7 @@
 .ppb-variant-selector-group-label,
 .ppb-variant-selector-group > label {
   min-inline-size: 0;
-  font-size: 0.75rem;
+  font-size: 12px;
   font-weight: 600;
   line-height: 1.35;
   overflow-wrap: anywhere;
@@ -47,13 +47,13 @@
   box-sizing: border-box;
   inline-size: 100%;
   min-inline-size: 0;
-  min-block-size: var(--bundle-control-hit-target, 2.75rem);
+  min-block-size: var(--bundle-control-hit-target, 44px);
 }
 
 .ppb-variant-selector-options {
   display: flex;
   flex-wrap: wrap;
-  gap: clamp(0.25rem, 1cqi, 0.5rem);
+  gap: clamp(4px, 1cqi, 8px);
   align-items: center;
   overflow: visible;
 }
@@ -62,8 +62,8 @@
   position: relative;
   display: inline-grid;
   place-items: center;
-  min-inline-size: var(--bundle-control-hit-target, 2.75rem);
-  min-block-size: var(--bundle-control-hit-target, 2.75rem);
+  min-inline-size: var(--bundle-control-hit-target, 44px);
+  min-block-size: var(--bundle-control-hit-target, 44px);
   cursor: pointer;
   overflow: visible;
   flex: 0 1 auto;
@@ -85,8 +85,8 @@
   box-sizing: border-box;
   display: inline-grid;
   place-items: center;
-  min-inline-size: var(--bundle-control-hit-target, 2.75rem);
-  min-block-size: var(--bundle-control-hit-target, 2.75rem);
+  min-inline-size: var(--bundle-control-hit-target, 44px);
+  min-block-size: var(--bundle-control-hit-target, 44px);
   border: 1px solid var(--bundle-variant-selector-border-color, rgba(0, 0, 0, 0.3));
   background: var(--bundle-variant-selector-bg-color, #fff);
   color: var(--bundle-variant-selector-text-color, currentColor);
@@ -96,19 +96,19 @@
 
 .ppb-variant-selector-option--pill .ppb-variant-selector-visual {
   inline-size: auto;
-  max-inline-size: min(100%, 18rem);
-  padding-inline: clamp(0.75rem, 2cqi, 1rem);
-  border-radius: var(--bundle-variant-selector-border-radius, 0.5rem);
+  max-inline-size: min(100%, 288px);
+  padding-inline: clamp(12px, 2cqi, 16px);
+  border-radius: var(--bundle-variant-selector-border-radius, 8px);
   line-height: 1.2;
   text-align: center;
   white-space: normal;
 }
 
 .ppb-variant-selector-option--color_swatch .ppb-variant-selector-visual {
-  min-inline-size: clamp(2rem, 10cqi, 2.5rem);
-  min-block-size: clamp(2rem, 10cqi, 2.5rem);
+  min-inline-size: clamp(32px, 10cqi, 40px);
+  min-block-size: clamp(32px, 10cqi, 40px);
   border-radius: 50%;
-  background: var(--wpb-ppb-swatch-color, repeating-conic-gradient(#ececec 0 25%, #fff 0 50%) 50% / 0.75rem 0.75rem);
+  background: var(--wpb-ppb-swatch-color, repeating-conic-gradient(#ececec 0 25%, #fff 0 50%) 50% / 12px 12px);
 }
 
 .ppb-variant-selector-option--color_swatch[data-color-mapped="false"] {
@@ -117,8 +117,8 @@
 
 .ppb-variant-selector-option--color_swatch[data-color-mapped="false"] .ppb-variant-selector-visual {
   inline-size: auto;
-  border-radius: var(--bundle-variant-selector-border-radius, 0.5rem);
-  padding-inline: clamp(0.6rem, 2cqi, 0.85rem);
+  border-radius: var(--bundle-variant-selector-border-radius, 8px);
+  padding-inline: clamp(9.6px, 2cqi, 13.6px);
 }
 
 .ppb-variant-selector-option--color_swatch[data-color-mapped="true"] .ppb-variant-selector-option-text,
@@ -135,11 +135,11 @@
 }
 
 .ppb-variant-selector-option--image_swatch .ppb-variant-selector-visual {
-  inline-size: clamp(2rem, 10cqi, 2.5rem);
-  min-inline-size: clamp(2rem, 10cqi, 2.5rem);
-  min-block-size: clamp(2rem, 10cqi, 2.5rem);
+  inline-size: clamp(32px, 10cqi, 40px);
+  min-inline-size: clamp(32px, 10cqi, 40px);
+  min-block-size: clamp(32px, 10cqi, 40px);
   aspect-ratio: 1;
-  border-radius: var(--bundle-variant-selector-border-radius, 0.5rem);
+  border-radius: var(--bundle-variant-selector-border-radius, 8px);
   overflow: hidden;
 }
 
@@ -147,7 +147,7 @@
   inline-size: auto;
   max-inline-size: 100%;
   aspect-ratio: auto;
-  padding-inline: clamp(0.6rem, 2cqi, 0.85rem);
+  padding-inline: clamp(9.6px, 2cqi, 13.6px);
 }
 
 .ppb-variant-selector-option--image_swatch img {
@@ -171,24 +171,24 @@
   position: absolute;
   z-index: 20;
   inset-inline-start: 50%;
-  inset-block-end: calc(100% + 0.5rem);
-  max-inline-size: min(14rem, calc(100vw - 1rem));
-  padding: 0.35rem 0.55rem;
-  border-radius: 0.35rem;
+  inset-block-end: calc(100% + 8px);
+  max-inline-size: min(224px, calc(100vw - 16px));
+  padding: 5.6px 8.8px;
+  border-radius: 5.6px;
   background: #1f1f1f;
   color: #fff;
-  font-size: 0.75rem;
+  font-size: 12px;
   line-height: 1.25;
   text-align: center;
   white-space: normal;
   opacity: 0;
   pointer-events: none;
-  transform: translateX(calc(-50% + var(--wpb-ppb-tooltip-shift-x, 0px))) translateY(0.2rem);
+  transform: translateX(calc(-50% + var(--wpb-ppb-tooltip-shift-x, 0px))) translateY(3.2px);
   transition: opacity 100ms ease, transform 100ms ease;
 }
 
 .ppb-variant-selector-tooltip[data-placement="below"] {
-  inset-block-start: calc(100% + 0.5rem);
+  inset-block-start: calc(100% + 8px);
   inset-block-end: auto;
 }
 
@@ -202,7 +202,7 @@
   display: none;
   min-inline-size: 0;
   overflow-wrap: anywhere;
-  font-size: 0.75rem;
+  font-size: 12px;
   line-height: 1.35;
 }
 
@@ -235,7 +235,7 @@
 #bundle-builder-app[data-ppb-template-type="PDP_MODAL"] {
   --bw-ppb-slot-surface: var(--bundle-surface-color, #ffffff);
   --bw-ppb-slot-accent: var(--bundle-global-primary-button, #1e3a8a);
-  --bw-ppb-slot-space: clamp(0.5rem, 2cqi, 0.875rem);
+  --bw-ppb-slot-space: clamp(8px, 2cqi, 14px);
   --bw-ppb-slot-radius: 10px;
   --bw-ppb-slot-hairline: 1px;
   --bw-ppb-slot-target: 44px;
@@ -925,8 +925,8 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: clamp(0.3125rem, 1.5cqi, 0.5rem);
-  padding: clamp(0.3125rem, 1.5cqi, 0.5rem);
+  gap: clamp(5px, 1.5cqi, 8px);
+  padding: clamp(5px, 1.5cqi, 8px);
 }
 
 .bw-selected-slots--mode-vertical > :not(button) > button {
@@ -939,9 +939,9 @@
 
 .bw-selected-slots--mode-vertical > :not(button) > :has(> img) {
   order: 1;
-  flex: 0 0 clamp(3rem, 15cqi, 3.125rem);
-  inline-size: clamp(3rem, 15cqi, 3.125rem);
-  block-size: clamp(3rem, 15cqi, 3.125rem);
+  flex: 0 0 clamp(48px, 15cqi, 50px);
+  inline-size: clamp(48px, 15cqi, 50px);
+  block-size: clamp(48px, 15cqi, 50px);
   border-radius: var(--bw-ppb-slot-radius);
   overflow: hidden;
 }

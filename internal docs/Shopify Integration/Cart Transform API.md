@@ -5,7 +5,7 @@ title: Cart Transform API
 type: shopify-integration
 status: authoritative
 summary: Shopify Cart Transform API target, activation, failure policy, inputs, and checkout-pricing boundaries.
-last_audited: 2026-09-01
+last_audited: 2026-09-25
 owners:
   - engineering
 domains:
@@ -38,9 +38,20 @@ target = "cart.transform.run"
 
 ## Failure policy
 
-`CartTransformService` creates the active transform with `blockOnFailure: true`. This is a checkout-pricing safety requirement: when Shopify cannot execute the Function within its runtime or resource limits, cart and checkout operations must return an error instead of continuing with unmodified component prices. Omitting the argument uses Shopify's `false` default and is unsafe for a bundle app whose Function owns the payable price.
+`CartTransformService` creates the active transform with
+`blockOnFailure: false`. If Shopify cannot execute the Function, Shopify may
+continue with the unmodified cart instead of preventing every cart mutation in
+the shop. This graceful-degradation policy protects ordinary product sales from
+a Function-wide outage. A failed transform can also leave selected bundle
+components unmerged and undiscounted, so executable Function verification and
+post-release monitoring remain required; graceful degradation is not a
+substitute for a healthy Function.
 
-The setup flow queries `blockOnFailure` together with the active Function ID. A matching Rust transform is reusable only when the value is `true`; an older transform with `false` is deleted and recreated fail-closed. `completeSetup()` runs during install, explicit storefront sync, and the separately approved Cart Transform repair operation.
+The setup flow queries `blockOnFailure` together with the active Function ID. A
+matching Rust transform is reusable only when the value is `false`; a blocking
+registration is deleted and recreated with graceful degradation.
+`completeSetup()` runs during install, explicit storefront sync, and the
+separately approved Cart Transform repair operation.
 
 ## Target status
 

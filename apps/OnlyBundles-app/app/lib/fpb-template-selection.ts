@@ -9,6 +9,9 @@ type FpbTemplateSelection = {
   bundleDesignPresetId: string | null;
 };
 
+const FPB_TEMPLATE = "FBP_SIDE_FOOTER";
+const FPB_PRESETS = new Set(["STANDARD", "CLASSIC", "COMPACT", "HORIZONTAL"]);
+
 function normalizeTemplateValue(value: string | null | undefined): string | null {
   if (value == null) return null;
   const trimmed = value.trim();
@@ -25,6 +28,13 @@ export function resolveFpbTemplateSelection(
     return {
       bundleDesignTemplate: savedTemplate,
       bundleDesignPresetId: savedPreset,
+    };
+  }
+
+  if (savedTemplate !== FPB_TEMPLATE || !savedPreset || !FPB_PRESETS.has(savedPreset)) {
+    return {
+      bundleDesignTemplate: FPB_TEMPLATE,
+      bundleDesignPresetId: "STANDARD",
     };
   }
 

@@ -34,6 +34,9 @@ describe("pre-commit critical hook planner", () => {
 
   it("tracks every CSS asset produced by the storefront CSS build", () => {
     expect(core.GENERATED_FILES.has(
+      "apps/OnlyBundles-app/extensions/bundle-builder/assets/bundle-widget-full-page-modal.js",
+    )).toBe(true);
+    expect(core.GENERATED_FILES.has(
       "apps/OnlyBundles-app/extensions/bundle-builder/assets/bundle-widget-bootstrap.css",
     )).toBe(true);
     expect(core.GENERATED_FILES.has(

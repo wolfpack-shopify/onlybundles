@@ -48,7 +48,7 @@
 
 #bundle-builder-modal.bw-bs-panel .bw-ppb-step-content-title--picker {
   margin: 0 clamp(20px, 5vw, 65px);
-  padding-top: clamp(0.75rem, 1.5vw, 1rem);
+  padding-top: clamp(12px, 1.5vw, 16px);
 }
 
 #bundle-builder-modal.bw-bs-panel .bw-bs-body {

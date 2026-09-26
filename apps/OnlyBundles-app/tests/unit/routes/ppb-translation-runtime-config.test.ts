@@ -73,7 +73,7 @@ describe("PPB translation runtime configuration", () => {
     });
   });
 
-  it("does not recover Sync Bundle product membership from legacy step JSON", () => {
+  it("leaves category relations raw for the canonical metafield publisher", () => {
     const config = buildSyncBundleConfiguration({
       id: "bundle-1",
       name: "Bundle",
@@ -99,6 +99,9 @@ describe("PPB translation runtime configuration", () => {
 
     expect(config.steps[0].products).toEqual([]);
     expect(config.steps[0].StepProduct).toEqual([]);
-    expect(config.steps[0].StepCategory[0].products).toEqual([]);
+    expect(config.steps[0].StepCategory[0].products).toEqual([{
+      id: "gid://shopify/Product/999998",
+      title: "Stale category product",
+    }]);
   });
 });

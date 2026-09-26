@@ -20,10 +20,14 @@ const APP_WORKSPACE = APP_PREFIX.slice(0, -1);
 const GENERATED_OUTPUTS = {
   "all": [
     appPath("extensions/bundle-builder/assets/bundle-widget-full-page-bundled.js"),
+    appPath("extensions/bundle-builder/assets/bundle-widget-full-page-modal.js"),
     appPath("extensions/bundle-builder/assets/bundle-widget-product-page-bundled.js"),
     appPath("extensions/bundle-builder/assets/wolfpack-bundles-sdk.js"),
   ],
-  "full-page": [appPath("extensions/bundle-builder/assets/bundle-widget-full-page-bundled.js")],
+  "full-page": [
+    appPath("extensions/bundle-builder/assets/bundle-widget-full-page-bundled.js"),
+    appPath("extensions/bundle-builder/assets/bundle-widget-full-page-modal.js"),
+  ],
   "product-page": [appPath("extensions/bundle-builder/assets/bundle-widget-product-page-bundled.js")],
   sdk: [appPath("extensions/bundle-builder/assets/wolfpack-bundles-sdk.js")],
 };

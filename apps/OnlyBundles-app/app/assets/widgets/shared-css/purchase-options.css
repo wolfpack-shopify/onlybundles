@@ -1,7 +1,7 @@
 .wpb-purchase-options {
   display: grid;
-  gap: clamp(0.5rem, 1cqi, 0.625rem);
-  margin: clamp(0.5rem, 1cqi, 0.75rem) 0 clamp(0.75rem, 1.5cqi, 1rem);
+  gap: clamp(8px, 1cqi, 10px);
+  margin: clamp(8px, 1cqi, 12px) 0 clamp(12px, 1.5cqi, 16px);
   min-inline-size: 0;
   padding: 0;
   border: 0;
@@ -18,11 +18,11 @@
   display: grid;
   min-height: 44px;
   align-items: stretch;
-  gap: clamp(0.3125rem, 0.75cqi, 0.5rem);
-  padding-block: clamp(0.75rem, 1.5cqi, 0.9375rem);
-  padding-inline: clamp(0.625rem, 1cqi, 0.75rem);
+  gap: clamp(5px, 0.75cqi, 8px);
+  padding-block: clamp(12px, 1.5cqi, 15px);
+  padding-inline: clamp(10px, 1cqi, 12px);
   border: 1px solid var(--wpb-border-color, #e3e3e3);
-  border-radius: var(--wpb-card-radius, 0.5rem);
+  border-radius: var(--wpb-card-radius, 8px);
   background: var(--wpb-surface-color, #fff);
   cursor: pointer;
 }
@@ -37,7 +37,7 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 0.625rem;
+  gap: 10px;
 }
 .wpb-purchase-options > .wpb-purchase-options__option[data-purchase-type="subscription"] {
   align-content: start;
@@ -51,16 +51,16 @@
 .wpb-purchase-options__plan-select {
   width: 100%;
   min-height: 44px;
-  padding-inline: 0.75rem;
+  padding-inline: 12px;
   border: 1px solid var(--wpb-border-color, #d8d8d8);
-  border-radius: calc(var(--wpb-card-radius, 0.5rem) - 0.125rem);
+  border-radius: calc(var(--wpb-card-radius, 8px) - 2px);
   background: var(--wpb-surface-color, #fff);
 }
 .wpb-purchase-options__plan-details {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: clamp(0.3125rem, 0.75cqi, 0.5rem);
+  gap: clamp(5px, 0.75cqi, 8px);
 }
 .wpb-purchase-options__plan-details > * {
   min-width: 0;
@@ -70,15 +70,15 @@
 }
 .wpb-purchase-options__discount-pill {
   justify-self: start;
-  padding: clamp(0.125rem, 0.25cqi, 0.1875rem) clamp(0.5rem, 0.75cqi, 0.625rem);
+  padding: clamp(2px, 0.25cqi, 3px) clamp(8px, 0.75cqi, 10px);
   border-radius: 999px;
   background: var(--bundle-discount-pill-bg, #1f2937);
   color: var(--bundle-discount-pill-text, #fff);
-  font-size: clamp(0.625rem, 0.75cqi, 0.6875rem);
+  font-size: clamp(10px, 0.75cqi, 11px);
   font-weight: 500;
 }
 @media (max-width: 749px) {
-  .wpb-purchase-options { gap: 0.5rem; }
+  .wpb-purchase-options { gap: 8px; }
 
   .fpb-mobile-summary-dialog .wpb-purchase-options__title,
   .fpb-mobile-summary-dialog .wpb-purchase-options__subtitle {

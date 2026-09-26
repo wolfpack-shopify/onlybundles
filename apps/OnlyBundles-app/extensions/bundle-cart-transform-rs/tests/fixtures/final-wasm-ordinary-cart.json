@@ -1,0 +1,42 @@
+{
+  "presentmentCurrencyRate": "1.0",
+  "localization": {
+    "country": {
+      "isoCode": "US"
+    }
+  },
+  "shop": {
+    "ppbPolicyRevisions": null
+  },
+  "cartTransform": {
+    "runtimeConfiguration": null
+  },
+  "cart": {
+    "lines": [
+      {
+        "id": "gid://shopify/CartLine/ordinary-1",
+        "quantity": 1,
+        "bundleDisplayProperties": null,
+        "stepType": null,
+        "selection": null,
+        "sellingPlanAllocation": null,
+        "merchandise": {
+          "__typename": "ProductVariant",
+          "id": "gid://shopify/ProductVariant/1",
+          "weight": 100.0,
+          "weightUnit": "GRAMS",
+          "product": {
+            "id": "gid://shopify/Product/1",
+            "runtimePolicies": null
+          }
+        },
+        "cost": {
+          "amountPerQuantity": {
+            "amount": "20.00",
+            "currencyCode": "USD"
+          }
+        }
+      }
+    ]
+  }
+}

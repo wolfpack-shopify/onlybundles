@@ -14,6 +14,10 @@
   position: relative;
 }
 
+#bundle-builder-app[data-bundle-type="product_page"] {
+  --bundle-control-hit-target: 44px;
+}
+
 #bundle-builder-modal {
   font-family: var(--bundle-font-family, inherit);
   font-size: 16px;
@@ -459,7 +463,7 @@
   max-width: min(100%, 42ch);
   margin: 0;
   color: var(--bundle-global-primary-text, #111111);
-  font-size: clamp(1.125rem, 1rem + 0.5vw, 1.5rem);
+  font-size: clamp(18px, 16px + 0.5vw, 24px);
   font-weight: 700;
   line-height: 1.25;
   text-align: left;

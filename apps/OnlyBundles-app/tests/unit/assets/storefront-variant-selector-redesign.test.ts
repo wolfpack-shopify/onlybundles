@@ -4,300 +4,252 @@ export {};
 const { JSDOM } = require('jsdom');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const {
+  createVariantDraftKey,
+  getVariantSelectionDraft,
   resolveCanonicalOptionValueSwatch,
+  resolveExactVariantSelection,
+  resolveInitialVariantSelection,
+  setVariantSelectionDraft,
   VariantSelectorComponent,
 } = require('../../../app/assets/widgets/shared/variant-selector.js');
 
-function createFpbProduct() {
+function createProduct() {
   return {
-    id: 'gid://shopify/Product/1',
-    variantId: 'variant-red-small',
+    id: 'product-shirt',
     price: 1000,
-    imageUrl: 'https://cdn.example/red-small.jpg',
-    options: ['Color', 'Size'],
+    imageUrl: 'https://cdn.example/product.jpg',
+    options: [
+      {
+        name: 'Color',
+        optionValues: [
+          { name: 'Red', swatch: { color: '#f00', image: null } },
+          { name: 'Blue', swatch: { color: '#00f', image: null } },
+        ],
+      },
+      { name: 'Size', optionValues: [] },
+    ],
     variants: [
       {
-        id: 'variant-red-small',
-        title: 'Red / Small',
+        id: 'red-small',
         option1: 'Red',
         option2: 'Small',
+        selectedOptions: [{ name: 'Color', value: 'Red' }, { name: 'Size', value: 'Small' }],
+        available: true,
         price: 1000,
-        available: true,
-        image: { url: 'https://cdn.example/red-small.jpg' },
       },
       {
-        id: 'variant-red-large',
-        title: 'Red / Extraordinarily long large size',
+        id: 'red-large',
         option1: 'Red',
-        option2: 'Extraordinarily long large size',
-        price: 1200,
-        available: true,
-        image: { url: 'https://cdn.example/red-large.jpg' },
+        option2: 'Large',
+        selectedOptions: [{ name: 'Color', value: 'Red' }, { name: 'Size', value: 'Large' }],
+        available: false,
+        price: 1100,
       },
       {
-        id: 'variant-blue-small',
-        title: 'Blue / Small',
+        id: 'blue-large',
         option1: 'Blue',
-        option2: 'Small',
-        price: 1100,
-        available: false,
-        image: { url: 'https://cdn.example/blue-small.jpg' },
+        option2: 'Large',
+        selectedOptions: [{ name: 'Color', value: 'Blue' }, { name: 'Size', value: 'Large' }],
+        available: true,
+        price: 1200,
       },
     ],
   };
 }
 
-describe('Direction A FPB variant selector behavior', () => {
-  it('uses the lowest-value option as the visual pill dimension when no primary is configured', () => {
-    const runtimeDocument = new JSDOM('<!doctype html><html><body></body></html>').window.document;
-    const sizes = ['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
-    const colors = ['Black', 'Navy', 'White', 'Gray'];
-    const variants = sizes.flatMap((size) => colors.map((color) => ({
-      id: `variant-${size}-${color}`,
-      title: `${size} / ${color}`,
-      option1: size,
-      option2: color,
-      available: true,
-    })));
+describe('FPB exact variant-selection contract', () => {
+  it('distinguishes incomplete, available, unavailable, and nonexistent combinations', () => {
+    const product = createProduct();
+    expect(resolveExactVariantSelection(product, {}).status).toBe('incomplete');
+    expect(resolveExactVariantSelection(product, { Color: 'Red', Size: 'Small' })).toMatchObject({
+      status: 'available',
+      variant: { id: 'red-small' },
+    });
+    expect(resolveExactVariantSelection(product, { Color: 'Red', Size: 'Large' })).toMatchObject({
+      status: 'unavailable',
+      variant: { id: 'red-large' },
+    });
+    expect(resolveExactVariantSelection(product, { Color: 'Blue', Size: 'Small' })).toEqual({
+      status: 'nonexistent',
+      selection: { Color: 'Blue', Size: 'Small' },
+      variant: null,
+    });
+  });
+
+  it('starts every dropdown dimension blank with an associated hidden placeholder label', () => {
+    const document = new JSDOM('<!doctype html>').window.document;
     const selector = VariantSelectorComponent.createConfiguredElement(
-      {
-        id: 'shirt',
-        variantId: variants[0].id,
-        options: ['Size', 'Color'],
-        variants,
-      },
+      createProduct(),
       null,
-      { variantSelectorMode: 'pill' },
-      runtimeDocument,
+      { variantSelectorMode: 'dropdown' },
+      document,
     );
+    const selects = Array.from(selector.querySelectorAll('select')) as HTMLSelectElement[];
 
-    expect(selector.querySelector('[role="radiogroup"]').getAttribute('aria-label')).toBe('Color');
-    expect(selector.querySelectorAll('input[type="radio"]')).toHaveLength(colors.length);
-    expect(selector.querySelector('select').getAttribute('aria-label')).toBe('Size');
-    expect(selector.querySelectorAll('select option')).toHaveLength(sizes.length);
+    expect(selects).toHaveLength(2);
+    expect(selects.map((select) => select.value)).toEqual(['', '']);
+    expect(selects.map((select) => select.options[0].textContent)).toEqual([
+      'Select Color',
+      'Select Size',
+    ]);
+    expect(selects.every((select) => select.options[0].disabled)).toBe(true);
+    expect(selects.map((select) => selector.querySelector(`label[for="${select.id}"]`)?.textContent))
+      .toEqual(['Select Color', 'Select Size']);
   });
 
-  it('keeps one pill dimension visible and compacts the second dimension into a native select', () => {
-    const runtimeDocument = new JSDOM('<!doctype html><html><body></body></html>').window.document;
-    const selector = VariantSelectorComponent.createConfiguredElement(
-      createFpbProduct(),
-      'Color',
-      { variantSelectorMode: 'pill' },
-      runtimeDocument,
-    );
-
-    expect(selector.querySelectorAll('[role="radiogroup"]')).toHaveLength(1);
-    expect(selector.querySelector('[role="radiogroup"]').getAttribute('aria-label')).toBe('Color');
-    expect(selector.querySelectorAll('select')).toHaveLength(1);
-    expect(selector.querySelector('select').getAttribute('aria-label')).toBe('Size');
-  });
-
-  it('uses Shopify color swatches for the visual dimension and a select for the other dimension', () => {
-    const runtimeDocument = new JSDOM('<!doctype html><html><body></body></html>').window.document;
-    const product: any = createFpbProduct();
-    product.options = [
-      {
-        name: 'Color',
-        optionValues: [
-          { name: 'Red', swatch: { color: '#ff0000', image: null } },
-          { name: 'Blue', swatch: { color: '#0000ff', image: null } },
-        ],
-      },
-      { name: 'Size', optionValues: [] },
-    ];
-
-    const selector = VariantSelectorComponent.createConfiguredElement(
-      product,
-      'Color',
-      { variantSelectorMode: 'color_swatch', swatchTooltipEnabled: true },
-      runtimeDocument,
-    );
-
-    expect(selector.querySelectorAll('[data-swatch-kind="color"]')).toHaveLength(2);
-    expect(selector.querySelectorAll('select')).toHaveLength(1);
-    expect(selector.querySelector('select').getAttribute('aria-label')).toBe('Size');
-  });
-
-  it('uses Shopify image swatches for the visual dimension and a select for the other dimension', () => {
-    const runtimeDocument = new JSDOM('<!doctype html><html><body></body></html>').window.document;
-    const product: any = createFpbProduct();
-    product.options = [
-      {
-        name: 'Color',
-        optionValues: [
-          {
-            name: 'Red',
-            swatch: {
-              color: null,
-              image: { previewImage: { url: 'https://cdn.example/red-swatch.jpg' } },
-            },
-          },
-          {
-            name: 'Blue',
-            swatch: {
-              color: null,
-              image: { previewImage: { url: 'https://cdn.example/blue-swatch.jpg' } },
-            },
-          },
-        ],
-      },
-      { name: 'Size', optionValues: [] },
-    ];
-
-    const selector = VariantSelectorComponent.createConfiguredElement(
-      product,
-      'Color',
-      { variantSelectorMode: 'image_swatch', swatchTooltipEnabled: true },
-      runtimeDocument,
-    );
-
-    expect(selector.querySelectorAll('[data-swatch-kind="image"]')).toHaveLength(2);
-    expect(selector.querySelector('img')?.getAttribute('src')).toBe(
-      'https://cdn.example/red-swatch.jpg',
-    );
-    expect(selector.querySelectorAll('select')).toHaveLength(1);
-    expect(selector.querySelector('select').getAttribute('aria-label')).toBe('Size');
-  });
-
-  it('coordinates native select changes with the selected pill dimension', () => {
-    const dom = new JSDOM('<!doctype html><html><body><article></article></body></html>');
-    const runtimeDocument = dom.window.document;
-    const card = runtimeDocument.querySelector('article');
-    const product = createFpbProduct();
+  it('reports an exact choice without silently changing its sibling dimension', () => {
+    const dom = new JSDOM('<!doctype html><article></article>');
+    const card = dom.window.document.querySelector('article')!;
+    const product = createProduct();
     const callback = jest.fn();
     card.append(VariantSelectorComponent.createConfiguredElement(
       product,
-      'Color',
-      { variantSelectorMode: 'pill' },
-      runtimeDocument,
+      null,
+      { variantSelectorMode: 'dropdown' },
+      dom.window.document,
     ));
     VariantSelectorComponent.attachListeners(card, product, callback);
+    const color = card.querySelector('[data-option-name="Color"]') as HTMLSelectElement;
+    const size = card.querySelector('[data-option-name="Size"]') as HTMLSelectElement;
 
-    const size = card.querySelector('select[aria-label="Size"]');
-    size.value = 'Extraordinarily long large size';
+    color.value = 'Blue';
+    color.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
+    expect(callback).toHaveBeenLastCalledWith(expect.objectContaining({
+      status: 'incomplete',
+      selection: { Color: 'Blue' },
+    }));
+    expect(size.value).toBe('');
+
+    size.value = 'Small';
     size.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
-
-    expect(callback).toHaveBeenCalledWith('variant-red-large', 'variant-red-small');
-    expect(product.variantId).toBe('variant-red-large');
-    expect(card.querySelector('input[value="Red"]').checked).toBe(true);
+    expect(callback).toHaveBeenLastCalledWith({
+      status: 'nonexistent',
+      selection: { Color: 'Blue', Size: 'Small' },
+      variant: null,
+    });
+    expect(color.value).toBe('Blue');
+    expect(size.value).toBe('Small');
   });
 
-  it('uses only Shopify option-value swatches and never infers colors from labels', () => {
-    const product = {
-      options: [{
-        name: 'Color',
-        optionValues: [
-          { name: 'Navy', swatch: { color: '#001F3F', image: null } },
-          { name: 'Pattern', swatch: { color: null, image: { previewImage: { url: 'https://cdn.example/pattern.jpg' } } } },
-          { name: 'Black', swatch: null },
-        ],
-      }],
-    };
-
-    expect(resolveCanonicalOptionValueSwatch(product, 'Color', 'Navy')).toEqual({
-      color: '#001F3F',
-      image: null,
-      label: 'Navy',
-    });
-    expect(resolveCanonicalOptionValueSwatch(product, 'Color', 'Pattern')).toEqual({
-      color: null,
-      image: { previewImage: { url: 'https://cdn.example/pattern.jpg' } },
-      label: 'Pattern',
-    });
-    expect(resolveCanonicalOptionValueSwatch(product, 'Color', 'Black')).toBeNull();
-    expect(resolveCanonicalOptionValueSwatch({ options: ['Color'] }, 'Color', 'Navy')).toBeNull();
-  });
-
-  it('renders every option dimension as a labeled radio group and retains unavailable values', () => {
-    const runtimeDocument = new JSDOM('<!doctype html><html><body></body></html>').window.document;
-    const selector = VariantSelectorComponent.createElement(
-      createFpbProduct(),
+  it('keeps unavailable and nonexistent values selectable while describing current availability', () => {
+    const document = new JSDOM('<!doctype html>').window.document;
+    const selector = VariantSelectorComponent.createConfiguredElement(
+      createProduct(),
       'Color',
-      runtimeDocument,
+      {
+        variantSelectorMode: 'pill',
+        selection: { Color: 'Red', Size: 'Small' },
+      },
+      document,
+    );
+    const blue = selector.querySelector('input[value="Blue"]') as HTMLInputElement;
+    const size = selector.querySelector('[data-option-name="Size"]') as HTMLSelectElement;
+
+    expect(blue.disabled).toBe(false);
+    const large = Array.from(size.options).find((option) => option.value === 'Large')!;
+    expect(large.disabled).toBe(false);
+    expect(large.textContent).toContain('out of stock');
+  });
+
+  it('uses the configured pill dimension or the fewest-value dimension with Shopify order as the tie break', () => {
+    const document = new JSDOM('<!doctype html>').window.document;
+    const selector = VariantSelectorComponent.createConfiguredElement(
+      createProduct(),
+      'Size',
+      { variantSelectorMode: 'pill' },
+      document,
+    );
+    expect(selector.querySelector('legend')?.textContent).toBe('Size');
+    expect(selector.querySelectorAll('select')).toHaveLength(1);
+  });
+
+  it('uses only canonical complete swatch mappings and renders post-save drift as a neutral pill', () => {
+    const document = new JSDOM('<!doctype html>').window.document;
+    const product: any = createProduct();
+    product.options[0].optionValues[1].swatch = null;
+    const selector = VariantSelectorComponent.createConfiguredElement(
+      product,
+      'Color',
+      { variantSelectorMode: 'color_swatch' },
+      document,
     );
 
-    const groups = selector.querySelectorAll('[role="radiogroup"]');
-    expect(groups).toHaveLength(2);
-    expect(selector.querySelector(`#${groups[0].getAttribute('aria-labelledby')}`).textContent).toBe('Color');
-    expect(selector.querySelector(`#${groups[1].getAttribute('aria-labelledby')}`).textContent).toBe('Size');
-
-    const values = Array.from(selector.querySelectorAll('input[type="radio"]'))
-      .map((input: any) => input.value);
-    expect(values).toEqual([
-      'Red',
-      'Blue',
-      'Small',
-      'Extraordinarily long large size',
-    ]);
-    expect(selector.querySelector('input[value="Blue"]').disabled).toBe(true);
+    expect(selector.querySelectorAll('[data-swatch-kind="color"]')).toHaveLength(1);
+    expect(selector.querySelector('input[value="Blue"]')?.closest('.vs-radio-control--neutral'))
+      .not.toBeNull();
+    expect(selector.querySelector('input[value="Blue"]')?.nextElementSibling?.textContent).toBe('Blue');
+    expect(resolveCanonicalOptionValueSwatch(product, 'Color', 'Blue')).toBeNull();
   });
 
-  it('does not hide a twelve-value dimension behind a disclosure control', () => {
-    const runtimeDocument = new JSDOM('<!doctype html><html><body></body></html>').window.document;
-    const product = {
-      id: 'many-values',
-      variantId: 'variant-1',
-      options: ['Size'],
-      variants: Array.from({ length: 12 }, (_, index) => ({
-        id: `variant-${index + 1}`,
-        option1: `Size ${index + 1}`,
-        title: `Size ${index + 1}`,
-        available: true,
+  it('restores the first committed variant in Shopify order and retains a current draft when several are committed', () => {
+    const product = createProduct();
+    expect(resolveInitialVariantSelection({
+      product,
+      committedVariantIds: ['blue-large', 'red-small'],
+    })).toMatchObject({ status: 'available', variant: { id: 'red-small' } });
+    expect(resolveInitialVariantSelection({
+      product,
+      draft: { Color: 'Blue' },
+      committedVariantIds: ['blue-large', 'red-small'],
+    })).toEqual({
+      status: 'incomplete',
+      selection: { Color: 'Blue' },
+      variant: null,
+    });
+  });
+
+  it('restores committed Storefront variants by canonical selectionId', () => {
+    const source = createProduct();
+    const productWithSelectionIds = {
+      ...source,
+      variants: source.variants.map((variant) => ({
+        ...variant,
+        selectionId: `gid://shopify/ProductVariant/${variant.id}`,
+        id: undefined,
       })),
     };
+    const result = resolveInitialVariantSelection({
+      product: productWithSelectionIds,
+      committedVariantIds: ['gid://shopify/ProductVariant/blue-large'],
+    });
 
-    const selector = VariantSelectorComponent.createElement(product, 'Size', runtimeDocument);
-
-    expect(selector.querySelectorAll('input[type="radio"]')).toHaveLength(12);
-    expect(selector.querySelectorAll('button')).toHaveLength(0);
+    expect(result.status).toBe('available');
+    expect(result.selection).toEqual({ Color: 'Blue', Size: 'Large' });
+    expect(result.variant?.selectionId).toBe('gid://shopify/ProductVariant/blue-large');
   });
 
-  it('updates the active variant once and keeps selector activation inside the card', () => {
-    const dom = new JSDOM('<!doctype html><html><body><article></article></body></html>');
-    const runtimeDocument = dom.window.document;
-    const card = runtimeDocument.querySelector('article');
-    const product = createFpbProduct();
-    const callback = jest.fn();
-    const cardClick = jest.fn();
-    card.addEventListener('click', cardClick);
-    card.append(VariantSelectorComponent.createElement(product, 'Color', runtimeDocument));
-    VariantSelectorComponent.attachListeners(card, product, callback);
+  it('keeps drafts isolated by owner, step, category, and parent product', () => {
+    const firstOwner = {};
+    const secondOwner = {};
+    const firstKey = createVariantDraftKey({
+      stepId: 'step-1',
+      categoryId: 'category-1',
+      product: createProduct(),
+    });
+    const secondKey = createVariantDraftKey({
+      stepId: 'step-1',
+      categoryId: 'category-2',
+      product: createProduct(),
+    });
+    setVariantSelectionDraft(firstOwner, firstKey, { Color: 'Red' });
+    setVariantSelectionDraft(firstOwner, secondKey, { Color: 'Blue' });
 
-    const input = card.querySelector('input[value="Extraordinarily long large size"]');
-    input.checked = true;
-    input.dispatchEvent(new dom.window.Event('change', { bubbles: true }));
-
-    expect(callback).toHaveBeenCalledTimes(1);
-    expect(callback).toHaveBeenCalledWith('variant-red-large', 'variant-red-small');
-    expect(product.variantId).toBe('variant-red-large');
-    expect(product.price).toBe(1200);
-    expect(product.imageUrl).toBe('https://cdn.example/red-large.jpg');
-    expect(cardClick).not.toHaveBeenCalled();
+    expect(getVariantSelectionDraft(firstOwner, firstKey)).toEqual({ Color: 'Red' });
+    expect(getVariantSelectionDraft(firstOwner, secondKey)).toEqual({ Color: 'Blue' });
+    expect(getVariantSelectionDraft(secondOwner, firstKey)).toEqual({});
   });
 
-  it('uses unique radio identities when the same product is rendered more than once', () => {
-    const runtimeDocument = new JSDOM('<!doctype html><html><body></body></html>').window.document;
-    const first = VariantSelectorComponent.createElement(createFpbProduct(), 'Color', runtimeDocument);
-    const second = VariantSelectorComponent.createElement(createFpbProduct(), 'Color', runtimeDocument);
-    const firstInputs = Array.from(first.querySelectorAll('input[type="radio"]')) as HTMLInputElement[];
-    const secondInputs = Array.from(second.querySelectorAll('input[type="radio"]')) as HTMLInputElement[];
-
-    expect(new Set([...firstInputs, ...secondInputs].map((input) => input.id)).size)
-      .toBe(firstInputs.length + secondInputs.length);
-    expect(new Set(firstInputs.map((input) => input.name)))
-      .not.toEqual(new Set(secondInputs.map((input) => input.name)));
-  });
-
-  it('keeps unavailable variants in the native dropdown with disabled semantics', () => {
-    const runtimeDocument = new JSDOM('<!doctype html><html><body></body></html>').window.document;
-    const selector = VariantSelectorComponent.createDropdownElement(
-      createFpbProduct(),
-      'Color',
-      { document: runtimeDocument, hideUnavailable: true },
+  it('creates unique native IDs and radio names for repeated product renderings', () => {
+    const document = new JSDOM('<!doctype html>').window.document;
+    const first = VariantSelectorComponent.createConfiguredElement(
+      createProduct(), 'Color', { variantSelectorMode: 'pill' }, document,
     );
+    const second = VariantSelectorComponent.createConfiguredElement(
+      createProduct(), 'Color', { variantSelectorMode: 'pill' }, document,
+    );
+    const inputs = [...first.querySelectorAll('input'), ...second.querySelectorAll('input')];
 
-    const unavailable = selector.querySelector('[data-variant-id="variant-blue-small"]');
-    expect(unavailable).not.toBeNull();
-    expect(unavailable.getAttribute('aria-disabled')).toBe('true');
+    expect(new Set(inputs.map((input: HTMLInputElement) => input.id)).size).toBe(inputs.length);
+    expect(first.querySelector('input')?.name).not.toBe(second.querySelector('input')?.name);
   });
 });

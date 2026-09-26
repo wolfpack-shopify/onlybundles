@@ -3,7 +3,7 @@
 #bundle-builder-app[data-ppb-template-type="PDP_MODAL"] {
   --bw-ppb-slot-surface: var(--bundle-surface-color, #ffffff);
   --bw-ppb-slot-accent: var(--bundle-global-primary-button, #1e3a8a);
-  --bw-ppb-slot-space: clamp(0.5rem, 2cqi, 0.875rem);
+  --bw-ppb-slot-space: clamp(8px, 2cqi, 14px);
   --bw-ppb-slot-radius: 10px;
   --bw-ppb-slot-hairline: 1px;
   --bw-ppb-slot-target: 44px;
@@ -693,8 +693,8 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: clamp(0.3125rem, 1.5cqi, 0.5rem);
-  padding: clamp(0.3125rem, 1.5cqi, 0.5rem);
+  gap: clamp(5px, 1.5cqi, 8px);
+  padding: clamp(5px, 1.5cqi, 8px);
 }
 
 .bw-selected-slots--mode-vertical > :not(button) > button {
@@ -707,9 +707,9 @@
 
 .bw-selected-slots--mode-vertical > :not(button) > :has(> img) {
   order: 1;
-  flex: 0 0 clamp(3rem, 15cqi, 3.125rem);
-  inline-size: clamp(3rem, 15cqi, 3.125rem);
-  block-size: clamp(3rem, 15cqi, 3.125rem);
+  flex: 0 0 clamp(48px, 15cqi, 50px);
+  inline-size: clamp(48px, 15cqi, 50px);
+  block-size: clamp(48px, 15cqi, 50px);
   border-radius: var(--bw-ppb-slot-radius);
   overflow: hidden;
 }

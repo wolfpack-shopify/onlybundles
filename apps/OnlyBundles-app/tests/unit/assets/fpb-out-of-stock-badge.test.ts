@@ -56,12 +56,14 @@ describe('Universal Out-of-Stock Badge and CTA Blocking Across Templates', () =>
           const badge = card.querySelector('.product-stock-badge--out');
           expect(badge).toBeNull();
 
-          // Verify Add button is marked disabled and shows out of stock label
+          // Icon CTA mode keeps its geometry and replaces a misleading plus with a neutral cross.
           const addBtn = card.querySelector('.product-add-btn') as HTMLButtonElement | null;
           expect(addBtn).not.toBeNull();
           expect(addBtn?.disabled).toBe(true);
           expect(addBtn?.getAttribute('aria-disabled')).toBe('true');
-          expect(addBtn?.textContent?.trim()).toBe('Out of stock');
+          expect(addBtn?.textContent?.trim()).toBe('×');
+          expect(addBtn?.getAttribute('data-out-of-stock-icon')).toBe('true');
+          expect(addBtn?.getAttribute('aria-label')).toContain('Out of stock');
 
           // Verify clicking the disabled add button does NOT call updateProductSelection
           addBtn?.dispatchEvent(new runtimeDocument.defaultView.MouseEvent('click', { bubbles: true, cancelable: true }));
@@ -72,7 +74,7 @@ describe('Universal Out-of-Stock Badge and CTA Blocking Across Templates', () =>
       });
     });
 
-    it('renders configured outOfStockText copy on button when provided via _resolveText', () => {
+    it('retains configured outOfStockText copy as the icon action accessible name', () => {
       const previousDocument = global.document;
       const runtimeDocument = new JSDOM('<!doctype html><html><body></body></html>').window.document;
       global.document = runtimeDocument;
@@ -108,7 +110,8 @@ describe('Universal Out-of-Stock Badge and CTA Blocking Across Templates', () =>
         expect(badge).toBeNull();
 
         const addBtn = card.querySelector('.product-add-btn') as HTMLButtonElement | null;
-        expect(addBtn?.textContent?.trim()).toBe('Sold Out Today');
+        expect(addBtn?.textContent?.trim()).toBe('×');
+        expect(addBtn?.getAttribute('aria-label')).toContain('Sold Out Today');
       } finally {
         global.document = previousDocument;
       }

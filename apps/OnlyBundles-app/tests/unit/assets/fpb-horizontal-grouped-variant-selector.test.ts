@@ -30,19 +30,19 @@ describe('FPB Horizontal grouped variant selector', () => {
     });
     expect(getInlineVariantSelectorPresentation('STANDARD')).toEqual({
       type: 'dropdown',
-      mobileMode: 'drawer',
+      mobileMode: 'inline',
     });
     expect(getInlineVariantSelectorPresentation('CLASSIC')).toEqual({
       type: 'dropdown',
-      mobileMode: 'drawer',
+      mobileMode: 'inline',
     });
     expect(getInlineVariantSelectorPresentation('COMPACT')).toEqual({
       type: 'buttons',
-      mobileMode: null,
+      mobileMode: 'inline',
     });
   });
 
-  it('marks Horizontal dropdowns for inline mobile interaction and retains variant identities', () => {
+  it('renders a native inline dropdown with a blank placeholder and every value', () => {
     const runtimeDocument = new JSDOM('<!doctype html><html><body></body></html>').window.document;
     const view = VariantSelectorComponent.createDropdownElement(product, 'Scent', {
       placeholder: 'Cherry',
@@ -51,14 +51,16 @@ describe('FPB Horizontal grouped variant selector', () => {
       document: runtimeDocument,
     });
 
-    expect(view.dataset.vsMobileMode).toBe('inline');
-    expect(view.querySelector('[data-variant-id="variant-cherry"]')).not.toBeNull();
-    expect(view.querySelector('[data-variant-id="variant-vanilla"]')).not.toBeNull();
-    expect(view.querySelector('[data-variant-id="variant-peach"]')?.getAttribute('aria-disabled')).toBe('true');
+    const select = view.querySelector('select') as HTMLSelectElement;
+    expect(select.value).toBe('');
+    expect(Array.from(select.options).map((option) => option.value)).toEqual([
+      '', 'Cherry', 'Vanilla', 'Peach',
+    ]);
+    expect(Array.from(select.options).find((option) => option.value === 'Peach')?.disabled).toBe(false);
   });
 
   it.each(['STANDARD', 'CLASSIC', 'COMPACT', 'HORIZONTAL'])(
-    'retains unavailable grouped variants as disabled in %s cards',
+    'retains unavailable grouped variants as selectable in %s cards',
     (designPreset) => {
       const originalDocument = (global as { document?: unknown }).document;
       const runtimeDocument = new JSDOM('<!doctype html><html><body></body></html>').window.document;
@@ -87,10 +89,11 @@ describe('FPB Horizontal grouped variant selector', () => {
 
         if (designPreset === 'COMPACT') {
           expect(card.querySelector('input[value="Cherry"]')).not.toBeNull();
-          expect(card.querySelector('input[value="Peach"]')?.hasAttribute('disabled')).toBe(true);
+          expect(card.querySelector('input[value="Peach"]')?.hasAttribute('disabled')).toBe(false);
         } else {
-          expect(card.querySelector('[data-variant-id="variant-cherry"]')).not.toBeNull();
-          expect(card.querySelector('[data-variant-id="variant-peach"]')?.getAttribute('aria-disabled')).toBe('true');
+          const select = card.querySelector('select') as HTMLSelectElement;
+          expect(Array.from(select.options).some((option) => option.value === 'Cherry')).toBe(true);
+          expect(Array.from(select.options).find((option) => option.value === 'Peach')?.disabled).toBe(false);
         }
       } finally {
         (global as { document?: unknown }).document = originalDocument;

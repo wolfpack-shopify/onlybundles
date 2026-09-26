@@ -12,6 +12,7 @@ interface DeploymentGeneralSyncSummary {
   metafieldDefinitionShopsSynced: number;
   mode: "disabled" | "apply";
   scannedShops: number;
+  syncedShops: number;
   scannedBundles: number;
   syncedBundles: number;
   failedBundles: number;
@@ -77,10 +78,9 @@ interface DeploymentGeneralSyncDependencies {
   ensureMetafieldDefinitions: (admin: unknown) => Promise<unknown>;
   prisma: GeneralSyncPrisma;
   getAdmin: (shopDomain: string) => Promise<unknown>;
-  syncPpbRuntime: (admin: unknown, shopDomain: string) => Promise<unknown>;
-  syncFpbRuntime: (admin: unknown, shopDomain: string) => Promise<unknown>;
+  prepareShopStorefront: (admin: unknown, shopDomain: string) => Promise<unknown>;
   syncStorefrontControlsRuntime: (admin: unknown, shopDomain: string) => Promise<unknown>;
-  syncBundle: (input: {
+  syncBundleData: (input: {
     admin: unknown;
     shopDomain: string;
     bundleId: string;
@@ -201,6 +201,7 @@ function emptySummary(mode: "disabled" | "apply"): DeploymentGeneralSyncSummary 
   return {
     mode,
     scannedShops: 0,
+    syncedShops: 0,
     scannedBundles: 0,
     syncedBundles: 0,
     failedBundles: 0,
@@ -438,15 +439,21 @@ export async function runDeploymentGeneralSync(
 
   const adminByShop = new Map<string, unknown>();
   const failedShops = new Set<string>();
+  const bundlesByShop = new Map<string, GeneralSyncBundle[]>();
+  for (const bundle of bundles) {
+    const shopBundles = bundlesByShop.get(bundle.shopId) ?? [];
+    shopBundles.push(bundle);
+    bundlesByShop.set(bundle.shopId, shopBundles);
+  }
 
   for (const shopDomain of shopDomains) {
+    const shopBundles = bundlesByShop.get(shopDomain) ?? [];
     try {
       const admin = await deps.getAdmin(shopDomain);
       if (await deps.ensureMetafieldDefinitions(admin) === false) {
         throw new Error("Variant metafield definition provisioning failed");
       }
-      await deps.syncPpbRuntime(admin, shopDomain);
-      await deps.syncFpbRuntime(admin, shopDomain);
+      await deps.prepareShopStorefront(admin, shopDomain);
       await deps.syncStorefrontControlsRuntime(admin, shopDomain);
       adminByShop.set(shopDomain, admin);
       summary.metafieldDefinitionShopsSynced += 1;
@@ -456,125 +463,92 @@ export async function runDeploymentGeneralSync(
     } catch (error: any) {
       const message = errorMessage(error);
       failedShops.add(shopDomain);
-      summary.failedShops += 1;
       summary.shopFailures.push({ shopDomain, error: message });
       deps.logger?.error?.("[DEPLOYMENT_GENERAL_SYNC] Shop setup failed.", {
         shopDomain,
         error: message,
       });
-    }
-  }
-
-  const addonShops = new Set<string>();
-  const subscriptionShops = new Set<string>();
-  const recurringSubscriptionShops = new Set<string>();
-  for (const bundle of bundles) {
-    if (failedShops.has(bundle.shopId)) continue;
-    if (!isBundleType(bundle.bundleType)) {
-      summary.failedBundles += 1;
-      summary.failures.push({
-        shopDomain: bundle.shopId,
-        bundleId: bundle.id,
-        error: `Unsupported bundle type: ${bundle.bundleType}`,
-      });
       continue;
     }
 
-    try {
-      const admin = adminByShop.get(bundle.shopId)!;
-      await runBundleVariantRemediation(
-        bundle.shopId,
-        bundle,
-        deps,
-        summary.variantRemediation,
-        admin,
-      );
-      await deps.syncBundle({
-        admin,
-        shopDomain: bundle.shopId,
-        bundleId: bundle.id,
-        bundleType: bundle.bundleType,
-        reason: "sync_bundle",
-      });
-      summary.syncedBundles += 1;
-      if (
-        bundle.bundleType === "full_page"
-        && hasEnabledAddonProducts(bundle.personalizationData)
-      ) {
-        addonShops.add(bundle.shopId);
-      }
-      if (hasEnabledSubscription(bundle.bundleSubscriptionConfig)) {
-        subscriptionShops.add(bundle.shopId);
-      }
-      if (hasEnabledRecurringSubscription(bundle.bundleSubscriptionConfig)) {
-        recurringSubscriptionShops.add(bundle.shopId);
+    const admin = adminByShop.get(shopDomain)!;
+    for (const bundle of shopBundles) {
+      if (!isBundleType(bundle.bundleType)) {
+        const message = `Unsupported bundle type: ${bundle.bundleType}`;
+        summary.failedBundles += 1;
+        summary.failures.push({ shopDomain, bundleId: bundle.id, error: message });
+        failedShops.add(shopDomain);
+        continue;
       }
 
-    } catch (error: any) {
-      const message = errorMessage(error);
-      summary.failedBundles += 1;
-      summary.failures.push({
-        shopDomain: bundle.shopId,
-        bundleId: bundle.id,
-        error: message,
-      });
-      deps.logger?.error?.("[DEPLOYMENT_GENERAL_SYNC] Bundle sync failed.", {
-        shopDomain: bundle.shopId,
-        bundleId: bundle.id,
-        error: message,
-      });
+      try {
+        await runBundleVariantRemediation(
+          shopDomain,
+          bundle,
+          deps,
+          summary.variantRemediation,
+          admin,
+        );
+        await deps.syncBundleData({
+          admin,
+          shopDomain,
+          bundleId: bundle.id,
+          bundleType: bundle.bundleType,
+          reason: "sync_bundle",
+        });
+        summary.syncedBundles += 1;
+      } catch (error: any) {
+        const message = errorMessage(error);
+        summary.failedBundles += 1;
+        summary.failures.push({ shopDomain, bundleId: bundle.id, error: message });
+        failedShops.add(shopDomain);
+        deps.logger?.error?.("[DEPLOYMENT_GENERAL_SYNC] Bundle sync failed.", {
+          shopDomain,
+          bundleId: bundle.id,
+          error: message,
+        });
+      }
     }
-  }
 
-  for (const shopDomain of addonShops) {
-    try {
-      const result = await deps.setupAddonDiscount(
-        adminByShop.get(shopDomain)!,
-        shopDomain,
-      );
-      if (!result.success) {
-        throw new Error(result.error ?? "Add-on discount setup failed");
-      }
-      summary.addonDiscountShopsSynced += 1;
-    } catch (error: any) {
-      summary.failedShops += 1;
-      summary.shopFailures.push({
-        shopDomain,
-        error: errorMessage(error),
-      });
-    }
-  }
-
-  for (const shopDomain of subscriptionShops) {
-    try {
-      const result = await deps.setupSubscriptionDiscount(
-        adminByShop.get(shopDomain)!,
-        shopDomain,
-      );
-      if (!result.success) {
-        throw new Error(result.error ?? "Subscription discount setup failed");
-      }
-      summary.subscriptionDiscountShopsSynced += 1;
-    } catch (error: any) {
-      summary.failedShops += 1;
+    const recordShopFailure = (error: unknown) => {
+      failedShops.add(shopDomain);
       summary.shopFailures.push({ shopDomain, error: errorMessage(error) });
-    }
-  }
+    };
 
-  for (const shopDomain of recurringSubscriptionShops) {
-    try {
-      const result = await deps.setupSubscriptionRecurringDiscount(
-        adminByShop.get(shopDomain)!,
-        shopDomain,
-      );
-      if (!result.success) {
-        throw new Error(result.error ?? "Recurring subscription discount setup failed");
+    if (shopBundles.some((bundle) => (
+      bundle.bundleType === "full_page"
+      && hasEnabledAddonProducts(bundle.personalizationData)
+    ))) {
+      try {
+        const result = await deps.setupAddonDiscount(admin, shopDomain);
+        if (!result.success) throw new Error(result.error ?? "Add-on discount setup failed");
+        summary.addonDiscountShopsSynced += 1;
+      } catch (error: any) {
+        recordShopFailure(error);
       }
-    } catch (error: any) {
-      summary.failedShops += 1;
-      summary.shopFailures.push({ shopDomain, error: errorMessage(error) });
+    }
+
+    if (shopBundles.some((bundle) => hasEnabledSubscription(bundle.bundleSubscriptionConfig))) {
+      try {
+        const result = await deps.setupSubscriptionDiscount(admin, shopDomain);
+        if (!result.success) throw new Error(result.error ?? "Subscription discount setup failed");
+        summary.subscriptionDiscountShopsSynced += 1;
+      } catch (error: any) {
+        recordShopFailure(error);
+      }
+    }
+
+    if (shopBundles.some((bundle) => hasEnabledRecurringSubscription(bundle.bundleSubscriptionConfig))) {
+      try {
+        const result = await deps.setupSubscriptionRecurringDiscount(admin, shopDomain);
+        if (!result.success) throw new Error(result.error ?? "Recurring subscription discount setup failed");
+      } catch (error: any) {
+        recordShopFailure(error);
+      }
     }
   }
 
+  summary.failedShops = failedShops.size;
+  summary.syncedShops = summary.scannedShops - summary.failedShops;
   return summary;
 }

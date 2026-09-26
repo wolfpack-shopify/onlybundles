@@ -5,7 +5,7 @@ title: Deployment
 type: operations
 status: active
 summary: Deployment commands, environment configuration, Shopify-managed installation rules, and SDK release ordering.
-last_audited: 2026-09-24
+last_audited: 2026-09-25
 owners:
   - engineering
 domains:
@@ -84,11 +84,12 @@ For CSS changes, also verify the exact served CSS asset. `window.__BUNDLE_WIDGET
 ## Cart Transform WASM
 
 ```bash
-cd apps/OnlyBundles-app/extensions/bundle-cart-transform-rs
-rustup run stable cargo build --target=wasm32-unknown-unknown --release
+npm run build:cart-transform
 ```
 
-The SIT and production deploy scripts run this build before `shopify app deploy`:
+The SIT and production deploy scripts run the mandatory final-WASM build gate
+before `shopify app deploy`. The gate builds with Shopify CLI, checks the final
+artifact size, and executes ordinary-cart and valid-bundle fixtures:
 
 ```bash
 npm run deploy:sit

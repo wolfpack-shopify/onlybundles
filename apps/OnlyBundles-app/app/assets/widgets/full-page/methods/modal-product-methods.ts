@@ -5,16 +5,8 @@ import { createSharedProductCardElement, getProductImageUrls } from '../../share
 import { VariantSelectorComponent } from '../../shared/variant-selector.js';
 import { shouldRenderInlineVariantSelector } from '../../shared/variant-selector-policy.js';
 import { ensureFpbProductModal } from '../product-modal-runtime.js';
-import { TemplateDesignSystem } from '../../shared/template-design-system.js';
 import { getSubscriptionProductCardPrice } from '../../shared/subscription-storefront-methods.js';
 import { resolveLowStockAlert } from '../../../../lib/low-stock-alert.js';
-
-const modalProductTemplateSystem = TemplateDesignSystem;
-
-function isClassicFpbPreset(designPreset: any) {
-  if (!modalProductTemplateSystem?.fpb?.resolveContract) return false;
-  return modalProductTemplateSystem.fpb.resolveContract(designPreset)?.summary?.mode === 'slots';
-}
 
 function getSelectionId(item: any = {}) {
   return String(item?.selectionId || '');
@@ -225,10 +217,7 @@ renderVariantSelector(product: any, step: any) {
   })) {
     return null;
   }
-  return VariantSelectorComponent.createDropdownElement(product, primaryOptionName, {
-    placeholder: this._resolveText?.('chooseOptionsButton', 'Choose Options') || 'Choose Options',
-    mobileMode: 'drawer',
-  });
+  return VariantSelectorComponent.createDropdownElement(product, primaryOptionName);
 },
 
 attachProductEventHandlers(productGrid: any, stepIndex: string|number) {
@@ -257,10 +246,11 @@ attachProductEventHandlers(productGrid: any, stepIndex: string|number) {
 
     if (product && step) {
       const initialImageIndex = Number(productCard.dataset.bwCardImageIndex || 0);
-      const isClassicQuickView = isClassicFpbPreset(this.getFullPageDesignPreset?.());
       productModal.open(product, step, {
         initialImageIndex,
-        readOnly: isClassicQuickView,
+        trigger: productCard.querySelector('.product-image, .product-title'),
+        displayVariantsAsIndividualProducts: step?.displayVariantsAsIndividualProducts === true
+          || step?.displayVariantsAsIndividual === true,
       });
     }
   };
@@ -376,35 +366,20 @@ attachProductEventHandlers(productGrid: any, stepIndex: string|number) {
     if (!cardElement.querySelector('.vs-wrapper')) {
       return;
     }
-    VariantSelectorComponent.attachListeners(cardElement, product, (newVariantId: string|number, oldVariantId: string|number) => {
-      const oldQuantity = this.selectedProducts[stepIndex]?.[oldVariantId] || 0;
-      if (oldQuantity > 0 && oldVariantId !== newVariantId) {
-        delete this.selectedProducts[stepIndex][oldVariantId];
-
-        const newQtyAvail = product.quantityAvailable;
-        const newOOS = this.isVariantOutOfStock(product);
-        const trackInventoryOnAddToCart = typeof this.isInventoryTrackingOnAddToCartEnabled === 'function'
-          ? this.isInventoryTrackingOnAddToCartEnabled()
-          : false;
-        let migratedQty = oldQuantity;
-        if (newOOS) {
-          ToastManager.show('Selected variant is out of stock — selection cleared.');
-          migratedQty = 0;
-        } else if (trackInventoryOnAddToCart && newQtyAvail !== null && oldQuantity > newQtyAvail) {
-          migratedQty = newQtyAvail;
-          ToastManager.show('Only ' + newQtyAvail + ' in stock — quantity adjusted.');
-        }
-        if (migratedQty > 0) {
-          this.selectedProducts[stepIndex][newVariantId] = migratedQty;
-        }
-        const qtyDisplay = cardElement.querySelector('.inline-qty-display');
-        if (qtyDisplay) {
-          qtyDisplay.textContent = String(migratedQty);
-        }
-      }
-
+    VariantSelectorComponent.attachListeners(cardElement, product, (result: any) => {
+      const variant = result.variant;
+      if (!variant) return;
+      const newVariantId = String(variant.selectionId || variant.id || '');
+      if (!newVariantId) return;
       product.selectionId = String(newVariantId);
       product.variantId = String(newVariantId);
+      product.price = variant.price;
+      product.compareAtPrice = resolveCompareAtPrice(variant);
+      product.available = variant.available !== false && variant.availableForSale !== false;
+      product.quantityAvailable = typeof variant.quantityAvailable === 'number'
+        ? variant.quantityAvailable
+        : null;
+      product.currentlyNotInStock = variant.currentlyNotInStock === true;
 
       cardElement.dataset.productId = newVariantId;
       cardElement.dataset.currentSelectedVariantId = newVariantId;
@@ -424,86 +399,6 @@ attachProductEventHandlers(productGrid: any, stepIndex: string|number) {
       this.updateModalNavigation();
       this.updateModalFooterMessaging();
     });
-  });
-
-  // Variant selector handler
-  newProductGrid.addEventListener('change', (e: any) => {
-    if (e.target.classList.contains('variant-selector')) {
-      e.stopPropagation();
-      const newVariantId = e.target.value;
-      const baseProductId = e.target.dataset.baseProductId || e.target.dataset.productId;
-
-      // Find the product and update its variant
-      const cardElement = e.target.closest('.product-card');
-      const product = findProduct(baseProductId)
-        || (cardElement ? findProduct(cardElement.dataset.productId) : null);
-      if (product) {
-        const variantData = product.variants.find((v: any)  => getSelectionId(v) === String(newVariantId));
-        if (variantData) {
-          const oldSelectionKey = getSelectionId(product);
-          const oldQuantity = this.selectedProducts[stepIndex]?.[oldSelectionKey] || 0;
-
-          product.selectionId = String(newVariantId);
-          // Sync the new variant's stock fields onto the product so
-          // getVariantAvailable() reflects post-swap state.
-          product.quantityAvailable = typeof variantData.quantityAvailable === 'number'
-            ? variantData.quantityAvailable
-            : null;
-          product.currentlyNotInStock = variantData.currentlyNotInStock === true;
-          product.available = variantData.available === true;
-          product.price = variantData.price;
-          product.compareAtPrice = resolveCompareAtPrice(variantData);
-
-          // Move quantity from old variant to new variant, re-clamping against
-          // the new variant's quantityAvailable. If the new variant can't hold
-          // the old quantity, reduce it and surface a toast.
-          if (oldQuantity > 0) {
-            delete this.selectedProducts[stepIndex][oldSelectionKey];
-
-            const newQtyAvail = product.quantityAvailable;
-            const newOOS = this.isVariantOutOfStock(product);
-            const trackInventoryOnAddToCart = typeof this.isInventoryTrackingOnAddToCartEnabled === 'function'
-              ? this.isInventoryTrackingOnAddToCartEnabled()
-              : false;
-            let migratedQty = oldQuantity;
-            if (newOOS) {
-              ToastManager.show('Selected variant is out of stock — selection cleared.');
-              migratedQty = 0;
-            } else if (trackInventoryOnAddToCart && newQtyAvail !== null && newQtyAvail > 0 && oldQuantity > newQtyAvail) {
-              migratedQty = newQtyAvail;
-              ToastManager.show('Only ' + newQtyAvail + ' in stock — quantity adjusted.');
-            }
-            if (migratedQty > 0) {
-              this.selectedProducts[stepIndex][newVariantId] = migratedQty;
-            }
-
-            const qtyDisplay = cardElement?.querySelector('.inline-qty-display');
-            if (qtyDisplay) {
-              qtyDisplay.textContent = String(migratedQty);
-            }
-          }
-
-          // Update product properties
-          product.variantId = newVariantId;
-          product.selectionId = newVariantId;
-
-          if (cardElement) {
-            cardElement.dataset.productId = newVariantId;
-            cardElement.dataset.currentSelectedVariantId = newVariantId;
-            cardElement.querySelectorAll('[data-product-id]').forEach((el: any) => {
-              if (el !== cardElement) {
-                el.dataset.productId = newVariantId;
-              }
-            });
-            this.updateProductCardVariantDisplay(cardElement, product, step);
-          }
-
-          // Update UI without full re-render
-          this.updateModalNavigation();
-          this.updateModalFooterMessaging();
-        }
-      }
-    }
   });
 
 },
